@@ -114,6 +114,20 @@
 //! println!("Elapsed: {} ns", elapsed);
 //! ```
 //!
+//! ## Time Meters for Elapsed Time Measurement
+//!
+//! ```
+//! use prism3_clock::meter::TimeMeter;
+//! use std::thread;
+//! use std::time::Duration;
+//!
+//! let mut meter = TimeMeter::new();
+//! meter.start();
+//! thread::sleep(Duration::from_millis(100));
+//! meter.stop();
+//! println!("Elapsed: {}", meter.readable_duration());
+//! ```
+//!
 //! # Design Principles
 //!
 //! - **Interface Segregation**: Don't force implementations to provide
@@ -153,3 +167,6 @@ pub use monotonic::MonotonicClock;
 pub use nano_monotonic::NanoMonotonicClock;
 pub use system::SystemClock;
 pub use zoned::Zoned;
+
+// Time meters
+pub mod meter;
