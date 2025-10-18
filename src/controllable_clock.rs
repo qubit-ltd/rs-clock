@@ -66,7 +66,7 @@ pub trait ControllableClock: Clock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{ControllableClock, MockClock};
+    /// use prism3_clock::{Clock, ControllableClock, MockClock};
     /// use chrono::{DateTime, Utc};
     ///
     /// let clock = MockClock::new();

@@ -269,10 +269,7 @@ fn test_zoned_clock_default_local_time_preserves_timestamp() {
     // The timestamp should be exactly the same
     assert_eq!(local.timestamp(), utc_time.timestamp());
     assert_eq!(local.timestamp_millis(), utc_time.timestamp_millis());
-    assert_eq!(
-        local.timestamp_nanos_opt(),
-        utc_time.timestamp_nanos_opt()
-    );
+    assert_eq!(local.timestamp_nanos_opt(), utc_time.timestamp_nanos_opt());
 
     // But the displayed time should be different
     assert_ne!(local.hour(), utc_time.hour());
