@@ -1,5 +1,8 @@
 # Prism3 Clock
 
+[![CircleCI](https://circleci.com/gh/3-prism/prism3-rust-clock.svg?style=shield)](https://circleci.com/gh/3-prism/prism3-rust-clock)
+[![Coverage Status](https://coveralls.io/repos/github/3-prism/prism3-rust-clock/badge.svg?branch=main)](https://coveralls.io/github/3-prism/prism3-rust-clock?branch=main)
+[![Crates.io](https://img.shields.io/crates/v/prism3-clock.svg?color=blue)](https://crates.io/crates/prism3-clock)
 [![Rust](https://img.shields.io/badge/rust-1.70+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
@@ -8,28 +11,43 @@ Thread-safe clock abstractions for Rust with monotonic and mock implementations.
 
 ## Overview
 
-Prism3 Clock provides a comprehensive set of clock abstractions and implementations for handling various time-related scenarios in Rust applications. It offers robust, thread-safe clock implementations that follow Rust idioms and best practices.
+Prism3 Clock provides a flexible and type-safe clock abstraction system for Rust applications. It offers robust, thread-safe clock implementations with support for basic time access, high-precision measurements, timezone handling, monotonic time, and testing support.
 
 ## Features
 
-### 🕐 **Clock Implementations**
-- **SystemClock**: Standard clock based on system time
-- **MonotonicClock**: Monotonically increasing clock (millisecond precision), unaffected by system time adjustments
-- **NanoMonotonicClock**: High-precision monotonic clock (nanosecond precision)
-- **MockClock**: Controllable test clock for testing scenarios
+### 🕐 **Clock Abstractions**
+- **Trait-based Design**: Flexible clock abstraction through orthogonal traits
+- **Interface Segregation**: Don't force implementations to provide features they don't need
+- **Composition over Inheritance**: Extend functionality through wrappers
+- **Zero-Cost Abstractions**: Pay only for what you use
+
+### ⏰ **Clock Implementations**
+- **SystemClock**: Uses system wall clock time
+- **MonotonicClock**: Monotonic time (unaffected by system time changes)
+- **NanoMonotonicClock**: Monotonic time with nanosecond precision
+- **MockClock**: Controllable clock for testing
+- **Zoned\<C\>**: Wrapper that adds timezone support to any clock
+
+### ⏱️ **Time Meters**
+- **TimeMeter**: Millisecond-precision time measurement for general use
+- **NanoTimeMeter**: Nanosecond-precision time measurement for high-precision needs
+- **Human-Readable Output**: Format elapsed time in readable strings
+- **Speed Calculation**: Calculate processing speed (items per second/minute)
+- **Test-Friendly**: Support injecting mock clocks for deterministic testing
 
 ### 🔒 **Thread Safety**
-- All clock implementations are thread-safe (`Send + Sync`)
+- All clock implementations are `Send + Sync`
 - Immutable design for system and monotonic clocks
 - Fine-grained locking for mock clock
+- Safe to share across threads
 
-### ⏱️ **Precision**
-- Millisecond precision for general use cases
-- Nanosecond precision for high-precision measurements
-- Monotonic time sources unaffected by system time adjustments
+### 🌍 **Timezone Support**
+- Convert UTC time to any timezone
+- Wrap any clock with timezone support
+- Based on `chrono-tz` for comprehensive timezone database
 
-### 🧪 **Testability**
-- Mock clock for controlled testing
+### 🧪 **Testing Support**
+- Mock clock with controllable time
 - Set time to specific points
 - Advance time programmatically
 - Auto-increment support
@@ -48,31 +66,26 @@ prism3-clock = "0.1.0"
 ### Basic Usage
 
 ```rust
-use prism3_clock::{Clock, MonotonicClock};
-
-// Create a monotonic clock
-let clock = MonotonicClock::new();
-
-// Get current time
-let now = clock.now();
-println!("Current time: {}", now);
-
-// Get millisecond timestamp
-let millis = clock.millis();
-println!("Milliseconds since epoch: {}", millis);
-```
-
-### System Clock
-
-```rust
 use prism3_clock::{Clock, SystemClock};
 
 let clock = SystemClock::new();
-let now = clock.now();
-println!("System time: {}", now);
+let timestamp = clock.millis();
+let time = clock.time();
+println!("Current time: {}", time);
 ```
 
-### Monotonic Clock for Time Measurement
+### With Timezone
+
+```rust
+use prism3_clock::{Clock, ZonedClock, SystemClock, Zoned};
+use chrono_tz::Asia::Shanghai;
+
+let clock = Zoned::new(SystemClock::new(), Shanghai);
+let local = clock.local_time();
+println!("Local time in Shanghai: {}", local);
+```
+
+### Monotonic Time for Performance Measurement
 
 ```rust
 use prism3_clock::{Clock, MonotonicClock};
@@ -82,14 +95,34 @@ use std::time::Duration;
 let clock = MonotonicClock::new();
 let start = clock.millis();
 
-// Perform some operations
 thread::sleep(Duration::from_millis(100));
 
 let elapsed = clock.millis() - start;
 println!("Elapsed: {} ms", elapsed);
 ```
 
-### High-Precision Timing
+### Testing with MockClock
+
+```rust
+use prism3_clock::{Clock, ControllableClock, MockClock};
+use chrono::{DateTime, Duration, Utc};
+
+let clock = MockClock::new();
+
+// Set to a specific time
+let fixed_time = DateTime::parse_from_rfc3339(
+    "2024-01-01T00:00:00Z"
+).unwrap().with_timezone(&Utc);
+clock.set_time(fixed_time);
+
+assert_eq!(clock.time(), fixed_time);
+
+// Advance time
+clock.add_duration(Duration::hours(1));
+assert_eq!(clock.time(), fixed_time + Duration::hours(1));
+```
+
+### High-Precision Measurements
 
 ```rust
 use prism3_clock::{NanoClock, NanoMonotonicClock};
@@ -97,48 +130,151 @@ use prism3_clock::{NanoClock, NanoMonotonicClock};
 let clock = NanoMonotonicClock::new();
 let start = clock.nanos();
 
-// Perform some operations
+// Perform some operation
+for _ in 0..1000 {
+    // Some work
+}
 
 let elapsed = clock.nanos() - start;
 println!("Elapsed: {} ns", elapsed);
 ```
 
-### Mock Clock for Testing
+### Time Meters for Elapsed Time Measurement
 
 ```rust
-use prism3_clock::{Clock, ControllableClock, MockClock};
-use chrono::Utc;
+use prism3_clock::meter::TimeMeter;
+use std::thread;
 use std::time::Duration;
 
-let clock = MockClock::new();
-
-// Set to a specific time
-let target_time = Utc::now();
-clock.set_time(target_time);
-
-// Advance time by 1 second
-clock.add_duration(Duration::from_secs(1));
-
-// Add milliseconds
-clock.add_millis(500, false);
-
-// Auto-increment on each call
-clock.add_millis(10, true);
-
-// Reset to initial state
-clock.reset();
+let mut meter = TimeMeter::new();
+meter.start();
+thread::sleep(Duration::from_millis(100));
+meter.stop();
+println!("Elapsed: {}", meter.readable_duration());
 ```
 
-### Using with Timezones
+### High-Precision Time Meter
 
 ```rust
-use prism3_clock::{Clock, MonotonicClock};
-use chrono_tz::Asia::Shanghai;
+use prism3_clock::meter::NanoTimeMeter;
 
-let clock = MonotonicClock::with_timezone(Shanghai);
-let now_shanghai = clock.now_in_timezone(Shanghai);
-println!("Shanghai time: {}", now_shanghai);
+let mut meter = NanoTimeMeter::new();
+meter.start();
+
+// Perform some operation
+for _ in 0..1000 {
+    // Some work
+}
+
+meter.stop();
+println!("Elapsed: {} ns", meter.nanos());
+println!("Readable: {}", meter.readable_duration());
 ```
+
+### Speed Calculation with Time Meter
+
+```rust
+use prism3_clock::meter::TimeMeter;
+use std::thread;
+use std::time::Duration;
+
+let mut meter = TimeMeter::new();
+meter.start();
+
+// Process 1000 items
+for _ in 0..1000 {
+    thread::sleep(Duration::from_micros(100));
+}
+
+meter.stop();
+println!("Processed 1000 items in {}", meter.readable_duration());
+println!("Speed: {}", meter.readable_speed(1000));
+```
+
+## Architecture
+
+The crate is built around several orthogonal traits:
+
+- **Clock**: Base trait providing UTC time
+- **NanoClock**: Extension for nanosecond precision
+- **ZonedClock**: Extension for timezone support
+- **ControllableClock**: Extension for time control (testing)
+
+This design follows the **Interface Segregation Principle**, ensuring that implementations only need to provide the features they actually support.
+
+## Clock Implementations
+
+### SystemClock
+
+- Based on system wall clock time
+- Subject to system time adjustments (NTP, manual changes)
+- Zero-sized type (ZST) with no runtime overhead
+- Use for: logging, timestamps, general time queries
+
+### MonotonicClock
+
+- Based on `std::time::Instant` (monotonically increasing)
+- Unaffected by system time adjustments
+- Millisecond precision
+- Records base point on creation
+- Use for: performance monitoring, timeout control, time interval measurements
+
+### NanoMonotonicClock
+
+- Based on `std::time::Instant` with nanosecond precision
+- Unaffected by system time adjustments
+- Higher precision than `MonotonicClock`
+- Use for: high-precision measurements, microbenchmarking
+
+### MockClock
+
+- Controllable clock for testing
+- Thread-safe with `Arc<Mutex<>>`
+- Supports time setting, advancement, and auto-increment
+- Based on `MonotonicClock` for stability
+- Use for: unit tests, integration tests, time-dependent logic testing
+
+### Zoned\<C\>
+
+- Wrapper that adds timezone support to any clock
+- Generic over any `Clock` implementation
+- Converts UTC time to local time in specified timezone
+- Use for: displaying local time, timezone conversions
+
+## Time Meters
+
+### TimeMeter
+
+A millisecond-precision time meter for measuring elapsed time with the following features:
+
+- **Flexible Clock Source**: Supports any clock implementing `Clock` trait
+- **Default to MonotonicClock**: Uses monotonic time by default for stable measurements
+- **Multiple Output Formats**: Milliseconds, seconds, minutes, and human-readable format
+- **Speed Calculation**: Calculate processing speed (items per second/minute)
+- **Real-Time Monitoring**: Get elapsed time without stopping the meter
+- **Test-Friendly**: Inject `MockClock` for deterministic testing
+
+Example output formats:
+- `123 ms` - Less than 1 second
+- `1.23 s` - 1-60 seconds
+- `1 m 23.45 s` - More than 1 minute
+
+### NanoTimeMeter
+
+A nanosecond-precision time meter with features similar to `TimeMeter`:
+
+- **Nanosecond Precision**: Based on `NanoClock` trait
+- **Default to NanoMonotonicClock**: Uses high-precision monotonic time
+- **Human-Readable Output**: Automatically chooses appropriate unit (ns, μs, ms, s, m)
+- **Speed Calculation**: High-precision speed calculation
+- **Test-Friendly**: Supports mock clock injection
+
+Example output formats:
+- `123 ns` - Less than 1 microsecond
+- `123.45 μs` - 1-1000 microseconds
+- `123.45 ms` - 1-1000 milliseconds
+- `1.23 s` - 1-60 seconds
+- `1 m 23.45 s` - More than 1 minute
 
 ## API Reference
 
@@ -147,17 +283,22 @@ println!("Shanghai time: {}", now_shanghai);
 The core `Clock` trait provides:
 
 - `millis()` - Returns current time in milliseconds since Unix epoch
-- `now()` - Returns current time as `DateTime<Utc>`
-- `timezone()` - Returns the clock's timezone
-- `now_in_timezone(tz)` - Returns current time in specified timezone
-- `with_timezone(tz)` - Creates a new clock with specified timezone
+- `time()` - Returns current time as `DateTime<Utc>`
 
 ### NanoClock Trait
 
 Extension trait for high-precision clocks:
 
 - `nanos()` - Returns current time in nanoseconds since Unix epoch
-- `now_precise()` - Returns high-precision `DateTime<Utc>`
+- `nano_time()` - Returns high-precision `DateTime<Utc>`
+
+### ZonedClock Trait
+
+Extension trait for timezone support:
+
+- `timezone()` - Returns the clock's timezone
+- `local_time()` - Returns current time in the clock's timezone
+- `local_time_in(tz)` - Returns current time in specified timezone
 
 ### ControllableClock Trait
 
@@ -167,67 +308,41 @@ Extension trait for controllable clocks (testing):
 - `add_duration(duration)` - Advances the clock by a duration
 - `reset()` - Resets the clock to initial state
 
-## Clock Implementations
+## Design Principles
 
-### SystemClock
+### Interface Segregation
 
-- Based on system time (`std::time::SystemTime`)
-- Affected by system time adjustments
-- Simple and efficient
-- Use for: logging, timestamps, system time synchronization
+The crate follows the Interface Segregation Principle by providing separate traits for different capabilities:
 
-### MonotonicClock
+- Not all clocks need nanosecond precision → `NanoClock` is separate
+- Not all clocks need timezone support → `ZonedClock` is separate
+- Only test clocks need controllability → `ControllableClock` is separate
 
-- Based on `Instant` (monotonically increasing)
-- Unaffected by system time adjustments
-- Millisecond precision
-- Use for: performance monitoring, timeout control, time interval calculation
+This allows implementations to provide only the features they need, keeping the API clean and focused.
 
-### NanoMonotonicClock
+### Single Responsibility
 
-- Based on `Instant` with nanosecond precision
-- Unaffected by system time adjustments
-- Higher computational overhead than `MonotonicClock`
-- Use for: high-precision measurements, microbenchmarking
+Each trait and type has one clear purpose:
 
-### MockClock
+- `Clock` - Provide UTC time
+- `NanoClock` - Provide high-precision time
+- `ZonedClock` - Provide timezone conversion
+- `ControllableClock` - Provide time control for testing
 
-- Programmable clock for testing
-- Thread-safe with fine-grained locking
-- Supports time setting, advancement, and auto-increment
-- Use for: unit tests, integration tests, time-dependent logic testing
+### Composition over Inheritance
 
-## Design Philosophy
+Functionality is extended through wrappers rather than inheritance:
 
-### Monotonicity
+- `Zoned<C>` wraps any `Clock` to add timezone support
+- Time meters accept any `Clock` implementation via generics
 
-Traditional system clocks can be affected by:
-- NTP synchronization
-- Manual time adjustments
-- Leap seconds
+### Zero-Cost Abstractions
 
-This can cause:
-- Negative time durations
-- Abnormally large time intervals
-- Time going backward
+The design ensures you only pay for what you use:
 
-Monotonic clocks solve these problems by:
-1. Using `Instant` as the time source (monotonically increasing)
-2. Recording initial baseline on creation
-3. Calculating relative time based on elapsed duration
-4. Ensuring time only moves forward
-
-### Thread Safety
-
-- **Immutable clocks** (`SystemClock`, `MonotonicClock`, `NanoMonotonicClock`):
-  - All fields are immutable
-  - Naturally thread-safe (`Send + Sync`)
-  - No locking overhead
-
-- **Mutable clocks** (`MockClock`):
-  - Uses `Arc<Mutex<T>>` for shared state
-  - Fine-grained locking strategy
-  - Prevents time going backward in concurrent scenarios
+- `SystemClock` and `MonotonicClock` are zero-sized or minimal overhead
+- Trait methods are often inlined
+- Generic code is monomorphized at compile time
 
 ## Testing & Code Coverage
 
@@ -244,13 +359,83 @@ cargo test
 
 # Generate text format report
 ./coverage.sh text
+
+# Run CI checks (tests, lints, formatting)
+./ci-check.sh
 ```
 
 ## Dependencies
 
-- **chrono**: Date and time handling
-- **chrono-tz**: Timezone support
-- **parking_lot**: Efficient mutex implementation
+- **chrono**: Date and time handling with serialization support
+- **chrono-tz**: Comprehensive timezone database
+- **parking_lot**: Efficient mutex implementation for mock clock
+
+## Use Cases
+
+### Performance Monitoring
+
+```rust
+use prism3_clock::meter::TimeMeter;
+
+let mut meter = TimeMeter::new();
+meter.start();
+
+// Perform operation
+process_data();
+
+meter.stop();
+log::info!("Processing took: {}", meter.readable_duration());
+```
+
+### Timeout Control
+
+```rust
+use prism3_clock::{Clock, MonotonicClock};
+use std::time::Duration;
+
+let clock = MonotonicClock::new();
+let deadline = clock.millis() + 5000; // 5 seconds from now
+
+while clock.millis() < deadline {
+    if try_operation() {
+        break;
+    }
+}
+```
+
+### Testing Time-Dependent Logic
+
+```rust
+use prism3_clock::{Clock, ControllableClock, MockClock};
+use chrono::Duration;
+
+#[test]
+fn test_expiration() {
+    let clock = MockClock::new();
+    let item = Item::new(clock.clone());
+
+    // Fast-forward 1 hour
+    clock.add_duration(Duration::hours(1));
+
+    assert!(item.is_expired());
+}
+```
+
+### Benchmarking
+
+```rust
+use prism3_clock::meter::NanoTimeMeter;
+
+let mut meter = NanoTimeMeter::new();
+meter.start();
+
+for _ in 0..10000 {
+    expensive_operation();
+}
+
+meter.stop();
+println!("Average time per operation: {} ns", meter.nanos() / 10000);
+```
 
 ## License
 
@@ -281,4 +466,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ---
 
 For more information about the Prism3 ecosystem, visit our [GitHub homepage](https://github.com/3-prism).
-

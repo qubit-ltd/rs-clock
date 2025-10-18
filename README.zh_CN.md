@@ -1,5 +1,8 @@
 # Prism3 Clock
 
+[![CircleCI](https://circleci.com/gh/3-prism/prism3-rust-clock.svg?style=shield)](https://circleci.com/gh/3-prism/prism3-rust-clock)
+[![Coverage Status](https://coveralls.io/repos/github/3-prism/prism3-rust-clock/badge.svg?branch=main)](https://coveralls.io/github/3-prism/prism3-rust-clock?branch=main)
+[![Crates.io](https://img.shields.io/crates/v/prism3-clock.svg?color=blue)](https://crates.io/crates/prism3-clock)
 [![Rust](https://img.shields.io/badge/rust-1.70+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
@@ -8,31 +11,46 @@
 
 ## 概述
 
-Prism3 Clock 为 Rust 应用程序提供了一套全面的时钟抽象和实现，用于处理各种时间相关的场景。它提供强大的、线程安全的时钟实现，遵循 Rust 惯用法和最佳实践。
+Prism3 Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象系统。它提供强大的、线程安全的时钟实现，支持基本时间访问、高精度测量、时区处理、单调时间和测试支持。
 
 ## 特性
 
-### 🕐 **时钟实现**
-- **SystemClock**: 基于系统时间的标准时钟
-- **MonotonicClock**: 单调递增时钟（毫秒精度），不受系统时间调整影响
-- **NanoMonotonicClock**: 高精度单调时钟（纳秒精度）
-- **MockClock**: 可控制的测试时钟，用于测试场景
+### 🕐 **时钟抽象**
+- **基于 Trait 的设计**：通过正交的 trait 实现灵活的时钟抽象
+- **接口隔离**：不强制实现不需要的功能
+- **组合优于继承**：通过包装器扩展功能
+- **零成本抽象**：只为使用的功能付出代价
+
+### ⏰ **时钟实现**
+- **SystemClock**：使用系统墙上时钟时间
+- **MonotonicClock**：单调时间（不受系统时间变化影响）
+- **NanoMonotonicClock**：纳秒精度的单调时间
+- **MockClock**：可控制的测试时钟
+- **Zoned\<C\>**：为任何时钟添加时区支持的包装器
+
+### ⏱️ **时间计量器**
+- **TimeMeter**：毫秒精度的时间测量，适用于一般场景
+- **NanoTimeMeter**：纳秒精度的时间测量，适用于高精度需求
+- **人类可读输出**：将耗时格式化为可读字符串
+- **速度计算**：计算处理速度（每秒/每分钟处理项数）
+- **测试友好**：支持注入模拟时钟以实现确定性测试
 
 ### 🔒 **线程安全**
-- 所有时钟实现都是线程安全的（`Send + Sync`）
+- 所有时钟实现都是 `Send + Sync`
 - 系统时钟和单调时钟采用不可变设计
 - 模拟时钟采用细粒度锁机制
+- 可安全地在线程间共享
 
-### ⏱️ **精度**
-- 毫秒精度，适用于一般场景
-- 纳秒精度，适用于高精度测量
-- 单调时间源，不受系统时间调整影响
+### 🌍 **时区支持**
+- 将 UTC 时间转换为任何时区
+- 为任何时钟包装时区支持
+- 基于 `chrono-tz` 提供全面的时区数据库
 
-### 🧪 **可测试性**
-- 提供模拟时钟用于受控测试
-- 可设置时间到特定时间点
-- 可编程方式推进时间
-- 支持自动递增
+### 🧪 **测试支持**
+- 可控时间的模拟时钟
+- 设置时间到特定时间点
+- 编程方式推进时间
+- 自动递增支持
 
 ## 安装
 
@@ -48,31 +66,26 @@ prism3-clock = "0.1.0"
 ### 基本使用
 
 ```rust
-use prism3_clock::{Clock, MonotonicClock};
-
-// 创建单调时钟
-let clock = MonotonicClock::new();
-
-// 获取当前时间
-let now = clock.now();
-println!("当前时间: {}", now);
-
-// 获取毫秒时间戳
-let millis = clock.millis();
-println!("自纪元以来的毫秒数: {}", millis);
-```
-
-### 系统时钟
-
-```rust
 use prism3_clock::{Clock, SystemClock};
 
 let clock = SystemClock::new();
-let now = clock.now();
-println!("系统时间: {}", now);
+let timestamp = clock.millis();
+let time = clock.time();
+println!("当前时间: {}", time);
 ```
 
-### 使用单调时钟测量时间
+### 使用时区
+
+```rust
+use prism3_clock::{Clock, ZonedClock, SystemClock, Zoned};
+use chrono_tz::Asia::Shanghai;
+
+let clock = Zoned::new(SystemClock::new(), Shanghai);
+let local = clock.local_time();
+println!("上海本地时间: {}", local);
+```
+
+### 使用单调时间进行性能测量
 
 ```rust
 use prism3_clock::{Clock, MonotonicClock};
@@ -82,14 +95,34 @@ use std::time::Duration;
 let clock = MonotonicClock::new();
 let start = clock.millis();
 
-// 执行一些操作
 thread::sleep(Duration::from_millis(100));
 
 let elapsed = clock.millis() - start;
 println!("耗时: {} 毫秒", elapsed);
 ```
 
-### 高精度计时
+### 使用 MockClock 进行测试
+
+```rust
+use prism3_clock::{Clock, ControllableClock, MockClock};
+use chrono::{DateTime, Duration, Utc};
+
+let clock = MockClock::new();
+
+// 设置到特定时间
+let fixed_time = DateTime::parse_from_rfc3339(
+    "2024-01-01T00:00:00Z"
+).unwrap().with_timezone(&Utc);
+clock.set_time(fixed_time);
+
+assert_eq!(clock.time(), fixed_time);
+
+// 推进时间
+clock.add_duration(Duration::hours(1));
+assert_eq!(clock.time(), fixed_time + Duration::hours(1));
+```
+
+### 高精度测量
 
 ```rust
 use prism3_clock::{NanoClock, NanoMonotonicClock};
@@ -98,47 +131,150 @@ let clock = NanoMonotonicClock::new();
 let start = clock.nanos();
 
 // 执行一些操作
+for _ in 0..1000 {
+    // 一些工作
+}
 
 let elapsed = clock.nanos() - start;
 println!("耗时: {} 纳秒", elapsed);
 ```
 
-### 使用模拟时钟进行测试
+### 使用时间计量器测量耗时
 
 ```rust
-use prism3_clock::{Clock, ControllableClock, MockClock};
-use chrono::Utc;
+use prism3_clock::meter::TimeMeter;
+use std::thread;
 use std::time::Duration;
 
-let clock = MockClock::new();
-
-// 设置到特定时间
-let target_time = Utc::now();
-clock.set_time(target_time);
-
-// 推进时间 1 秒
-clock.add_duration(Duration::from_secs(1));
-
-// 添加毫秒
-clock.add_millis(500, false);
-
-// 每次调用自动递增
-clock.add_millis(10, true);
-
-// 重置到初始状态
-clock.reset();
+let mut meter = TimeMeter::new();
+meter.start();
+thread::sleep(Duration::from_millis(100));
+meter.stop();
+println!("耗时: {}", meter.readable_duration());
 ```
 
-### 使用时区
+### 高精度时间计量器
 
 ```rust
-use prism3_clock::{Clock, MonotonicClock};
-use chrono_tz::Asia::Shanghai;
+use prism3_clock::meter::NanoTimeMeter;
 
-let clock = MonotonicClock::with_timezone(Shanghai);
-let now_shanghai = clock.now_in_timezone(Shanghai);
-println!("上海时间: {}", now_shanghai);
+let mut meter = NanoTimeMeter::new();
+meter.start();
+
+// 执行一些操作
+for _ in 0..1000 {
+    // 一些工作
+}
+
+meter.stop();
+println!("耗时: {} 纳秒", meter.nanos());
+println!("可读格式: {}", meter.readable_duration());
 ```
+
+### 使用时间计量器计算速度
+
+```rust
+use prism3_clock::meter::TimeMeter;
+use std::thread;
+use std::time::Duration;
+
+let mut meter = TimeMeter::new();
+meter.start();
+
+// 处理 1000 个项目
+for _ in 0..1000 {
+    thread::sleep(Duration::from_micros(100));
+}
+
+meter.stop();
+println!("处理 1000 个项目耗时 {}", meter.readable_duration());
+println!("速度: {}", meter.readable_speed(1000));
+```
+
+## 架构
+
+本 crate 围绕几个正交的 trait 构建：
+
+- **Clock**：提供 UTC 时间的基础 trait
+- **NanoClock**：纳秒精度的扩展
+- **ZonedClock**：时区支持的扩展
+- **ControllableClock**：时间控制的扩展（测试用）
+
+这种设计遵循**接口隔离原则**，确保实现只需要提供它们实际支持的功能。
+
+## 时钟实现
+
+### SystemClock
+
+- 基于系统墙上时钟时间
+- 受系统时间调整影响（NTP、手动更改）
+- 零大小类型（ZST），无运行时开销
+- 适用于：日志记录、时间戳、一般时间查询
+
+### MonotonicClock
+
+- 基于 `std::time::Instant`（单调递增）
+- 不受系统时间调整影响
+- 毫秒精度
+- 创建时记录基准点
+- 适用于：性能监控、超时控制、时间间隔测量
+
+### NanoMonotonicClock
+
+- 基于 `std::time::Instant`，纳秒精度
+- 不受系统时间调整影响
+- 比 `MonotonicClock` 精度更高
+- 适用于：高精度测量、微基准测试
+
+### MockClock
+
+- 可控制的测试时钟
+- 使用 `Arc<Mutex<>>` 实现线程安全
+- 支持时间设置、推进和自动递增
+- 基于 `MonotonicClock` 保证稳定性
+- 适用于：单元测试、集成测试、时间相关逻辑测试
+
+### Zoned\<C\>
+
+- 为任何时钟添加时区支持的包装器
+- 泛型支持任何 `Clock` 实现
+- 将 UTC 时间转换为指定时区的本地时间
+- 适用于：显示本地时间、时区转换
+
+## 时间计量器
+
+### TimeMeter
+
+毫秒精度的时间计量器，用于测量耗时，具有以下特性：
+
+- **灵活的时钟源**：支持任何实现 `Clock` trait 的时钟
+- **默认使用 MonotonicClock**：默认使用单调时间以获得稳定的测量结果
+- **多种输出格式**：毫秒、秒、分钟和人类可读格式
+- **速度计算**：计算处理速度（每秒/每分钟处理项数）
+- **实时监控**：无需停止计量器即可获取耗时
+- **测试友好**：注入 `MockClock` 实现确定性测试
+
+输出格式示例：
+- `123 ms` - 小于 1 秒
+- `1.23 s` - 1-60 秒
+- `1 m 23.45 s` - 超过 1 分钟
+
+### NanoTimeMeter
+
+纳秒精度的时间计量器，具有与 `TimeMeter` 类似的特性：
+
+- **纳秒精度**：基于 `NanoClock` trait
+- **默认使用 NanoMonotonicClock**：使用高精度单调时间
+- **人类可读输出**：自动选择合适的单位（ns、μs、ms、s、m）
+- **速度计算**：高精度速度计算
+- **测试友好**：支持模拟时钟注入
+
+输出格式示例：
+- `123 ns` - 小于 1 微秒
+- `123.45 μs` - 1-1000 微秒
+- `123.45 ms` - 1-1000 毫秒
+- `1.23 s` - 1-60 秒
+- `1 m 23.45 s` - 超过 1 分钟
 
 ## API 参考
 
@@ -147,17 +283,22 @@ println!("上海时间: {}", now_shanghai);
 核心 `Clock` trait 提供：
 
 - `millis()` - 返回自 Unix 纪元以来的毫秒数
-- `now()` - 返回当前时间的 `DateTime<Utc>`
-- `timezone()` - 返回时钟的时区
-- `now_in_timezone(tz)` - 返回指定时区的当前时间
-- `with_timezone(tz)` - 创建使用指定时区的新时钟
+- `time()` - 返回当前时间的 `DateTime<Utc>`
 
 ### NanoClock Trait
 
 高精度时钟的扩展 trait：
 
 - `nanos()` - 返回自 Unix 纪元以来的纳秒数
-- `now_precise()` - 返回高精度的 `DateTime<Utc>`
+- `nano_time()` - 返回高精度的 `DateTime<Utc>`
+
+### ZonedClock Trait
+
+时区支持的扩展 trait：
+
+- `timezone()` - 返回时钟的时区
+- `local_time()` - 返回时钟时区的当前时间
+- `local_time_in(tz)` - 返回指定时区的当前时间
 
 ### ControllableClock Trait
 
@@ -167,67 +308,41 @@ println!("上海时间: {}", now_shanghai);
 - `add_duration(duration)` - 将时钟推进指定时长
 - `reset()` - 将时钟重置到初始状态
 
-## 时钟实现
+## 设计原则
 
-### SystemClock
+### 接口隔离
 
-- 基于系统时间（`std::time::SystemTime`）
-- 受系统时间调整影响
-- 简单高效
-- 适用于：日志记录、时间戳、系统时间同步
+本 crate 遵循接口隔离原则，为不同的能力提供独立的 trait：
 
-### MonotonicClock
+- 并非所有时钟都需要纳秒精度 → `NanoClock` 是独立的
+- 并非所有时钟都需要时区支持 → `ZonedClock` 是独立的
+- 只有测试时钟需要可控性 → `ControllableClock` 是独立的
 
-- 基于 `Instant`（单调递增）
-- 不受系统时间调整影响
-- 毫秒精度
-- 适用于：性能监控、超时控制、时间间隔计算
+这使得实现只需提供它们需要的功能，保持 API 简洁和专注。
 
-### NanoMonotonicClock
+### 单一职责
 
-- 基于 `Instant`，纳秒精度
-- 不受系统时间调整影响
-- 计算开销比 `MonotonicClock` 稍大
-- 适用于：高精度测量、微基准测试
+每个 trait 和类型都有一个明确的目的：
 
-### MockClock
+- `Clock` - 提供 UTC 时间
+- `NanoClock` - 提供高精度时间
+- `ZonedClock` - 提供时区转换
+- `ControllableClock` - 提供测试用的时间控制
 
-- 可编程的测试时钟
-- 线程安全，采用细粒度锁
-- 支持时间设置、推进和自动递增
-- 适用于：单元测试、集成测试、时间相关逻辑测试
+### 组合优于继承
 
-## 设计理念
+通过包装器而不是继承来扩展功能：
 
-### 单调性
+- `Zoned<C>` 包装任何 `Clock` 以添加时区支持
+- 时间计量器通过泛型接受任何 `Clock` 实现
 
-传统系统时钟可能受以下因素影响：
-- NTP 同步
-- 手动时间调整
-- 闰秒
+### 零成本抽象
 
-这可能导致：
-- 负数时间间隔
-- 异常大的时间间隔
-- 时间倒流
+设计确保只为使用的功能付出代价：
 
-单调时钟通过以下方式解决这些问题：
-1. 使用 `Instant` 作为时间源（单调递增）
-2. 创建时记录初始基准点
-3. 基于经过的时长计算相对时间
-4. 确保时间只会向前移动
-
-### 线程安全
-
-- **不可变时钟**（`SystemClock`、`MonotonicClock`、`NanoMonotonicClock`）：
-  - 所有字段都是不可变的
-  - 天然线程安全（`Send + Sync`）
-  - 无锁开销
-
-- **可变时钟**（`MockClock`）：
-  - 使用 `Arc<Mutex<T>>` 管理共享状态
-  - 细粒度锁策略
-  - 防止并发场景下时间倒流
+- `SystemClock` 和 `MonotonicClock` 是零大小或最小开销
+- Trait 方法通常会被内联
+- 泛型代码在编译时单态化
 
 ## 测试与代码覆盖率
 
@@ -244,13 +359,83 @@ cargo test
 
 # 生成文本格式报告
 ./coverage.sh text
+
+# 运行 CI 检查（测试、lint、格式化）
+./ci-check.sh
 ```
 
 ## 依赖项
 
-- **chrono**: 日期和时间处理
-- **chrono-tz**: 时区支持
-- **parking_lot**: 高效的互斥锁实现
+- **chrono**：日期和时间处理，支持序列化
+- **chrono-tz**：全面的时区数据库
+- **parking_lot**：高效的互斥锁实现，用于模拟时钟
+
+## 使用场景
+
+### 性能监控
+
+```rust
+use prism3_clock::meter::TimeMeter;
+
+let mut meter = TimeMeter::new();
+meter.start();
+
+// 执行操作
+process_data();
+
+meter.stop();
+log::info!("处理耗时: {}", meter.readable_duration());
+```
+
+### 超时控制
+
+```rust
+use prism3_clock::{Clock, MonotonicClock};
+use std::time::Duration;
+
+let clock = MonotonicClock::new();
+let deadline = clock.millis() + 5000; // 从现在开始 5 秒
+
+while clock.millis() < deadline {
+    if try_operation() {
+        break;
+    }
+}
+```
+
+### 测试时间相关逻辑
+
+```rust
+use prism3_clock::{Clock, ControllableClock, MockClock};
+use chrono::Duration;
+
+#[test]
+fn test_expiration() {
+    let clock = MockClock::new();
+    let item = Item::new(clock.clone());
+
+    // 快进 1 小时
+    clock.add_duration(Duration::hours(1));
+
+    assert!(item.is_expired());
+}
+```
+
+### 基准测试
+
+```rust
+use prism3_clock::meter::NanoTimeMeter;
+
+let mut meter = NanoTimeMeter::new();
+meter.start();
+
+for _ in 0..10000 {
+    expensive_operation();
+}
+
+meter.stop();
+println!("每次操作平均耗时: {} 纳秒", meter.nanos() / 10000);
+```
 
 ## 许可证
 
@@ -279,4 +464,3 @@ Copyright (c) 2025 棱芯科技有限公司。保留所有权利。
 ---
 
 有关 Prism3 生态系统的更多信息，请访问我们的 [GitHub 主页](https://github.com/3-prism)。
-
