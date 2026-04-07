@@ -1,16 +1,24 @@
 version: 2.1
 
 # ==============================================================================
-# Orbs - Reusable Configuration Packages
-# Using the official CircleCI Rust orb to simplify CI/CD configuration.
-# Documentation: https://circleci.com/developer/orbs/orb/circleci/rust
+# Configuration
+# This project uses Rust nightly toolchain for all CI jobs
+# Reason: rustfmt requires nightly for imports_layout = "Vertical" feature
 # ==============================================================================
-orbs:
-  rust: circleci/rust@1.8.0
+
+commands:
+  checkout_https:
+    steps:
+      - run:
+          name: Checkout source via HTTPS
+          command: |
+            git clone "https://github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git" .
+            git checkout "$CIRCLE_SHA1"
 
 # ==============================================================================
 # Job Definitions
 # Each job represents a collection of steps to be executed in a specific environment.
+# All jobs use the official Rust nightly Docker image
 # ==============================================================================
 jobs:
   # ------------------------------------------------------------------------------
@@ -19,20 +27,25 @@ jobs:
   # This optimization reduces the number of containers from 2 to 1, saving ~15-20 seconds.
   # ------------------------------------------------------------------------------
   fast_checks:
-    executor:
-      name: rust/default
-      tag: '1.85'
+    docker:
+      - image: rustlang/rust:nightly
     steps:
-      - checkout
+      - checkout_https
       # Restore cached dependencies to speed up the process
       - restore_cache:
           keys:
-            - v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
-            - v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-
-            - v2-cargo-cache-{{ arch }}-
+            - v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
+            - v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-
+            - v3-cargo-cache-nightly-{{ arch }}-
+      - run:
+          name: Install rustfmt component
+          command: rustup component add rustfmt
       - run:
           name: Check code format
           command: cargo fmt -- --check
+      - run:
+          name: Install clippy component
+          command: rustup component add clippy
       - run:
           name: Run clippy (with dependency caching)
           command: |
@@ -40,7 +53,7 @@ jobs:
             cargo clippy --all-targets --all-features -- -D warnings
       # Save cache for future runs (separate caches for registry and build artifacts)
       - save_cache:
-          key: v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
+          key: v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
           paths:
             - "~/.cargo/registry/index"
             - "~/.cargo/registry/cache"
@@ -55,18 +68,17 @@ jobs:
   # saving ~50% of test execution time.
   # ------------------------------------------------------------------------------
   build_test_coverage:
-    executor:
-      name: rust/default
-      tag: '1.85'
+    docker:
+      - image: rustlang/rust:nightly
     resource_class: medium+
     steps:
-      - checkout
+      - checkout_https
       # Restore enhanced cargo cache
       - restore_cache:
           keys:
-            - v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
-            - v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-
-            - v2-cargo-cache-{{ arch }}-
+            - v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
+            - v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-
+            - v3-cargo-cache-nightly-{{ arch }}-
       # Restore cache for cargo-binstall
       - restore_cache:
           keys:
@@ -136,7 +148,7 @@ jobs:
           command: cargo build --release --verbose
       # Save all caches
       - save_cache:
-          key: v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
+          key: v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
           paths:
             - "~/.cargo/registry/index"
             - "~/.cargo/registry/cache"
@@ -169,17 +181,16 @@ jobs:
   # Generates API documentation using `rustdoc`.
   # ------------------------------------------------------------------------------
   doc:
-    executor:
-      name: rust/default
-      tag: '1.85'
+    docker:
+      - image: rustlang/rust:nightly
     steps:
-      - checkout
+      - checkout_https
       # Restore enhanced cargo cache
       - restore_cache:
           keys:
-            - v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
-            - v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-
-            - v2-cargo-cache-{{ arch }}-
+            - v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
+            - v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-
+            - v3-cargo-cache-nightly-{{ arch }}-
       # Attach workspace to reuse build artifacts from build_and_test
       - attach_workspace:
           at: .
@@ -196,17 +207,16 @@ jobs:
   # Checks for security vulnerabilities in dependencies using `cargo-audit`.
   # ------------------------------------------------------------------------------
   security_audit:
-    executor:
-      name: rust/default
-      tag: '1.85'
+    docker:
+      - image: rustlang/rust:nightly
     steps:
-      - checkout
+      - checkout_https
       # Restore enhanced cargo cache
       - restore_cache:
           keys:
-            - v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
-            - v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-
-            - v2-cargo-cache-{{ arch }}-
+            - v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
+            - v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-
+            - v3-cargo-cache-nightly-{{ arch }}-
       # Restore cache for cargo-binstall
       - restore_cache:
           keys:
@@ -239,7 +249,7 @@ jobs:
             fi
       # Save enhanced cargo cache
       - save_cache:
-          key: v2-cargo-cache-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
+          key: v3-cargo-cache-nightly-{{ arch }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
           paths:
             - "~/.cargo/registry/index"
             - "~/.cargo/registry/cache"

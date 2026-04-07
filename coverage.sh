@@ -28,9 +28,11 @@ echo "📁 Coverage will only include files in: $CURRENT_CRATE_DIR"
 CURRENT_CRATE_NAME=$(basename "$CURRENT_CRATE_DIR")
 WORKSPACE_ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
-# Create list of other workspace crates to exclude
+# Create list of other workspace crates to exclude (sibling dirs with Cargo.toml)
 OTHER_CRATES=""
-for crate_dir in "$WORKSPACE_ROOT"/prism3-*/; do
+for crate_dir in "$WORKSPACE_ROOT"/*/; do
+    [ -d "$crate_dir" ] || continue
+    [ -f "$crate_dir/Cargo.toml" ] || continue
     crate_name=$(basename "$crate_dir")
     if [ "$crate_name" != "$CURRENT_CRATE_NAME" ]; then
         if [ -z "$OTHER_CRATES" ]; then
