@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -9,7 +9,7 @@
 //! Tests for MonotonicClock.
 
 use chrono::Datelike;
-use prism3_clock::{Clock, MonotonicClock};
+use qubit_clock::{Clock, MonotonicClock};
 use std::thread;
 use std::time::Duration;
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -27,7 +27,7 @@ use chrono_tz::Tz;
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::{Clock, ZonedClock, SystemClock, Zoned};
+/// use qubit_clock::{Clock, ZonedClock, SystemClock, Zoned};
 /// use chrono_tz::Asia::Shanghai;
 ///
 /// let clock = Zoned::new(SystemClock::new(), Shanghai);
@@ -48,7 +48,7 @@ pub trait ZonedClock: Clock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{ZonedClock, SystemClock, Zoned};
+    /// use qubit_clock::{ZonedClock, SystemClock, Zoned};
     /// use chrono_tz::Asia::Shanghai;
     ///
     /// let clock = Zoned::new(SystemClock::new(), Shanghai);
@@ -69,7 +69,7 @@ pub trait ZonedClock: Clock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{ZonedClock, SystemClock, Zoned};
+    /// use qubit_clock::{ZonedClock, SystemClock, Zoned};
     /// use chrono_tz::Asia::Shanghai;
     ///
     /// let clock = Zoned::new(SystemClock::new(), Shanghai);

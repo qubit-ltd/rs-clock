@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -9,7 +9,7 @@
 //! Tests for the ControllableClock trait.
 
 use chrono::{DateTime, Duration, Utc};
-use prism3_clock::{Clock, ControllableClock, MockClock};
+use qubit_clock::{Clock, ControllableClock, MockClock};
 
 #[test]
 fn test_controllable_clock_set_time() {

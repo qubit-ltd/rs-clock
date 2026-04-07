@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -32,7 +32,7 @@ use chrono::{DateTime, Duration, Utc};
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::{Clock, ControllableClock, MockClock};
+/// use qubit_clock::{Clock, ControllableClock, MockClock};
 /// use chrono::{DateTime, Duration, Utc};
 ///
 /// let clock = MockClock::new();
@@ -66,7 +66,7 @@ pub trait ControllableClock: Clock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{Clock, ControllableClock, MockClock};
+    /// use qubit_clock::{Clock, ControllableClock, MockClock};
     /// use chrono::{DateTime, Utc};
     ///
     /// let clock = MockClock::new();
@@ -88,7 +88,7 @@ pub trait ControllableClock: Clock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{Clock, ControllableClock, MockClock};
+    /// use qubit_clock::{Clock, ControllableClock, MockClock};
     /// use chrono::Duration;
     ///
     /// let clock = MockClock::new();
@@ -110,7 +110,7 @@ pub trait ControllableClock: Clock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{Clock, ControllableClock, MockClock};
+    /// use qubit_clock::{Clock, ControllableClock, MockClock};
     /// use chrono::Duration;
     ///
     /// let clock = MockClock::new();

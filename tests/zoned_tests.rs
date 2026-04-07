@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -13,7 +13,7 @@ use chrono_tz::America::New_York;
 use chrono_tz::Asia::Shanghai;
 use chrono_tz::Europe::London;
 use chrono_tz::Tz;
-use prism3_clock::{
+use qubit_clock::{
     Clock, ControllableClock, MockClock, MonotonicClock, SystemClock, Zoned, ZonedClock,
 };
 

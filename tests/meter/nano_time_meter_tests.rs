@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -9,8 +9,8 @@
 //! Tests for NanoTimeMeter.
 
 use chrono::Duration;
-use prism3_clock::meter::NanoTimeMeter;
-use prism3_clock::{NanoClock, NanoMonotonicClock};
+use qubit_clock::meter::NanoTimeMeter;
+use qubit_clock::{NanoClock, NanoMonotonicClock};
 use std::thread;
 use std::time::Duration as StdDuration;
 

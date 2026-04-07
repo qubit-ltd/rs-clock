@@ -1,14 +1,14 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
  ******************************************************************************/
 //! Tests for the Clock trait.
 
-use prism3_clock::{Clock, MockClock, MonotonicClock, SystemClock};
+use qubit_clock::{Clock, MockClock, MonotonicClock, SystemClock};
 use std::thread;
 use std::time::Duration;
 

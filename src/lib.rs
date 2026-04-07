@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -41,7 +41,7 @@
 //! ## Basic Usage
 //!
 //! ```
-//! use prism3_clock::{Clock, SystemClock};
+//! use qubit_clock::{Clock, SystemClock};
 //!
 //! let clock = SystemClock::new();
 //! let timestamp = clock.millis();
@@ -52,7 +52,7 @@
 //! ## With Timezone
 //!
 //! ```
-//! use prism3_clock::{Clock, ZonedClock, SystemClock, Zoned};
+//! use qubit_clock::{Clock, ZonedClock, SystemClock, Zoned};
 //! use chrono_tz::Asia::Shanghai;
 //!
 //! let clock = Zoned::new(SystemClock::new(), Shanghai);
@@ -63,7 +63,7 @@
 //! ## Monotonic Time for Performance Measurement
 //!
 //! ```
-//! use prism3_clock::{Clock, MonotonicClock};
+//! use qubit_clock::{Clock, MonotonicClock};
 //! use std::thread;
 //! use std::time::Duration;
 //!
@@ -79,7 +79,7 @@
 //! ## Testing with MockClock
 //!
 //! ```
-//! use prism3_clock::{Clock, ControllableClock, MockClock};
+//! use qubit_clock::{Clock, ControllableClock, MockClock};
 //! use chrono::{DateTime, Duration, Utc};
 //!
 //! let clock = MockClock::new();
@@ -100,7 +100,7 @@
 //! ## High-Precision Measurements
 //!
 //! ```
-//! use prism3_clock::{NanoClock, NanoMonotonicClock};
+//! use qubit_clock::{NanoClock, NanoMonotonicClock};
 //!
 //! let clock = NanoMonotonicClock::new();
 //! let start = clock.nanos();
@@ -117,7 +117,7 @@
 //! ## Time Meters for Elapsed Time Measurement
 //!
 //! ```
-//! use prism3_clock::meter::TimeMeter;
+//! use qubit_clock::meter::TimeMeter;
 //! use std::thread;
 //! use std::time::Duration;
 //!

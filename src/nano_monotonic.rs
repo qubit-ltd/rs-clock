@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -40,7 +40,7 @@ use std::time::Instant;
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::{NanoClock, NanoMonotonicClock};
+/// use qubit_clock::{NanoClock, NanoMonotonicClock};
 ///
 /// let clock = NanoMonotonicClock::new();
 /// let start = clock.nanos();
@@ -81,7 +81,7 @@ impl NanoMonotonicClock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::NanoMonotonicClock;
+    /// use qubit_clock::NanoMonotonicClock;
     ///
     /// let clock = NanoMonotonicClock::new();
     /// ```

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -70,7 +70,7 @@ use chrono::Duration;
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::meter::TimeMeter;
+/// use qubit_clock::meter::TimeMeter;
 /// use std::thread;
 /// use std::time::Duration as StdDuration;
 ///
@@ -120,7 +120,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{MonotonicClock, meter::TimeMeter};
+    /// use qubit_clock::{MonotonicClock, meter::TimeMeter};
     ///
     /// let clock = MonotonicClock::new();
     /// let meter = TimeMeter::with_clock(clock);
@@ -147,7 +147,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{MonotonicClock, meter::TimeMeter};
+    /// use qubit_clock::{MonotonicClock, meter::TimeMeter};
     ///
     /// let clock = MonotonicClock::new();
     /// let meter = TimeMeter::with_clock_started(clock);
@@ -166,7 +166,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::new();
     /// meter.start();
@@ -185,7 +185,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::start_now();
     /// // Do some work
@@ -204,7 +204,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::start_now();
     /// // Do some work
@@ -223,7 +223,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::start_now();
     /// // Do some work
@@ -252,7 +252,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     /// use std::thread;
     /// use std::time::Duration;
     ///
@@ -281,7 +281,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     /// use std::thread;
     /// use std::time::Duration;
     ///
@@ -305,7 +305,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::new();
     /// meter.start();
@@ -334,7 +334,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::start_now();
     /// let duration = meter.duration();
@@ -356,7 +356,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::start_now();
     /// // Do some work
@@ -383,7 +383,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     /// use std::thread;
     /// use std::time::Duration;
     ///
@@ -419,7 +419,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     /// use std::thread;
     /// use std::time::Duration;
     ///
@@ -454,7 +454,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::start_now();
     /// // Do some work
@@ -483,7 +483,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::start_now();
     /// // Do some work
@@ -507,7 +507,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::new();
     /// assert!(!meter.is_running());
@@ -529,7 +529,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::start_now();
     /// assert!(!meter.is_stopped());
@@ -549,7 +549,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let meter = TimeMeter::new();
     /// let clock = meter.clock();
@@ -567,7 +567,7 @@ impl<C: Clock> TimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let mut meter = TimeMeter::new();
     /// let clock = meter.clock_mut();
@@ -591,7 +591,7 @@ impl TimeMeter<MonotonicClock> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let meter = TimeMeter::new();
     /// ```
@@ -609,7 +609,7 @@ impl TimeMeter<MonotonicClock> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::TimeMeter;
+    /// use qubit_clock::meter::TimeMeter;
     ///
     /// let meter = TimeMeter::start_now();
     /// ```

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -35,7 +35,7 @@ use std::ops::Deref;
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::{Clock, ZonedClock, SystemClock, Zoned};
+/// use qubit_clock::{Clock, ZonedClock, SystemClock, Zoned};
 /// use chrono_tz::Asia::Shanghai;
 ///
 /// // Wrap a SystemClock with Shanghai timezone
@@ -47,7 +47,7 @@ use std::ops::Deref;
 /// ## Using with MockClock
 ///
 /// ```
-/// use prism3_clock::{
+/// use qubit_clock::{
 ///     Clock, ZonedClock, ControllableClock, MockClock, Zoned
 /// };
 /// use chrono::{DateTime, Utc};
@@ -93,7 +93,7 @@ impl<C: Clock> Zoned<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{SystemClock, Zoned};
+    /// use qubit_clock::{SystemClock, Zoned};
     /// use chrono_tz::Asia::Shanghai;
     ///
     /// let clock = Zoned::new(SystemClock::new(), Shanghai);
@@ -112,7 +112,7 @@ impl<C: Clock> Zoned<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{Clock, SystemClock, Zoned};
+    /// use qubit_clock::{Clock, SystemClock, Zoned};
     /// use chrono_tz::Asia::Shanghai;
     ///
     /// let clock = Zoned::new(SystemClock::new(), Shanghai);
@@ -133,7 +133,7 @@ impl<C: Clock> Zoned<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{SystemClock, Zoned};
+    /// use qubit_clock::{SystemClock, Zoned};
     /// use chrono_tz::Asia::Shanghai;
     ///
     /// let clock = Zoned::new(SystemClock::new(), Shanghai);

@@ -1,14 +1,14 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
  ******************************************************************************/
 //! Tests for the NanoClock trait.
 
-use prism3_clock::{NanoClock, NanoMonotonicClock};
+use qubit_clock::{NanoClock, NanoMonotonicClock};
 use std::thread;
 use std::time::Duration;
 

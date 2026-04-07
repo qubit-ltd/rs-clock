@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -41,7 +41,7 @@ use std::sync::Arc;
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::{Clock, ControllableClock, MockClock};
+/// use qubit_clock::{Clock, ControllableClock, MockClock};
 /// use chrono::{DateTime, Duration, Utc};
 ///
 /// let clock = MockClock::new();
@@ -98,7 +98,7 @@ impl MockClock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::MockClock;
+    /// use qubit_clock::MockClock;
     ///
     /// let clock = MockClock::new();
     /// ```
@@ -130,7 +130,7 @@ impl MockClock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{Clock, MockClock};
+    /// use qubit_clock::{Clock, MockClock};
     ///
     /// let clock = MockClock::new();
     /// let before = clock.millis();

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -38,7 +38,7 @@ use chrono::{DateTime, Utc};
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::{Clock, SystemClock};
+/// use qubit_clock::{Clock, SystemClock};
 ///
 /// let clock = SystemClock::new();
 /// let timestamp = clock.millis();
@@ -62,7 +62,7 @@ impl SystemClock {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::SystemClock;
+    /// use qubit_clock::SystemClock;
     ///
     /// let clock = SystemClock::new();
     /// ```

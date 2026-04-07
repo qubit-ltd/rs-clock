@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -34,7 +34,7 @@
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::meter::format_duration_millis;
+/// use qubit_clock::meter::format_duration_millis;
 ///
 /// assert_eq!(format_duration_millis(500), "500 ms");
 /// assert_eq!(format_duration_millis(1500), "1.5s");
@@ -100,7 +100,7 @@ pub fn format_duration_millis(millis: i64) -> String {
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::meter::format_duration_nanos;
+/// use qubit_clock::meter::format_duration_nanos;
 ///
 /// assert_eq!(format_duration_nanos(500), "500 ns");
 /// assert_eq!(format_duration_nanos(1500), "1.5 μs");
@@ -155,7 +155,7 @@ pub fn format_duration_nanos(nanos: i128) -> String {
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::meter::format_speed;
+/// use qubit_clock::meter::format_speed;
 ///
 /// assert_eq!(format_speed(123.456, "/s"), "123.46/s");
 /// assert_eq!(format_speed(0.0, "/m"), "0.00/m");

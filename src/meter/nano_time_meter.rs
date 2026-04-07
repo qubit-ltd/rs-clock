@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -45,7 +45,7 @@ use chrono::Duration;
 /// # Examples
 ///
 /// ```
-/// use prism3_clock::meter::NanoTimeMeter;
+/// use qubit_clock::meter::NanoTimeMeter;
 ///
 /// // Basic usage
 /// let mut meter = NanoTimeMeter::new();
@@ -84,7 +84,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{NanoMonotonicClock, meter::NanoTimeMeter};
+    /// use qubit_clock::{NanoMonotonicClock, meter::NanoTimeMeter};
     ///
     /// let clock = NanoMonotonicClock::new();
     /// let meter = NanoTimeMeter::with_clock(clock);
@@ -111,7 +111,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::{NanoMonotonicClock, meter::NanoTimeMeter};
+    /// use qubit_clock::{NanoMonotonicClock, meter::NanoTimeMeter};
     ///
     /// let clock = NanoMonotonicClock::new();
     /// let meter = NanoTimeMeter::with_clock_started(clock);
@@ -130,7 +130,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::new();
     /// meter.start();
@@ -149,7 +149,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// // Do some work
@@ -168,7 +168,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// // Do some work
@@ -187,7 +187,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// // Do some work
@@ -219,7 +219,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// // Do some work
@@ -246,7 +246,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// // Do some work
@@ -271,7 +271,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     /// use std::thread;
     /// use std::time::Duration;
     ///
@@ -295,7 +295,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     /// use std::thread;
     /// use std::time::Duration;
     ///
@@ -319,7 +319,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::new();
     /// meter.start();
@@ -349,7 +349,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// let duration = meter.duration();
@@ -371,7 +371,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// // Do some work
@@ -398,7 +398,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     /// use std::thread;
     /// use std::time::Duration;
     ///
@@ -434,7 +434,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     /// use std::thread;
     /// use std::time::Duration;
     ///
@@ -469,7 +469,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// // Do some work
@@ -498,7 +498,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// // Do some work
@@ -522,7 +522,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::new();
     /// assert!(!meter.is_running());
@@ -544,7 +544,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::start_now();
     /// assert!(!meter.is_stopped());
@@ -564,7 +564,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let meter = NanoTimeMeter::new();
     /// let clock = meter.clock();
@@ -582,7 +582,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let mut meter = NanoTimeMeter::new();
     /// let clock = meter.clock_mut();
@@ -607,7 +607,7 @@ impl NanoTimeMeter<NanoMonotonicClock> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let meter = NanoTimeMeter::new();
     /// ```
@@ -625,7 +625,7 @@ impl NanoTimeMeter<NanoMonotonicClock> {
     /// # Examples
     ///
     /// ```
-    /// use prism3_clock::meter::NanoTimeMeter;
+    /// use qubit_clock::meter::NanoTimeMeter;
     ///
     /// let meter = NanoTimeMeter::start_now();
     /// ```

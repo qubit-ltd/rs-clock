@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -9,8 +9,8 @@
 //! Tests for TimeMeter.
 
 use chrono::Duration;
-use prism3_clock::meter::TimeMeter;
-use prism3_clock::{Clock, MockClock, MonotonicClock};
+use qubit_clock::meter::TimeMeter;
+use qubit_clock::{Clock, MockClock, MonotonicClock};
 use std::thread;
 use std::time::Duration as StdDuration;
 

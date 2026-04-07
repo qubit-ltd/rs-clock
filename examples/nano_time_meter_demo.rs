@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -11,7 +11,7 @@
 //! This example shows how to use NanoTimeMeter for high-precision
 //! time measurement with nanosecond precision.
 
-use prism3_clock::meter::NanoTimeMeter;
+use qubit_clock::meter::NanoTimeMeter;
 use std::thread;
 use std::time::Duration;
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025.
- *    3-Prism Co. Ltd.
+ *    Copyright (c) 2025 - 2026.
+ *    Haixing Hu, Qubit Co. Ltd.
  *
  *    All rights reserved.
  *
@@ -20,7 +20,7 @@
 //! ## Basic Usage with TimeMeter
 //!
 //! ```
-//! use prism3_clock::meter::TimeMeter;
+//! use qubit_clock::meter::TimeMeter;
 //! use std::thread;
 //! use std::time::Duration;
 //!
@@ -34,7 +34,7 @@
 //! ## High-Precision Measurement with NanoTimeMeter
 //!
 //! ```
-//! use prism3_clock::meter::NanoTimeMeter;
+//! use qubit_clock::meter::NanoTimeMeter;
 //!
 //! let mut meter = NanoTimeMeter::new();
 //! meter.start();
