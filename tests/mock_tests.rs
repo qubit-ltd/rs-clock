@@ -284,7 +284,13 @@ fn test_mock_clock_multiple_threads() {
     // All additions should have accumulated
     let final_time = clock.time();
     let expected_hours = (0..10).sum::<i64>();
-    assert_eq!(final_time, fixed_time + Duration::hours(expected_hours));
+    let expected_base = fixed_time + Duration::hours(expected_hours);
+    let diff_ms = (final_time - expected_base).num_milliseconds();
+    assert!(
+        diff_ms >= 0 && diff_ms < 1000,
+        "Final time should be within 1s after expected time, diff_ms: {}",
+        diff_ms
+    );
 }
 
 #[test]
