@@ -287,7 +287,7 @@ fn test_mock_clock_multiple_threads() {
     let expected_base = fixed_time + Duration::hours(expected_hours);
     let diff_ms = (final_time - expected_base).num_milliseconds();
     assert!(
-        diff_ms >= 0 && diff_ms < 1000,
+        (0..1000).contains(&diff_ms),
         "Final time should be within 1s after expected time, diff_ms: {}",
         diff_ms
     );
