@@ -117,14 +117,14 @@ jobs:
 
       - name: Generate coverage
         run: |
-          cd prism3-core
-          cargo llvm-cov --lcov --output-path lcov.info
+          cd rust-clock
+          cargo llvm-cov --package qubit-clock --lcov --output-path lcov.info
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: prism3-core/lcov.info
-          flags: prism3-core
+          files: rust-clock/lcov.info
+          flags: qubit-clock
 ```
 
 ## Common Issues

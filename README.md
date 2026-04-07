@@ -1,8 +1,8 @@
-# Prism3 Clock
+# Qubit Clock
 
-[![CircleCI](https://circleci.com/gh/3-prism/prism3-rust-clock.svg?style=shield)](https://circleci.com/gh/3-prism/prism3-rust-clock)
-[![Coverage Status](https://coveralls.io/repos/github/3-prism/prism3-rust-clock/badge.svg?branch=main)](https://coveralls.io/github/3-prism/prism3-rust-clock?branch=main)
-[![Crates.io](https://img.shields.io/crates/v/prism3-clock.svg?color=blue)](https://crates.io/crates/prism3-clock)
+[![CircleCI](https://circleci.com/gh/qubit-ltd/rust-clock.svg?style=shield)](https://circleci.com/gh/qubit-ltd/rust-clock)
+[![Coverage Status](https://coveralls.io/repos/github/qubit-ltd/rust-clock/badge.svg?branch=main)](https://coveralls.io/github/qubit-ltd/rust-clock?branch=main)
+[![Crates.io](https://img.shields.io/crates/v/qubit-clock.svg?color=blue)](https://crates.io/crates/qubit-clock)
 [![Rust](https://img.shields.io/badge/rust-1.70+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
@@ -11,7 +11,7 @@ Thread-safe clock abstractions for Rust with monotonic and mock implementations.
 
 ## Overview
 
-Prism3 Clock provides a flexible and type-safe clock abstraction system for Rust applications. It offers robust, thread-safe clock implementations with support for basic time access, high-precision measurements, timezone handling, monotonic time, and testing support.
+Qubit Clock provides a flexible and type-safe clock abstraction system for Rust applications. It offers robust, thread-safe clock implementations with support for basic time access, high-precision measurements, timezone handling, monotonic time, and testing support.
 
 ## Features
 
@@ -58,7 +58,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-prism3-clock = "0.1.0"
+qubit-clock = "0.1.1"
 ```
 
 ## Quick Start
@@ -66,7 +66,7 @@ prism3-clock = "0.1.0"
 ### Basic Usage
 
 ```rust
-use prism3_clock::{Clock, SystemClock};
+use qubit_clock::{Clock, SystemClock};
 
 let clock = SystemClock::new();
 let timestamp = clock.millis();
@@ -77,7 +77,7 @@ println!("Current time: {}", time);
 ### With Timezone
 
 ```rust
-use prism3_clock::{Clock, ZonedClock, SystemClock, Zoned};
+use qubit_clock::{Clock, ZonedClock, SystemClock, Zoned};
 use chrono_tz::Asia::Shanghai;
 
 let clock = Zoned::new(SystemClock::new(), Shanghai);
@@ -88,7 +88,7 @@ println!("Local time in Shanghai: {}", local);
 ### Monotonic Time for Performance Measurement
 
 ```rust
-use prism3_clock::{Clock, MonotonicClock};
+use qubit_clock::{Clock, MonotonicClock};
 use std::thread;
 use std::time::Duration;
 
@@ -104,7 +104,7 @@ println!("Elapsed: {} ms", elapsed);
 ### Testing with MockClock
 
 ```rust
-use prism3_clock::{Clock, ControllableClock, MockClock};
+use qubit_clock::{Clock, ControllableClock, MockClock};
 use chrono::{DateTime, Duration, Utc};
 
 let clock = MockClock::new();
@@ -125,7 +125,7 @@ assert_eq!(clock.time(), fixed_time + Duration::hours(1));
 ### High-Precision Measurements
 
 ```rust
-use prism3_clock::{NanoClock, NanoMonotonicClock};
+use qubit_clock::{NanoClock, NanoMonotonicClock};
 
 let clock = NanoMonotonicClock::new();
 let start = clock.nanos();
@@ -142,7 +142,7 @@ println!("Elapsed: {} ns", elapsed);
 ### Time Meters for Elapsed Time Measurement
 
 ```rust
-use prism3_clock::meter::TimeMeter;
+use qubit_clock::meter::TimeMeter;
 use std::thread;
 use std::time::Duration;
 
@@ -156,7 +156,7 @@ println!("Elapsed: {}", meter.readable_duration());
 ### High-Precision Time Meter
 
 ```rust
-use prism3_clock::meter::NanoTimeMeter;
+use qubit_clock::meter::NanoTimeMeter;
 
 let mut meter = NanoTimeMeter::new();
 meter.start();
@@ -174,7 +174,7 @@ println!("Readable: {}", meter.readable_duration());
 ### Speed Calculation with Time Meter
 
 ```rust
-use prism3_clock::meter::TimeMeter;
+use qubit_clock::meter::TimeMeter;
 use std::thread;
 use std::time::Duration;
 
@@ -375,7 +375,7 @@ cargo test
 ### Performance Monitoring
 
 ```rust
-use prism3_clock::meter::TimeMeter;
+use qubit_clock::meter::TimeMeter;
 
 let mut meter = TimeMeter::new();
 meter.start();
@@ -390,7 +390,7 @@ log::info!("Processing took: {}", meter.readable_duration());
 ### Timeout Control
 
 ```rust
-use prism3_clock::{Clock, MonotonicClock};
+use qubit_clock::{Clock, MonotonicClock};
 use std::time::Duration;
 
 let clock = MonotonicClock::new();
@@ -406,7 +406,7 @@ while clock.millis() < deadline {
 ### Testing Time-Dependent Logic
 
 ```rust
-use prism3_clock::{Clock, ControllableClock, MockClock};
+use qubit_clock::{Clock, ControllableClock, MockClock};
 use chrono::Duration;
 
 #[test]
@@ -424,7 +424,7 @@ fn test_expiration() {
 ### Benchmarking
 
 ```rust
-use prism3_clock::meter::NanoTimeMeter;
+use qubit_clock::meter::NanoTimeMeter;
 
 let mut meter = NanoTimeMeter::new();
 meter.start();
@@ -439,7 +439,7 @@ println!("Average time per operation: {} ns", meter.nanos() / 10000);
 
 ## License
 
-Copyright (c) 2025 3-Prism Co. Ltd. All rights reserved.
+Copyright (c) 2025 - 2026. Haixing Hu, Qubit Co. Ltd. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -461,8 +461,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Author
 
-**Haixing Hu** - *3-Prism Co. Ltd.*
+**Haixing Hu** - *Qubit Co. Ltd.*
 
 ---
 
-For more information about the Prism3 ecosystem, visit our [GitHub homepage](https://github.com/3-prism).
+For more information about the Qubit open source projects, visit our [GitHub homepage](https://github.com/qubit-ltd).

@@ -8,7 +8,7 @@
 
 ## 1. 设计概述
 
-本文档描述了 `prism3-clock` crate 的架构设计。该设计提供了一套清晰、类型安全、灵活的时钟抽象，支持多种使用场景。
+本文档描述了 `qubit-clock` crate 的架构设计。该设计提供了一套清晰、类型安全、灵活的时钟抽象，支持多种使用场景。
 
 ### 1.1 设计目标
 
@@ -500,7 +500,7 @@ let local = clock.local_time();
 ### 5.1 场景 1：简单日志（只需要 UTC 时间）
 
 ```rust
-use prism3_clock::{Clock, SystemClock};
+use qubit_clock::{Clock, SystemClock};
 
 fn log_event(clock: &dyn Clock, event: &str) {
     let timestamp = clock.millis();
@@ -523,7 +523,7 @@ fn main() {
 ### 5.2 场景 2：性能监控（需要单调性）
 
 ```rust
-use prism3_clock::{Clock, MonotonicClock};
+use qubit_clock::{Clock, MonotonicClock};
 use std::sync::Arc;
 
 struct PerformanceMonitor {
@@ -562,7 +562,7 @@ fn main() {
 ### 5.3 场景 3：业务逻辑（需要本地时间）
 
 ```rust
-use prism3_clock::{Clock, ZonedClock, SystemClock, Zoned};
+use qubit_clock::{Clock, ZonedClock, SystemClock, Zoned};
 use chrono_tz::Asia::Shanghai;
 use std::sync::Arc;
 
@@ -604,7 +604,7 @@ fn main() {
 ### 5.4 场景 4：单元测试（需要控制时间）
 
 ```rust
-use prism3_clock::{Clock, ZonedClock, ControllableClock, MockClock, Zoned};
+use qubit_clock::{Clock, ZonedClock, ControllableClock, MockClock, Zoned};
 use chrono_tz::Asia::Shanghai;
 use std::sync::Arc;
 
@@ -645,7 +645,7 @@ fn test_order_creation() {
 ### 5.5 场景 5：高精度性能测试
 
 ```rust
-use prism3_clock::{NanoClock, NanoMonotonicClock};
+use qubit_clock::{NanoClock, NanoMonotonicClock};
 
 fn benchmark(clock: &dyn NanoClock) {
     let start = clock.nanos();
@@ -674,7 +674,7 @@ fn main() {
 ## 6. 文件组织结构
 
 ```
-prism3-rust-clock/
+rust-clock/
 ├── src/
 │   ├── lib.rs                    # 模块导出和文档
 │   ├── clock.rs                  # Clock trait
