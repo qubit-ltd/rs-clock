@@ -1,14 +1,14 @@
 [package]
-name = "prism3-clock"
-version = "0.1.0"
+name = "qubit-clock"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.70"
-authors = ["Hu Haixing <starfish.hu@gmail.com>"]
+authors = ["Haixing Hu <starfish.hu@gmail.com>"]
 license = "Apache-2.0"
-repository = "https://github.com/3-prism/prism3-rust-clock"
+repository = "https://github.com/qubit-ltd/rust-clock"
 description = "Thread-safe clock abstractions for Rust: monotonic clocks, mock testing, high-precision time meters, and timezone support"
-homepage = "https://github.com/3-prism/prism3-rust-clock"
-documentation = "https://docs.rs/prism3-clock"
+homepage = "https://github.com/qubit-ltd/rust-clock"
+documentation = "https://docs.rs/qubit-clock"
 readme = "README.md"
 keywords = ["clock", "time", "monotonic", "mock", "testing"]
 categories = ["date-and-time", "development-tools::testing"]
@@ -22,7 +22,7 @@ exclude = [
 ]
 
 [lib]
-name = "prism3_clock"
+name = "qubit_clock"
 doctest = false
 
 [dependencies]
