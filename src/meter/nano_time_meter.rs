@@ -89,6 +89,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// let clock = NanoMonotonicClock::new();
     /// let meter = NanoTimeMeter::with_clock(clock);
     /// ```
+    #[inline]
     pub fn with_clock(clock: C) -> Self {
         NanoTimeMeter {
             clock,
@@ -116,6 +117,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// let clock = NanoMonotonicClock::new();
     /// let meter = NanoTimeMeter::with_clock_started(clock);
     /// ```
+    #[inline]
     pub fn with_clock_started(clock: C) -> Self {
         let mut meter = Self::with_clock(clock);
         meter.start();
@@ -135,6 +137,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// let mut meter = NanoTimeMeter::new();
     /// meter.start();
     /// ```
+    #[inline]
     pub fn start(&mut self) {
         self.start_time = Some(self.clock.nanos());
         self.end_time = None;
@@ -155,6 +158,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// // Do some work
     /// meter.stop();
     /// ```
+    #[inline]
     pub fn stop(&mut self) {
         self.end_time = Some(self.clock.nanos());
     }
@@ -175,6 +179,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// meter.stop();
     /// meter.reset();
     /// ```
+    #[inline]
     pub fn reset(&mut self) {
         self.start_time = None;
         self.end_time = None;
@@ -194,6 +199,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// meter.restart();
     /// // Do more work
     /// ```
+    #[inline]
     pub fn restart(&mut self) {
         self.reset();
         self.start();
@@ -225,6 +231,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// // Do some work
     /// assert!(meter.nanos() > 0);
     /// ```
+    #[inline]
     pub fn nanos(&self) -> i128 {
         let start = match self.start_time {
             Some(t) => t,
@@ -252,6 +259,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// // Do some work
     /// assert!(meter.micros() >= 0);
     /// ```
+    #[inline]
     pub fn micros(&self) -> i128 {
         self.nanos() / 1_000
     }
@@ -279,6 +287,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// thread::sleep(Duration::from_millis(100));
     /// assert!(meter.millis() >= 100);
     /// ```
+    #[inline]
     pub fn millis(&self) -> i64 {
         (self.nanos() / 1_000_000) as i64
     }
@@ -303,6 +312,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// thread::sleep(Duration::from_secs(1));
     /// assert!(meter.seconds() >= 1);
     /// ```
+    #[inline]
     pub fn seconds(&self) -> i64 {
         (self.nanos() / 1_000_000_000) as i64
     }
@@ -326,6 +336,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// // Simulate some time
     /// meter.stop();
     /// ```
+    #[inline]
     pub fn minutes(&self) -> i64 {
         (self.nanos() / 60_000_000_000) as i64
     }
@@ -354,6 +365,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// let mut meter = NanoTimeMeter::start_now();
     /// let duration = meter.duration();
     /// ```
+    #[inline]
     pub fn duration(&self) -> Duration {
         Duration::nanoseconds(self.nanos() as i64)
     }
@@ -378,6 +390,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// meter.stop();
     /// println!("Elapsed: {}", meter.readable_duration());
     /// ```
+    #[inline]
     pub fn readable_duration(&self) -> String {
         format_duration_nanos(self.nanos())
     }
@@ -409,6 +422,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     ///     println!("Speed: {:.2} items/s", speed);
     /// }
     /// ```
+    #[inline]
     pub fn speed_per_second(&self, count: usize) -> Option<f64> {
         let seconds = self.seconds();
         if seconds == 0 {
@@ -445,6 +459,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     ///     println!("Speed: {:.2} items/m", speed);
     /// }
     /// ```
+    #[inline]
     pub fn speed_per_minute(&self, count: usize) -> Option<f64> {
         let seconds = self.seconds();
         if seconds == 0 {
@@ -476,6 +491,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// meter.stop();
     /// println!("Speed: {}", meter.formatted_speed_per_second(1000));
     /// ```
+    #[inline]
     pub fn formatted_speed_per_second(&self, count: usize) -> String {
         match self.speed_per_second(count) {
             Some(speed) => format_speed(speed, "/s"),
@@ -505,6 +521,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// meter.stop();
     /// println!("Speed: {}", meter.formatted_speed_per_minute(1000));
     /// ```
+    #[inline]
     pub fn formatted_speed_per_minute(&self, count: usize) -> String {
         match self.speed_per_minute(count) {
             Some(speed) => format_speed(speed, "/m"),
@@ -531,6 +548,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// meter.stop();
     /// assert!(!meter.is_running());
     /// ```
+    #[inline]
     pub fn is_running(&self) -> bool {
         self.start_time.is_some() && self.end_time.is_none()
     }
@@ -551,6 +569,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// meter.stop();
     /// assert!(meter.is_stopped());
     /// ```
+    #[inline]
     pub fn is_stopped(&self) -> bool {
         self.end_time.is_some()
     }
@@ -569,6 +588,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// let meter = NanoTimeMeter::new();
     /// let clock = meter.clock();
     /// ```
+    #[inline]
     pub fn clock(&self) -> &C {
         &self.clock
     }
@@ -587,6 +607,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// let mut meter = NanoTimeMeter::new();
     /// let clock = meter.clock_mut();
     /// ```
+    #[inline]
     pub fn clock_mut(&mut self) -> &mut C {
         &mut self.clock
     }
@@ -611,6 +632,7 @@ impl NanoTimeMeter<NanoMonotonicClock> {
     ///
     /// let meter = NanoTimeMeter::new();
     /// ```
+    #[inline]
     pub fn new() -> Self {
         Self::with_clock(NanoMonotonicClock::new())
     }
@@ -629,12 +651,14 @@ impl NanoTimeMeter<NanoMonotonicClock> {
     ///
     /// let meter = NanoTimeMeter::start_now();
     /// ```
+    #[inline]
     pub fn start_now() -> Self {
         Self::with_clock_started(NanoMonotonicClock::new())
     }
 }
 
 impl Default for NanoTimeMeter<NanoMonotonicClock> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }

@@ -94,6 +94,7 @@ impl MonotonicClock {
     /// let clock = MonotonicClock::new();
     /// ```
     ///
+    #[inline]
     pub fn new() -> Self {
         MonotonicClock {
             instant_base: Instant::now(),
@@ -103,12 +104,14 @@ impl MonotonicClock {
 }
 
 impl Default for MonotonicClock {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl Clock for MonotonicClock {
+    #[inline]
     fn millis(&self) -> i64 {
         let elapsed = self.instant_base.elapsed();
         let elapsed_millis = elapsed.as_millis() as i64;

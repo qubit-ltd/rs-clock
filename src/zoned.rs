@@ -99,6 +99,7 @@ impl<C: Clock> Zoned<C> {
     /// let clock = Zoned::new(SystemClock::new(), Shanghai);
     /// ```
     ///
+    #[inline]
     pub fn new(clock: C, timezone: Tz) -> Self {
         Zoned { clock, timezone }
     }
@@ -120,6 +121,7 @@ impl<C: Clock> Zoned<C> {
     /// let millis = inner.millis();
     /// ```
     ///
+    #[inline]
     pub fn inner(&self) -> &C {
         &self.clock
     }
@@ -140,26 +142,31 @@ impl<C: Clock> Zoned<C> {
     /// let inner = clock.into_inner();
     /// ```
     ///
+    #[inline]
     pub fn into_inner(self) -> C {
         self.clock
     }
 }
 
 impl<C: Clock> Clock for Zoned<C> {
+    #[inline]
     fn millis(&self) -> i64 {
         self.clock.millis()
     }
 
+    #[inline]
     fn time(&self) -> DateTime<Utc> {
         self.clock.time()
     }
 }
 
 impl<C: Clock> ZonedClock for Zoned<C> {
+    #[inline]
     fn timezone(&self) -> Tz {
         self.timezone
     }
 
+    #[inline]
     fn local_time(&self) -> DateTime<Tz> {
         self.timezone.from_utc_datetime(&self.time().naive_utc())
     }
@@ -168,6 +175,7 @@ impl<C: Clock> ZonedClock for Zoned<C> {
 impl<C: Clock> Deref for Zoned<C> {
     type Target = C;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.clock
     }

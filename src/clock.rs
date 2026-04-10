@@ -83,6 +83,7 @@ pub trait Clock: Send + Sync {
     /// let time = clock.time();
     /// println!("Current time: {}", time);
     /// ```
+    #[inline]
     fn time(&self) -> DateTime<Utc> {
         DateTime::from_timestamp_millis(self.millis()).unwrap_or_else(Utc::now)
     }

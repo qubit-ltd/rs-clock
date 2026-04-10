@@ -89,6 +89,7 @@ pub trait NanoClock: Clock {
     /// let time = clock.time_precise();
     /// println!("Current time (precise): {}", time);
     /// ```
+    #[inline]
     fn time_precise(&self) -> DateTime<Utc> {
         let nanos = self.nanos();
         let secs = (nanos / 1_000_000_000) as i64;

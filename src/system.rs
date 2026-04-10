@@ -67,16 +67,19 @@ impl SystemClock {
     /// let clock = SystemClock::new();
     /// ```
     ///
+    #[inline]
     pub fn new() -> Self {
         SystemClock
     }
 }
 
 impl Clock for SystemClock {
+    #[inline]
     fn millis(&self) -> i64 {
         Utc::now().timestamp_millis()
     }
 
+    #[inline]
     fn time(&self) -> DateTime<Utc> {
         Utc::now()
     }

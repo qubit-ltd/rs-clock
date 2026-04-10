@@ -86,6 +86,7 @@ impl NanoMonotonicClock {
     /// let clock = NanoMonotonicClock::new();
     /// ```
     ///
+    #[inline]
     pub fn new() -> Self {
         let now = Utc::now();
         NanoMonotonicClock {
@@ -97,12 +98,14 @@ impl NanoMonotonicClock {
 }
 
 impl Default for NanoMonotonicClock {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl Clock for NanoMonotonicClock {
+    #[inline]
     fn millis(&self) -> i64 {
         let elapsed = self.instant_base.elapsed();
         let elapsed_millis = elapsed.as_millis() as i64;
@@ -113,6 +116,7 @@ impl Clock for NanoMonotonicClock {
 }
 
 impl NanoClock for NanoMonotonicClock {
+    #[inline]
     fn nanos(&self) -> i128 {
         let elapsed = self.instant_base.elapsed();
         let elapsed_nanos = elapsed.as_nanos() as i128;

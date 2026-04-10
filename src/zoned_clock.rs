@@ -76,6 +76,7 @@ pub trait ZonedClock: Clock {
     /// let local = clock.local_time();
     /// println!("Local time: {}", local);
     /// ```
+    #[inline]
     fn local_time(&self) -> DateTime<Tz> {
         self.timezone().from_utc_datetime(&self.time().naive_utc())
     }

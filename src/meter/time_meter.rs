@@ -125,6 +125,7 @@ impl<C: Clock> TimeMeter<C> {
     /// let clock = MonotonicClock::new();
     /// let meter = TimeMeter::with_clock(clock);
     /// ```
+    #[inline]
     pub fn with_clock(clock: C) -> Self {
         TimeMeter {
             clock,
@@ -152,6 +153,7 @@ impl<C: Clock> TimeMeter<C> {
     /// let clock = MonotonicClock::new();
     /// let meter = TimeMeter::with_clock_started(clock);
     /// ```
+    #[inline]
     pub fn with_clock_started(clock: C) -> Self {
         let mut meter = Self::with_clock(clock);
         meter.start();
@@ -171,6 +173,7 @@ impl<C: Clock> TimeMeter<C> {
     /// let mut meter = TimeMeter::new();
     /// meter.start();
     /// ```
+    #[inline]
     pub fn start(&mut self) {
         self.start_time = Some(self.clock.millis());
         self.end_time = None;
@@ -191,6 +194,7 @@ impl<C: Clock> TimeMeter<C> {
     /// // Do some work
     /// meter.stop();
     /// ```
+    #[inline]
     pub fn stop(&mut self) {
         self.end_time = Some(self.clock.millis());
     }
@@ -211,6 +215,7 @@ impl<C: Clock> TimeMeter<C> {
     /// meter.stop();
     /// meter.reset();
     /// ```
+    #[inline]
     pub fn reset(&mut self) {
         self.start_time = None;
         self.end_time = None;
@@ -230,6 +235,7 @@ impl<C: Clock> TimeMeter<C> {
     /// meter.restart();
     /// // Do more work
     /// ```
+    #[inline]
     pub fn restart(&mut self) {
         self.reset();
         self.start();
@@ -260,6 +266,7 @@ impl<C: Clock> TimeMeter<C> {
     /// thread::sleep(Duration::from_millis(100));
     /// assert!(meter.millis() >= 100);
     /// ```
+    #[inline]
     pub fn millis(&self) -> i64 {
         let start = match self.start_time {
             Some(t) => t,
@@ -289,6 +296,7 @@ impl<C: Clock> TimeMeter<C> {
     /// thread::sleep(Duration::from_secs(2));
     /// assert!(meter.seconds() >= 2);
     /// ```
+    #[inline]
     pub fn seconds(&self) -> i64 {
         self.millis() / 1000
     }
@@ -313,6 +321,7 @@ impl<C: Clock> TimeMeter<C> {
     /// meter.stop();
     /// // In real usage, this would be >= 2 after 2 minutes
     /// ```
+    #[inline]
     pub fn minutes(&self) -> i64 {
         self.millis() / 60000
     }
@@ -339,6 +348,7 @@ impl<C: Clock> TimeMeter<C> {
     /// let mut meter = TimeMeter::start_now();
     /// let duration = meter.duration();
     /// ```
+    #[inline]
     pub fn duration(&self) -> Duration {
         Duration::milliseconds(self.millis())
     }
@@ -363,6 +373,7 @@ impl<C: Clock> TimeMeter<C> {
     /// meter.stop();
     /// println!("Elapsed: {}", meter.readable_duration());
     /// ```
+    #[inline]
     pub fn readable_duration(&self) -> String {
         format_duration_millis(self.millis())
     }
@@ -394,6 +405,7 @@ impl<C: Clock> TimeMeter<C> {
     ///     println!("Speed: {:.2} items/s", speed);
     /// }
     /// ```
+    #[inline]
     pub fn speed_per_second(&self, count: usize) -> Option<f64> {
         let seconds = self.seconds();
         if seconds == 0 {
@@ -430,6 +442,7 @@ impl<C: Clock> TimeMeter<C> {
     ///     println!("Speed: {:.2} items/m", speed);
     /// }
     /// ```
+    #[inline]
     pub fn speed_per_minute(&self, count: usize) -> Option<f64> {
         let seconds = self.seconds();
         if seconds == 0 {
@@ -461,6 +474,7 @@ impl<C: Clock> TimeMeter<C> {
     /// meter.stop();
     /// println!("Speed: {}", meter.formatted_speed_per_second(1000));
     /// ```
+    #[inline]
     pub fn formatted_speed_per_second(&self, count: usize) -> String {
         match self.speed_per_second(count) {
             Some(speed) => format_speed(speed, "/s"),
@@ -490,6 +504,7 @@ impl<C: Clock> TimeMeter<C> {
     /// meter.stop();
     /// println!("Speed: {}", meter.formatted_speed_per_minute(1000));
     /// ```
+    #[inline]
     pub fn formatted_speed_per_minute(&self, count: usize) -> String {
         match self.speed_per_minute(count) {
             Some(speed) => format_speed(speed, "/m"),
@@ -516,6 +531,7 @@ impl<C: Clock> TimeMeter<C> {
     /// meter.stop();
     /// assert!(!meter.is_running());
     /// ```
+    #[inline]
     pub fn is_running(&self) -> bool {
         self.start_time.is_some() && self.end_time.is_none()
     }
@@ -536,6 +552,7 @@ impl<C: Clock> TimeMeter<C> {
     /// meter.stop();
     /// assert!(meter.is_stopped());
     /// ```
+    #[inline]
     pub fn is_stopped(&self) -> bool {
         self.end_time.is_some()
     }
@@ -554,6 +571,7 @@ impl<C: Clock> TimeMeter<C> {
     /// let meter = TimeMeter::new();
     /// let clock = meter.clock();
     /// ```
+    #[inline]
     pub fn clock(&self) -> &C {
         &self.clock
     }
@@ -572,6 +590,7 @@ impl<C: Clock> TimeMeter<C> {
     /// let mut meter = TimeMeter::new();
     /// let clock = meter.clock_mut();
     /// ```
+    #[inline]
     pub fn clock_mut(&mut self) -> &mut C {
         &mut self.clock
     }
@@ -595,6 +614,7 @@ impl TimeMeter<MonotonicClock> {
     ///
     /// let meter = TimeMeter::new();
     /// ```
+    #[inline]
     pub fn new() -> Self {
         Self::with_clock(MonotonicClock::new())
     }
@@ -613,12 +633,14 @@ impl TimeMeter<MonotonicClock> {
     ///
     /// let meter = TimeMeter::start_now();
     /// ```
+    #[inline]
     pub fn start_now() -> Self {
         Self::with_clock_started(MonotonicClock::new())
     }
 }
 
 impl Default for TimeMeter<MonotonicClock> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }

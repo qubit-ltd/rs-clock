@@ -158,6 +158,7 @@ impl MockClock {
 }
 
 impl Default for MockClock {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -188,6 +189,7 @@ impl ControllableClock for MockClock {
         inner.add_every_time = false;
     }
 
+    #[inline]
     fn add_duration(&self, duration: Duration) {
         let millis = duration.num_milliseconds();
         self.add_millis(millis, false);
