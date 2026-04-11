@@ -117,13 +117,13 @@ jobs:
 
       - name: Generate coverage
         run: |
-          cd rust-clock
+          cd rs-clock
           cargo llvm-cov --package qubit-clock --lcov --output-path lcov.info
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: rust-clock/lcov.info
+          files: rs-clock/lcov.info
           flags: qubit-clock
 ```
 

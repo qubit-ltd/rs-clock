@@ -674,7 +674,7 @@ fn main() {
 ## 6. 文件组织结构
 
 ```
-rust-clock/
+rs-clock/
 ├── src/
 │   ├── lib.rs                    # 模块导出和文档
 │   ├── clock.rs                  # Clock trait
