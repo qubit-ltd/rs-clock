@@ -2,7 +2,7 @@
 name = "qubit-clock"
 version = "0.1.4"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/qubit-ltd/rs-clock"
@@ -32,4 +32,3 @@ parking_lot = "0.12"
 
 [dev-dependencies]
 serde_json = "1.0"
-
