@@ -92,8 +92,12 @@ pub trait NanoClock: Clock {
     #[inline]
     fn time_precise(&self) -> DateTime<Utc> {
         let nanos = self.nanos();
-        let secs = (nanos / 1_000_000_000) as i64;
-        let nsecs = (nanos % 1_000_000_000) as u32;
-        DateTime::from_timestamp(secs, nsecs).unwrap_or_else(Utc::now)
+        let secs = nanos.div_euclid(1_000_000_000);
+        let nsecs = nanos.rem_euclid(1_000_000_000) as u32;
+        let secs = match i64::try_from(secs) {
+            Ok(value) => value,
+            Err(_) => return DateTime::<Utc>::UNIX_EPOCH,
+        };
+        DateTime::from_timestamp(secs, nsecs).unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
     }
 }

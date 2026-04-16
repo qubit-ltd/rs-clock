@@ -8,9 +8,43 @@
  ******************************************************************************/
 //! Tests for the NanoClock trait.
 
-use qubit_clock::{NanoClock, NanoMonotonicClock};
+use chrono::{DateTime, Utc};
+use qubit_clock::{Clock, NanoClock, NanoMonotonicClock};
 use std::thread;
 use std::time::Duration;
+
+#[derive(Debug, Clone, Copy)]
+struct FixedNanoClock {
+    nanos: i128,
+}
+
+impl FixedNanoClock {
+    const fn new(nanos: i128) -> Self {
+        Self { nanos }
+    }
+}
+
+impl Clock for FixedNanoClock {
+    fn millis(&self) -> i64 {
+        let millis = self.nanos.div_euclid(1_000_000);
+        match i64::try_from(millis) {
+            Ok(value) => value,
+            Err(_) => {
+                if millis.is_negative() {
+                    i64::MIN
+                } else {
+                    i64::MAX
+                }
+            }
+        }
+    }
+}
+
+impl NanoClock for FixedNanoClock {
+    fn nanos(&self) -> i128 {
+        self.nanos
+    }
+}
 
 #[test]
 fn test_nano_clock_nanos_returns_positive() {
@@ -111,6 +145,26 @@ fn test_nano_clock_higher_precision_than_millis() {
              This might be due to system limitations."
         );
     }
+}
+
+#[test]
+fn test_nano_clock_time_precise_handles_negative_nanos() {
+    let clock = FixedNanoClock::new(-1);
+    let time = clock.time_precise();
+    assert_eq!(time.timestamp(), -1);
+    assert_eq!(time.timestamp_subsec_nanos(), 999_999_999);
+
+    let clock = FixedNanoClock::new(-1_500_000_000);
+    let time = clock.time_precise();
+    assert_eq!(time.timestamp(), -2);
+    assert_eq!(time.timestamp_subsec_nanos(), 500_000_000);
+}
+
+#[test]
+fn test_nano_clock_time_precise_out_of_range_falls_back_to_unix_epoch() {
+    let clock = FixedNanoClock::new(i128::MAX);
+    let time = clock.time_precise();
+    assert_eq!(time, DateTime::<Utc>::UNIX_EPOCH);
 }
 
 #[test]
