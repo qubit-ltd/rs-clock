@@ -389,16 +389,21 @@ fn test_speed_calculation_with_fractional_seconds() {
     clock.add_millis(500, false); // 0.5 seconds
     meter.stop();
 
-    // Speed should be None because seconds() returns 0
-    assert_eq!(meter.speed_per_second(1000), None);
+    // seconds() is still integer-truncated.
+    assert_eq!(meter.seconds(), 0);
+    // But speed now uses the precise elapsed milliseconds.
+    assert_eq!(meter.speed_per_second(1000), Some(2000.0));
+    assert_eq!(meter.speed_per_minute(1000), Some(120_000.0));
 
-    // But if we have at least 1 second
+    // For non-integer seconds, speed should also use precise duration.
     meter.restart();
     clock.add_millis(1500, false); // 1.5 seconds
     meter.stop();
 
-    // seconds() returns 1, so speed is 1000 / 1 = 1000
-    assert_eq!(meter.speed_per_second(1000), Some(1000.0));
+    let speed = meter
+        .speed_per_second(1000)
+        .expect("speed should be available for positive elapsed time");
+    assert!((speed - 666.6666666666666).abs() < 1e-9);
 }
 
 #[test]

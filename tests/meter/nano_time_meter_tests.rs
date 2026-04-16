@@ -458,14 +458,22 @@ fn test_speed_calculation_with_fractional_seconds() {
     thread::sleep(StdDuration::from_millis(500));
     meter.stop();
 
-    // Speed should be None because seconds() returns 0
-    assert_eq!(meter.speed_per_second(1000), None);
+    // seconds() is still integer-truncated.
+    assert_eq!(meter.seconds(), 0);
+    // But speed now uses precise elapsed nanoseconds, so sub-second
+    // durations can still report speed.
+    let speed_half_sec = meter
+        .speed_per_second(1000)
+        .expect("speed should be available for positive elapsed time");
+    assert!(speed_half_sec > 1500.0);
 
-    // But if we have at least 1 second
+    // Around 1 second should report speed around 1000/s.
     meter.restart();
     thread::sleep(StdDuration::from_secs(1));
     meter.stop();
 
     let speed = meter.speed_per_second(1000);
     assert!(speed.is_some());
+    let speed = speed.expect("speed should be available");
+    assert!((900.0..=1100.0).contains(&speed));
 }

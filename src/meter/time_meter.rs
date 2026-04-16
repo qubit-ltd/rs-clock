@@ -407,11 +407,11 @@ impl<C: Clock> TimeMeter<C> {
     /// ```
     #[inline]
     pub fn speed_per_second(&self, count: usize) -> Option<f64> {
-        let seconds = self.seconds();
-        if seconds == 0 {
+        let elapsed_millis = self.millis();
+        if elapsed_millis <= 0 {
             None
         } else {
-            Some(count as f64 / seconds as f64)
+            Some((count as f64 * 1000.0) / elapsed_millis as f64)
         }
     }
 
@@ -444,11 +444,11 @@ impl<C: Clock> TimeMeter<C> {
     /// ```
     #[inline]
     pub fn speed_per_minute(&self, count: usize) -> Option<f64> {
-        let seconds = self.seconds();
-        if seconds == 0 {
+        let elapsed_millis = self.millis();
+        if elapsed_millis <= 0 {
             None
         } else {
-            Some((count as f64 / seconds as f64) * 60.0)
+            Some((count as f64 * 60_000.0) / elapsed_millis as f64)
         }
     }
 
