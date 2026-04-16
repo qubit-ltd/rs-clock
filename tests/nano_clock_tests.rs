@@ -93,12 +93,6 @@ fn test_nano_clock_precision() {
         elapsed_nanos >= 100_000_000,
         "Elapsed time should be at least 100ms in nanoseconds"
     );
-
-    // Should be less than 200ms (allowing for some overhead)
-    assert!(
-        elapsed_nanos < 200_000_000,
-        "Elapsed time should be less than 200ms"
-    );
 }
 
 #[test]

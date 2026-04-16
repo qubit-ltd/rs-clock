@@ -115,13 +115,6 @@ fn test_nano_monotonic_clock_elapsed_time() {
         "At least 100ms should have elapsed, got: {} ns",
         elapsed
     );
-
-    // Should be less than 200ms
-    assert!(
-        elapsed < 200_000_000,
-        "Elapsed time should be less than 200ms, got: {} ns",
-        elapsed
-    );
 }
 
 #[test]

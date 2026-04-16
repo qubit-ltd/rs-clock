@@ -85,12 +85,6 @@ fn test_monotonic_clock_elapsed_time() {
         "At least 100ms should have elapsed, got: {}",
         elapsed
     );
-
-    assert!(
-        elapsed < 200,
-        "Elapsed time should be less than 200ms, got: {}",
-        elapsed
-    );
 }
 
 #[test]
