@@ -17,7 +17,7 @@
 
 use crate::{Clock, NanoClock};
 use chrono::Utc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// A clock implementation that provides nanosecond-precision monotonic time.
 ///
@@ -95,6 +95,62 @@ impl NanoMonotonicClock {
             system_time_base_nanos: now.timestamp_subsec_nanos(),
         }
     }
+
+    /// Returns the elapsed monotonic duration since this clock was created.
+    ///
+    /// This value is based purely on `Instant` and is not affected by system
+    /// time adjustments.
+    ///
+    /// # Returns
+    ///
+    /// The elapsed monotonic duration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::NanoMonotonicClock;
+    /// use std::thread;
+    /// use std::time::Duration;
+    ///
+    /// let clock = NanoMonotonicClock::new();
+    /// thread::sleep(Duration::from_millis(10));
+    /// assert!(clock.elapsed() >= Duration::from_millis(10));
+    /// ```
+    #[inline]
+    pub fn elapsed(&self) -> Duration {
+        self.instant_base.elapsed()
+    }
+
+    /// Returns the elapsed monotonic time in nanoseconds since creation.
+    ///
+    /// Unlike [`NanoClock::nanos`](crate::NanoClock::nanos), this value does
+    /// not include a wall-clock epoch anchor and is intended for interval
+    /// measurement.
+    ///
+    /// # Returns
+    ///
+    /// The elapsed monotonic nanoseconds, saturated at `i128::MAX`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::NanoMonotonicClock;
+    /// use std::thread;
+    /// use std::time::Duration;
+    ///
+    /// let clock = NanoMonotonicClock::new();
+    /// thread::sleep(Duration::from_millis(10));
+    /// assert!(clock.monotonic_nanos() >= 10_000_000);
+    /// ```
+    #[inline]
+    pub fn monotonic_nanos(&self) -> i128 {
+        let elapsed_nanos = self.elapsed().as_nanos();
+        if elapsed_nanos > i128::MAX as u128 {
+            i128::MAX
+        } else {
+            elapsed_nanos as i128
+        }
+    }
 }
 
 impl Default for NanoMonotonicClock {
@@ -107,21 +163,24 @@ impl Default for NanoMonotonicClock {
 impl Clock for NanoMonotonicClock {
     #[inline]
     fn millis(&self) -> i64 {
-        let elapsed = self.instant_base.elapsed();
-        let elapsed_millis = elapsed.as_millis() as i64;
+        let elapsed_millis = self.elapsed().as_millis();
+        let elapsed_millis = if elapsed_millis > i64::MAX as u128 {
+            i64::MAX
+        } else {
+            elapsed_millis as i64
+        };
         let base_millis =
             self.system_time_base_seconds * 1000 + (self.system_time_base_nanos / 1_000_000) as i64;
-        base_millis + elapsed_millis
+        base_millis.saturating_add(elapsed_millis)
     }
 }
 
 impl NanoClock for NanoMonotonicClock {
     #[inline]
     fn nanos(&self) -> i128 {
-        let elapsed = self.instant_base.elapsed();
-        let elapsed_nanos = elapsed.as_nanos() as i128;
+        let elapsed_nanos = self.monotonic_nanos();
         let base_nanos = (self.system_time_base_seconds as i128) * 1_000_000_000
             + (self.system_time_base_nanos as i128);
-        base_nanos + elapsed_nanos
+        base_nanos.saturating_add(elapsed_nanos)
     }
 }

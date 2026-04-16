@@ -18,7 +18,7 @@
 
 use crate::Clock;
 use chrono::Utc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// A clock implementation that provides monotonically increasing time.
 ///
@@ -101,6 +101,62 @@ impl MonotonicClock {
             system_time_base_millis: Utc::now().timestamp_millis(),
         }
     }
+
+    /// Returns the elapsed monotonic duration since this clock was created.
+    ///
+    /// This value is based purely on `Instant` and is not affected by system
+    /// time adjustments.
+    ///
+    /// # Returns
+    ///
+    /// The elapsed monotonic duration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::MonotonicClock;
+    /// use std::thread;
+    /// use std::time::Duration;
+    ///
+    /// let clock = MonotonicClock::new();
+    /// thread::sleep(Duration::from_millis(10));
+    /// assert!(clock.elapsed() >= Duration::from_millis(10));
+    /// ```
+    #[inline]
+    pub fn elapsed(&self) -> Duration {
+        self.instant_base.elapsed()
+    }
+
+    /// Returns the elapsed monotonic time in milliseconds since creation.
+    ///
+    /// Unlike [`Clock::millis`](crate::Clock::millis), this value does not
+    /// include a wall-clock epoch anchor and is intended for interval
+    /// measurement.
+    ///
+    /// # Returns
+    ///
+    /// The elapsed monotonic milliseconds, saturated at `i64::MAX`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::MonotonicClock;
+    /// use std::thread;
+    /// use std::time::Duration;
+    ///
+    /// let clock = MonotonicClock::new();
+    /// thread::sleep(Duration::from_millis(10));
+    /// assert!(clock.monotonic_millis() >= 10);
+    /// ```
+    #[inline]
+    pub fn monotonic_millis(&self) -> i64 {
+        let elapsed_millis = self.elapsed().as_millis();
+        if elapsed_millis > i64::MAX as u128 {
+            i64::MAX
+        } else {
+            elapsed_millis as i64
+        }
+    }
 }
 
 impl Default for MonotonicClock {
@@ -113,8 +169,7 @@ impl Default for MonotonicClock {
 impl Clock for MonotonicClock {
     #[inline]
     fn millis(&self) -> i64 {
-        let elapsed = self.instant_base.elapsed();
-        let elapsed_millis = elapsed.as_millis() as i64;
-        self.system_time_base_millis + elapsed_millis
+        self.system_time_base_millis
+            .saturating_add(self.monotonic_millis())
     }
 }

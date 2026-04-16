@@ -125,6 +125,22 @@ fn test_nano_monotonic_clock_elapsed_time() {
 }
 
 #[test]
+fn test_nano_monotonic_clock_elapsed() {
+    let clock = NanoMonotonicClock::new();
+    thread::sleep(Duration::from_millis(30));
+    assert!(clock.elapsed() >= Duration::from_millis(30));
+}
+
+#[test]
+fn test_nano_monotonic_clock_monotonic_nanos() {
+    let clock = NanoMonotonicClock::new();
+    let start = clock.monotonic_nanos();
+    thread::sleep(Duration::from_millis(50));
+    let end = clock.monotonic_nanos();
+    assert!(end >= start + 45_000_000);
+}
+
+#[test]
 fn test_nano_monotonic_clock_nanos_millis_consistency() {
     let clock = NanoMonotonicClock::new();
     let nanos = clock.nanos();

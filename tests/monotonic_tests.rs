@@ -94,6 +94,22 @@ fn test_monotonic_clock_elapsed_time() {
 }
 
 #[test]
+fn test_monotonic_clock_elapsed() {
+    let clock = MonotonicClock::new();
+    thread::sleep(Duration::from_millis(30));
+    assert!(clock.elapsed() >= Duration::from_millis(30));
+}
+
+#[test]
+fn test_monotonic_clock_monotonic_millis() {
+    let clock = MonotonicClock::new();
+    let start = clock.monotonic_millis();
+    thread::sleep(Duration::from_millis(50));
+    let end = clock.monotonic_millis();
+    assert!(end >= start + 45);
+}
+
+#[test]
 fn test_monotonic_clock_consistency() {
     let clock = MonotonicClock::new();
     let millis = clock.millis();
