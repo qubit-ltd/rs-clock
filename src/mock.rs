@@ -147,13 +147,85 @@ impl MockClock {
     /// ```
     ///
     pub fn add_millis(&self, millis: i64, add_every_time: bool) {
-        let mut inner = self.inner.lock();
         if add_every_time {
-            inner.millis_to_add_each_time = millis;
-            inner.add_every_time = true;
+            self.set_auto_advance_millis(millis);
         } else {
-            inner.millis_to_add += millis;
+            self.advance_millis(millis);
         }
+    }
+
+    /// Advances the clock by a fixed amount once.
+    ///
+    /// This method updates the offset used by [`millis()`](Clock::millis) and
+    /// [`time()`](Clock::time) without enabling auto-advance.
+    ///
+    /// # Arguments
+    ///
+    /// * `millis` - The milliseconds to add once.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::{Clock, MockClock};
+    ///
+    /// let clock = MockClock::new();
+    /// let before = clock.millis();
+    /// clock.advance_millis(1000);
+    /// assert_eq!(clock.millis(), before + 1000);
+    /// ```
+    pub fn advance_millis(&self, millis: i64) {
+        let mut inner = self.inner.lock();
+        inner.millis_to_add += millis;
+    }
+
+    /// Enables auto-advance on each read operation.
+    ///
+    /// After calling this method, each call to [`millis()`](Clock::millis) or
+    /// [`time()`](Clock::time) will advance the clock by `millis`.
+    ///
+    /// # Arguments
+    ///
+    /// * `millis` - The milliseconds to advance on each read.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::{Clock, MockClock};
+    ///
+    /// let clock = MockClock::new();
+    /// clock.set_auto_advance_millis(100);
+    /// let t1 = clock.millis();
+    /// let t2 = clock.millis();
+    /// assert_eq!(t2 - t1, 100);
+    /// ```
+    pub fn set_auto_advance_millis(&self, millis: i64) {
+        let mut inner = self.inner.lock();
+        inner.millis_to_add_each_time = millis;
+        inner.add_every_time = true;
+    }
+
+    /// Disables auto-advance behavior.
+    ///
+    /// This method clears the per-read advance setting. Subsequent read
+    /// operations will no longer mutate the clock state.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::{Clock, MockClock};
+    ///
+    /// let clock = MockClock::new();
+    /// clock.set_auto_advance_millis(100);
+    /// let _ = clock.millis();
+    /// clock.clear_auto_advance();
+    /// let t1 = clock.millis();
+    /// let t2 = clock.millis();
+    /// assert!((t2 - t1).abs() < 10);
+    /// ```
+    pub fn clear_auto_advance(&self) {
+        let mut inner = self.inner.lock();
+        inner.millis_to_add_each_time = 0;
+        inner.add_every_time = false;
     }
 }
 
@@ -192,7 +264,7 @@ impl ControllableClock for MockClock {
     #[inline]
     fn add_duration(&self, duration: Duration) {
         let millis = duration.num_milliseconds();
-        self.add_millis(millis, false);
+        self.advance_millis(millis);
     }
 
     fn reset(&self) {

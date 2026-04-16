@@ -85,6 +85,17 @@ fn test_mock_clock_add_millis_once() {
 }
 
 #[test]
+fn test_mock_clock_advance_millis() {
+    let clock = MockClock::new();
+    let before = clock.millis();
+
+    clock.advance_millis(1500);
+
+    let after = clock.millis();
+    assert_eq!(after - before, 1500);
+}
+
+#[test]
 fn test_mock_clock_add_millis_every_time() {
     let clock = MockClock::new();
 
@@ -96,6 +107,21 @@ fn test_mock_clock_add_millis_every_time() {
 
     assert_eq!(t2 - t1, 100);
     assert_eq!(t3 - t2, 100);
+}
+
+#[test]
+fn test_mock_clock_set_and_clear_auto_advance() {
+    let clock = MockClock::new();
+    clock.set_auto_advance_millis(100);
+
+    let t1 = clock.millis();
+    let t2 = clock.millis();
+    assert_eq!(t2 - t1, 100);
+
+    clock.clear_auto_advance();
+    let t3 = clock.millis();
+    let t4 = clock.millis();
+    assert!((t4 - t3).abs() < 10);
 }
 
 #[test]
