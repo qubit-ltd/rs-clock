@@ -23,7 +23,7 @@ exclude = [
 
 [lib]
 name = "qubit_clock"
-doctest = false
+doctest = true
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
