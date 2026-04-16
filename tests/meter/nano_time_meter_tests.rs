@@ -10,9 +10,55 @@
 
 use chrono::Duration;
 use qubit_clock::meter::NanoTimeMeter;
-use qubit_clock::{NanoClock, NanoMonotonicClock};
+use qubit_clock::{Clock, NanoClock, NanoMonotonicClock};
+use std::collections::VecDeque;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration as StdDuration;
+
+#[derive(Debug)]
+struct SequenceNanoClock {
+    values: Mutex<VecDeque<i128>>,
+    fallback: i128,
+}
+
+impl SequenceNanoClock {
+    fn new(values: Vec<i128>) -> Self {
+        assert!(!values.is_empty(), "values must not be empty");
+        let fallback = *values.last().expect("values must not be empty");
+        Self {
+            values: Mutex::new(VecDeque::from(values)),
+            fallback,
+        }
+    }
+
+    fn next_nanos(&self) -> i128 {
+        self.values
+            .lock()
+            .expect("mutex poisoned")
+            .pop_front()
+            .unwrap_or(self.fallback)
+    }
+}
+
+impl Clock for SequenceNanoClock {
+    fn millis(&self) -> i64 {
+        let millis = self.next_nanos().div_euclid(1_000_000);
+        if millis > i64::MAX as i128 {
+            i64::MAX
+        } else if millis < i64::MIN as i128 {
+            i64::MIN
+        } else {
+            millis as i64
+        }
+    }
+}
+
+impl NanoClock for SequenceNanoClock {
+    fn nanos(&self) -> i128 {
+        self.next_nanos()
+    }
+}
 
 #[test]
 fn test_new() {
@@ -438,6 +484,36 @@ fn test_conversion_accuracy() {
     // Check conversion accuracy
     assert_eq!(micros, nanos / 1_000);
     assert_eq!(millis, (nanos / 1_000_000) as i64);
+}
+
+#[test]
+fn test_conversion_saturates_on_positive_overflow() {
+    let huge_nanos = (i64::MAX as i128 + 10) * 60_000_000_000;
+    let clock = SequenceNanoClock::new(vec![0, huge_nanos]);
+    let mut meter = NanoTimeMeter::with_clock(clock);
+    meter.start();
+    meter.stop();
+
+    assert_eq!(meter.nanos(), huge_nanos);
+    assert_eq!(meter.millis(), i64::MAX);
+    assert_eq!(meter.seconds(), i64::MAX);
+    assert_eq!(meter.minutes(), i64::MAX);
+    assert_eq!(meter.duration(), Duration::nanoseconds(i64::MAX));
+}
+
+#[test]
+fn test_conversion_saturates_on_negative_overflow() {
+    let huge_nanos = (i64::MIN as i128 - 10) * 60_000_000_000;
+    let clock = SequenceNanoClock::new(vec![0, huge_nanos]);
+    let mut meter = NanoTimeMeter::with_clock(clock);
+    meter.start();
+    meter.stop();
+
+    assert_eq!(meter.nanos(), huge_nanos);
+    assert_eq!(meter.millis(), i64::MIN);
+    assert_eq!(meter.seconds(), i64::MIN);
+    assert_eq!(meter.minutes(), i64::MIN);
+    assert_eq!(meter.duration(), Duration::nanoseconds(i64::MIN));
 }
 
 #[test]
