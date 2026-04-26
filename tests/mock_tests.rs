@@ -136,6 +136,43 @@ fn test_mock_clock_add_millis_negative() {
 }
 
 #[test]
+fn test_mock_clock_advance_millis_saturates_positive_overflow() {
+    let clock = MockClock::new();
+
+    clock.advance_millis(i64::MAX);
+    clock.advance_millis(1);
+
+    assert_eq!(clock.millis(), i64::MAX);
+}
+
+#[test]
+fn test_mock_clock_advance_millis_saturates_negative_overflow() {
+    let clock = MockClock::new();
+    clock.set_time(DateTime::<Utc>::UNIX_EPOCH);
+
+    clock.advance_millis(i64::MIN);
+    clock.advance_millis(-1);
+
+    let millis = clock.millis();
+    assert!(
+        millis <= i64::MIN.saturating_add(1_000),
+        "negative overflow should stay near i64::MIN, got: {}",
+        millis
+    );
+}
+
+#[test]
+fn test_mock_clock_auto_advance_saturates_positive_overflow() {
+    let clock = MockClock::new();
+    clock.set_time(DateTime::<Utc>::UNIX_EPOCH);
+    clock.advance_millis(i64::MAX);
+    clock.set_auto_advance_millis(1);
+
+    assert_eq!(clock.millis(), i64::MAX);
+    assert_eq!(clock.millis(), i64::MAX);
+}
+
+#[test]
 fn test_mock_clock_reset() {
     let clock = MockClock::new();
     let initial = clock.time();

@@ -157,7 +157,9 @@ impl MockClock {
     /// Advances the clock by a fixed amount once.
     ///
     /// This method updates the offset used by [`millis()`](Clock::millis) and
-    /// [`time()`](Clock::time) without enabling auto-advance.
+    /// [`time()`](Clock::time) without enabling auto-advance. If the
+    /// accumulated offset exceeds the `i64` range, it saturates at the nearest
+    /// boundary.
     ///
     /// # Arguments
     ///
@@ -175,7 +177,7 @@ impl MockClock {
     /// ```
     pub fn advance_millis(&self, millis: i64) {
         let mut inner = self.inner.lock();
-        inner.millis_to_add += millis;
+        inner.millis_to_add = inner.millis_to_add.saturating_add(millis);
     }
 
     /// Enables auto-advance on each read operation.
@@ -239,11 +241,19 @@ impl Default for MockClock {
 impl Clock for MockClock {
     fn millis(&self) -> i64 {
         let mut inner = self.inner.lock();
-        let elapsed = inner.monotonic_clock.millis() - inner.create_time;
-        let result = inner.epoch + elapsed + inner.millis_to_add;
+        let elapsed = inner
+            .monotonic_clock
+            .millis()
+            .saturating_sub(inner.create_time);
+        let result = inner
+            .epoch
+            .saturating_add(elapsed)
+            .saturating_add(inner.millis_to_add);
 
         if inner.add_every_time {
-            inner.millis_to_add += inner.millis_to_add_each_time;
+            inner.millis_to_add = inner
+                .millis_to_add
+                .saturating_add(inner.millis_to_add_each_time);
         }
 
         result
@@ -254,8 +264,8 @@ impl ControllableClock for MockClock {
     fn set_time(&self, instant: DateTime<Utc>) {
         let mut inner = self.inner.lock();
         let current_monotonic = inner.monotonic_clock.millis();
-        let elapsed = current_monotonic - inner.create_time;
-        inner.epoch = instant.timestamp_millis() - elapsed;
+        let elapsed = current_monotonic.saturating_sub(inner.create_time);
+        inner.epoch = instant.timestamp_millis().saturating_sub(elapsed);
         inner.millis_to_add = 0;
         inner.millis_to_add_each_time = 0;
         inner.add_every_time = false;
