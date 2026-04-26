@@ -145,11 +145,7 @@ impl NanoMonotonicClock {
     #[inline]
     pub fn monotonic_nanos(&self) -> i128 {
         let elapsed_nanos = self.elapsed().as_nanos();
-        if elapsed_nanos > i128::MAX as u128 {
-            i128::MAX
-        } else {
-            elapsed_nanos as i128
-        }
+        i128::try_from(elapsed_nanos).unwrap_or(i128::MAX)
     }
 }
 
@@ -164,11 +160,7 @@ impl Clock for NanoMonotonicClock {
     #[inline]
     fn millis(&self) -> i64 {
         let elapsed_millis = self.elapsed().as_millis();
-        let elapsed_millis = if elapsed_millis > i64::MAX as u128 {
-            i64::MAX
-        } else {
-            elapsed_millis as i64
-        };
+        let elapsed_millis = i64::try_from(elapsed_millis).unwrap_or(i64::MAX);
         let base_millis =
             self.system_time_base_seconds * 1000 + (self.system_time_base_nanos / 1_000_000) as i64;
         base_millis.saturating_add(elapsed_millis)

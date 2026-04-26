@@ -151,11 +151,7 @@ impl MonotonicClock {
     #[inline]
     pub fn monotonic_millis(&self) -> i64 {
         let elapsed_millis = self.elapsed().as_millis();
-        if elapsed_millis > i64::MAX as u128 {
-            i64::MAX
-        } else {
-            elapsed_millis as i64
-        }
+        i64::try_from(elapsed_millis).unwrap_or(i64::MAX)
     }
 }
 

@@ -253,7 +253,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
             None => return 0,
         };
         let end = self.end_time.unwrap_or_else(|| self.clock.nanos());
-        end - start
+        end.saturating_sub(start)
     }
 
     /// Returns the elapsed duration in microseconds.

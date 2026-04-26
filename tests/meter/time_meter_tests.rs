@@ -275,6 +275,35 @@ fn test_formatted_speed_per_minute() {
 }
 
 #[test]
+fn test_speed_zero_time_with_mock_clock() {
+    let clock = MockClock::new();
+    let meter = TimeMeter::with_clock(clock);
+
+    assert_eq!(meter.speed_per_second(1000), None);
+    assert_eq!(meter.speed_per_minute(1000), None);
+    assert_eq!(meter.formatted_speed_per_second(1000), "N/A");
+    assert_eq!(meter.formatted_speed_per_minute(1000), "N/A");
+}
+
+#[test]
+fn test_formatted_speed_positive_with_default_clock() {
+    let mut meter = TimeMeter::start_now();
+    thread::sleep(StdDuration::from_millis(10));
+    meter.stop();
+
+    assert!(meter.speed_per_second(1000).is_some());
+    assert!(meter.speed_per_minute(1000).is_some());
+
+    let per_second = meter.formatted_speed_per_second(1000);
+    let per_minute = meter.formatted_speed_per_minute(1000);
+
+    assert!(per_second.ends_with("/s"));
+    assert_ne!(per_second, "N/A");
+    assert!(per_minute.ends_with("/m"));
+    assert_ne!(per_minute, "N/A");
+}
+
+#[test]
 fn test_is_running_states() {
     let mut meter = TimeMeter::new();
 
@@ -486,4 +515,49 @@ fn test_millis_uses_current_time_when_running() {
     clock.add_millis(100, false);
     let elapsed3 = meter.millis();
     assert_eq!(elapsed3, 150); // Should still be 150, not 250
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FixedClock {
+    millis: i64,
+}
+
+impl FixedClock {
+    const fn new(millis: i64) -> Self {
+        Self { millis }
+    }
+}
+
+impl Clock for FixedClock {
+    fn millis(&self) -> i64 {
+        self.millis
+    }
+}
+
+#[test]
+fn test_millis_saturates_on_positive_elapsed_overflow() {
+    let mut meter = TimeMeter::with_clock(FixedClock::new(i64::MIN));
+    assert_eq!(meter.millis(), 0);
+    assert!(!meter.is_running());
+
+    meter.start();
+    assert!(meter.is_running());
+
+    *meter.clock_mut() = FixedClock::new(i64::MAX);
+    assert_eq!(meter.millis(), i64::MAX);
+
+    meter.stop();
+    assert!(!meter.is_running());
+
+    assert_eq!(meter.millis(), i64::MAX);
+}
+
+#[test]
+fn test_millis_saturates_on_negative_elapsed_overflow() {
+    let mut meter = TimeMeter::with_clock(FixedClock::new(i64::MAX));
+    meter.start();
+    *meter.clock_mut() = FixedClock::new(i64::MIN);
+    meter.stop();
+
+    assert_eq!(meter.millis(), i64::MIN);
 }
