@@ -13,6 +13,36 @@ use qubit_clock::{Clock, NanoClock, NanoMonotonicClock};
 use std::thread;
 use std::time::Duration;
 
+/// Extracts the base timestamp's sub-millisecond nanoseconds from debug output.
+fn nano_monotonic_base_sub_millis(clock: &NanoMonotonicClock) -> u32 {
+    let debug = format!("{clock:?}");
+    let marker = "system_time_base_nanos: ";
+    let start = debug
+        .find(marker)
+        .expect("debug output should include system_time_base_nanos")
+        + marker.len();
+    let digits: String = debug[start..]
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit())
+        .collect();
+    let base_nanos = digits
+        .parse::<u32>()
+        .expect("system_time_base_nanos should parse as u32");
+    base_nanos % 1_000_000
+}
+
+/// Creates a clock whose base sub-millisecond value exposes rollover behavior.
+fn create_clock_with_large_base_sub_millis() -> (NanoMonotonicClock, u32) {
+    for _ in 0..10_000 {
+        let clock = NanoMonotonicClock::new();
+        let base_sub_millis = nano_monotonic_base_sub_millis(&clock);
+        if (500_000..900_000).contains(&base_sub_millis) {
+            return (clock, base_sub_millis);
+        }
+    }
+    panic!("could not create NanoMonotonicClock with suitable sub-millisecond base");
+}
+
 #[test]
 fn test_nano_monotonic_clock_new() {
     let clock = NanoMonotonicClock::new();
@@ -147,6 +177,33 @@ fn test_nano_monotonic_clock_nanos_millis_consistency() {
         diff <= 1,
         "nanos() and millis() should be consistent, diff: {}",
         diff
+    );
+}
+
+#[test]
+fn test_nano_monotonic_clock_millis_does_not_lag_nanos_after_rollover() {
+    let (clock, base_sub_millis) = create_clock_with_large_base_sub_millis();
+    let rollover_nanos = 1_000_000 - i128::from(base_sub_millis);
+    let started = std::time::Instant::now();
+
+    loop {
+        let elapsed_sub_millis = clock.monotonic_nanos().rem_euclid(1_000_000);
+        if elapsed_sub_millis >= rollover_nanos && elapsed_sub_millis < 950_000 {
+            break;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "timed out waiting for sub-millisecond rollover window"
+        );
+        std::hint::spin_loop();
+    }
+
+    let nanos_as_millis = (clock.nanos() / 1_000_000) as i64;
+    let millis = clock.millis();
+
+    assert!(
+        millis >= nanos_as_millis,
+        "millis() should not lag nanos() after sub-millisecond rollover: millis={millis}, nanos_as_millis={nanos_as_millis}",
     );
 }
 
