@@ -188,7 +188,7 @@ for _ in 0..1000 {
 
 meter.stop();
 println!("处理 1000 个项目耗时 {}", meter.readable_duration());
-println!("速度: {}", meter.readable_speed(1000));
+println!("速度: {}", meter.formatted_speed_per_second(1000));
 ```
 
 ## 架构
@@ -256,8 +256,9 @@ println!("速度: {}", meter.readable_speed(1000));
 
 输出格式示例：
 - `123 ms` - 小于 1 秒
-- `1.23 s` - 1-60 秒
-- `1 m 23.45 s` - 超过 1 分钟
+- `1.5s` - 1-60 秒
+- `1m 23s` - 超过 1 分钟
+- `1h 1m 5s` - 超过 1 小时
 
 ### NanoTimeMeter
 
@@ -265,16 +266,17 @@ println!("速度: {}", meter.readable_speed(1000));
 
 - **纳秒精度**：基于 `NanoClock` trait
 - **默认使用 NanoMonotonicClock**：使用高精度单调时间
-- **人类可读输出**：自动选择合适的单位（ns、μs、ms、s、m）
+- **人类可读输出**：自动选择合适的单位（ns、μs、ms、s、m、h）
 - **速度计算**：高精度速度计算
 - **测试友好**：支持模拟时钟注入
 
 输出格式示例：
 - `123 ns` - 小于 1 微秒
-- `123.45 μs` - 1-1000 微秒
-- `123.45 ms` - 1-1000 毫秒
-- `1.23 s` - 1-60 秒
-- `1 m 23.45 s` - 超过 1 分钟
+- `123.4 μs` - 1-1000 微秒
+- `123.4 ms` - 1-1000 毫秒
+- `1.5s` - 1-60 秒
+- `1m 23s` - 超过 1 分钟
+- `1h 1m 5s` - 超过 1 小时
 
 ## API 参考
 
@@ -290,7 +292,7 @@ println!("速度: {}", meter.readable_speed(1000));
 高精度时钟的扩展 trait：
 
 - `nanos()` - 返回自 Unix 纪元以来的纳秒数
-- `nano_time()` - 返回高精度的 `DateTime<Utc>`
+- `time_precise()` - 返回高精度的 `DateTime<Utc>`
 
 ### ZonedClock Trait
 
@@ -298,7 +300,8 @@ println!("速度: {}", meter.readable_speed(1000));
 
 - `timezone()` - 返回时钟的时区
 - `local_time()` - 返回时钟时区的当前时间
-- `local_time_in(tz)` - 返回指定时区的当前时间
+
+使用 `Zoned::new(clock, tz)` 为时钟指定时区。
 
 ### ControllableClock Trait
 

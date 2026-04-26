@@ -188,7 +188,7 @@ for _ in 0..1000 {
 
 meter.stop();
 println!("Processed 1000 items in {}", meter.readable_duration());
-println!("Speed: {}", meter.readable_speed(1000));
+println!("Speed: {}", meter.formatted_speed_per_second(1000));
 ```
 
 ## Architecture
@@ -256,8 +256,9 @@ A millisecond-precision time meter for measuring elapsed time with the following
 
 Example output formats:
 - `123 ms` - Less than 1 second
-- `1.23 s` - 1-60 seconds
-- `1 m 23.45 s` - More than 1 minute
+- `1.5s` - 1-60 seconds
+- `1m 23s` - More than 1 minute
+- `1h 1m 5s` - More than 1 hour
 
 ### NanoTimeMeter
 
@@ -265,16 +266,17 @@ A nanosecond-precision time meter with features similar to `TimeMeter`:
 
 - **Nanosecond Precision**: Based on `NanoClock` trait
 - **Default to NanoMonotonicClock**: Uses high-precision monotonic time
-- **Human-Readable Output**: Automatically chooses appropriate unit (ns, μs, ms, s, m)
+- **Human-Readable Output**: Automatically chooses appropriate unit (ns, μs, ms, s, m, h)
 - **Speed Calculation**: High-precision speed calculation
 - **Test-Friendly**: Supports mock clock injection
 
 Example output formats:
 - `123 ns` - Less than 1 microsecond
-- `123.45 μs` - 1-1000 microseconds
-- `123.45 ms` - 1-1000 milliseconds
-- `1.23 s` - 1-60 seconds
-- `1 m 23.45 s` - More than 1 minute
+- `123.4 μs` - 1-1000 microseconds
+- `123.4 ms` - 1-1000 milliseconds
+- `1.5s` - 1-60 seconds
+- `1m 23s` - More than 1 minute
+- `1h 1m 5s` - More than 1 hour
 
 ## API Reference
 
@@ -290,7 +292,7 @@ The core `Clock` trait provides:
 Extension trait for high-precision clocks:
 
 - `nanos()` - Returns current time in nanoseconds since Unix epoch
-- `nano_time()` - Returns high-precision `DateTime<Utc>`
+- `time_precise()` - Returns high-precision `DateTime<Utc>`
 
 ### ZonedClock Trait
 
@@ -298,7 +300,8 @@ Extension trait for timezone support:
 
 - `timezone()` - Returns the clock's timezone
 - `local_time()` - Returns current time in the clock's timezone
-- `local_time_in(tz)` - Returns current time in specified timezone
+
+Use `Zoned::new(clock, tz)` to select the timezone for a clock.
 
 ### ControllableClock Trait
 
