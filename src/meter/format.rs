@@ -20,8 +20,8 @@
 /// The format adapts based on the duration:
 /// - Less than 1 second: "X ms"
 /// - Less than 1 minute: "X.Ys" (rounded to 1 decimal place)
-/// - Less than 1 hour: "Xm Ys"
-/// - 1 hour or more: "Xh Ym Zs"
+/// - Less than 1 hour: "Xm Ys" (rounded to the nearest second)
+/// - 1 hour or more: "Xh Ym Zs" (rounded to the nearest second)
 ///
 /// # Arguments
 ///
@@ -45,20 +45,30 @@ pub fn format_duration_millis(millis: i64) -> String {
     format_duration_millis_i128(i128::from(millis))
 }
 
-/// Formats a millisecond duration stored as `i128`.
-///
-/// This helper keeps [`format_duration_nanos`] from truncating very large
-/// nanosecond values before formatting them.
-fn format_duration_millis_i128(millis: i128) -> String {
-    if millis < 0 {
-        return "0 ms".to_string();
+/// Formats a value stored in tenths using the specified unit suffix.
+fn format_tenths(value_tenths: i128, unit: &str) -> String {
+    let whole = value_tenths / 10;
+    let tenths = value_tenths % 10;
+    if tenths > 0 {
+        format!("{}.{}{}", whole, tenths, unit)
+    } else {
+        format!("{}{}", whole, unit)
     }
+}
 
-    if millis < 1000 {
-        return format!("{} ms", millis);
+/// Divides a non-negative value by a positive divisor using half-up rounding.
+fn div_round_half_up(value: i128, divisor: i128) -> i128 {
+    let quotient = value / divisor;
+    let remainder = value % divisor;
+    if remainder >= divisor - remainder {
+        quotient.saturating_add(1)
+    } else {
+        quotient
     }
+}
 
-    let total_seconds = millis / 1000;
+/// Formats a non-negative duration expressed as whole seconds.
+fn format_duration_seconds(total_seconds: i128) -> String {
     let hours = total_seconds / 3600;
     let minutes = (total_seconds % 3600) / 60;
     let seconds = total_seconds % 60;
@@ -80,13 +90,32 @@ fn format_duration_millis_i128(millis: i128) -> String {
             format!("{}m", minutes)
         }
     } else {
-        let millis_part = millis % 1000;
-        if millis_part > 0 {
-            format!("{}.{}s", seconds, millis_part / 100)
-        } else {
-            format!("{}s", seconds)
-        }
+        format!("{}s", seconds)
     }
+}
+
+/// Formats a millisecond duration stored as `i128`.
+///
+/// This helper keeps [`format_duration_nanos`] from truncating very large
+/// nanosecond values before formatting them.
+fn format_duration_millis_i128(millis: i128) -> String {
+    if millis < 0 {
+        return "0 ms".to_string();
+    }
+
+    if millis < 1000 {
+        return format!("{} ms", millis);
+    }
+
+    if millis < 60_000 {
+        let tenths = div_round_half_up(millis, 100);
+        if tenths >= 600 {
+            return format_duration_seconds(tenths / 10);
+        }
+        return format_tenths(tenths, "s");
+    }
+
+    format_duration_seconds(div_round_half_up(millis, 1000))
 }
 
 /// Formats a duration in nanoseconds into a human-readable string.
@@ -95,7 +124,8 @@ fn format_duration_millis_i128(millis: i128) -> String {
 /// - Less than 1 microsecond: "X ns"
 /// - Less than 1 millisecond: "X.Y μs" (rounded to 1 decimal place)
 /// - Less than 1 second: "X.Y ms" (rounded to 1 decimal place)
-/// - 1 second or more: delegates to `format_duration_millis`
+/// - Less than 1 minute: "X.Ys" (rounded to 1 decimal place)
+/// - 1 minute or more: "Xm Ys" or "Xh Ym Zs" (rounded to the nearest second)
 ///
 /// # Arguments
 ///
@@ -125,24 +155,25 @@ pub fn format_duration_nanos(nanos: i128) -> String {
     }
 
     if nanos < 1_000_000 {
-        let micros = nanos / 1000;
-        let nanos_part = nanos % 1000;
-        if nanos_part > 0 {
-            format!("{}.{} μs", micros, nanos_part / 100)
-        } else {
-            format!("{} μs", micros)
+        let tenths = div_round_half_up(nanos, 100);
+        if tenths >= 10_000 {
+            return format_duration_nanos(tenths * 100);
         }
+        format_tenths(tenths, " μs")
     } else if nanos < 1_000_000_000 {
-        let millis = nanos / 1_000_000;
-        let micros_part = (nanos % 1_000_000) / 100_000;
-        if micros_part > 0 {
-            format!("{}.{} ms", millis, micros_part)
-        } else {
-            format!("{} ms", millis)
+        let tenths = div_round_half_up(nanos, 100_000);
+        if tenths >= 10_000 {
+            return format_duration_nanos(tenths * 100_000);
         }
+        format_tenths(tenths, " ms")
+    } else if nanos < 60_000_000_000 {
+        let tenths = div_round_half_up(nanos, 100_000_000);
+        if tenths >= 600 {
+            return format_duration_seconds(tenths / 10);
+        }
+        format_tenths(tenths, "s")
     } else {
-        let millis = nanos / 1_000_000;
-        format_duration_millis_i128(millis)
+        format_duration_seconds(div_round_half_up(nanos, 1_000_000_000))
     }
 }
 

@@ -34,7 +34,9 @@ fn test_format_duration_millis_seconds_with_fraction() {
     assert_eq!(format_duration_millis(1000), "1s");
     assert_eq!(format_duration_millis(1100), "1.1s");
     assert_eq!(format_duration_millis(1500), "1.5s");
-    assert_eq!(format_duration_millis(1999), "1.9s");
+    assert_eq!(format_duration_millis(1949), "1.9s");
+    assert_eq!(format_duration_millis(1950), "2s");
+    assert_eq!(format_duration_millis(1999), "2s");
     assert_eq!(format_duration_millis(2000), "2s");
 }
 
@@ -43,7 +45,9 @@ fn test_format_duration_millis_minutes_and_seconds() {
     assert_eq!(format_duration_millis(60000), "1m");
     assert_eq!(format_duration_millis(61000), "1m 1s");
     assert_eq!(format_duration_millis(65000), "1m 5s");
+    assert_eq!(format_duration_millis(59950), "1m");
     assert_eq!(format_duration_millis(119000), "1m 59s");
+    assert_eq!(format_duration_millis(119500), "2m");
     assert_eq!(format_duration_millis(120000), "2m");
 }
 
@@ -95,9 +99,13 @@ fn test_format_duration_nanos_microseconds() {
     assert_eq!(format_duration_nanos(1000), "1 μs");
     assert_eq!(format_duration_nanos(1100), "1.1 μs");
     assert_eq!(format_duration_nanos(1500), "1.5 μs");
-    assert_eq!(format_duration_nanos(1999), "1.9 μs");
+    assert_eq!(format_duration_nanos(1949), "1.9 μs");
+    assert_eq!(format_duration_nanos(1950), "2 μs");
+    assert_eq!(format_duration_nanos(1999), "2 μs");
     assert_eq!(format_duration_nanos(2000), "2 μs");
-    assert_eq!(format_duration_nanos(999999), "999.9 μs");
+    assert_eq!(format_duration_nanos(999949), "999.9 μs");
+    assert_eq!(format_duration_nanos(999950), "1 ms");
+    assert_eq!(format_duration_nanos(999999), "1 ms");
 }
 
 #[test]
@@ -105,9 +113,13 @@ fn test_format_duration_nanos_milliseconds() {
     assert_eq!(format_duration_nanos(1_000_000), "1 ms");
     assert_eq!(format_duration_nanos(1_100_000), "1.1 ms");
     assert_eq!(format_duration_nanos(1_500_000), "1.5 ms");
-    assert_eq!(format_duration_nanos(1_999_000), "1.9 ms");
+    assert_eq!(format_duration_nanos(1_949_000), "1.9 ms");
+    assert_eq!(format_duration_nanos(1_950_000), "2 ms");
+    assert_eq!(format_duration_nanos(1_999_000), "2 ms");
     assert_eq!(format_duration_nanos(2_000_000), "2 ms");
-    assert_eq!(format_duration_nanos(999_999_999), "999.9 ms");
+    assert_eq!(format_duration_nanos(999_949_999), "999.9 ms");
+    assert_eq!(format_duration_nanos(999_950_000), "1s");
+    assert_eq!(format_duration_nanos(999_999_999), "1s");
 }
 
 #[test]
@@ -116,8 +128,21 @@ fn test_format_duration_nanos_seconds_and_above() {
     assert_eq!(format_duration_nanos(1_000_000_000), "1s");
     // 1.5 seconds
     assert_eq!(format_duration_nanos(1_500_000_000), "1.5s");
+    // 1.949999999 seconds rounds directly to 1 decimal place without double rounding
+    assert_eq!(format_duration_nanos(1_949_999_999), "1.9s");
+    // 1.95 seconds rounds to 2 seconds
+    assert_eq!(format_duration_nanos(1_950_000_000), "2s");
+    // 1.999 seconds rounds to 2 seconds
+    assert_eq!(format_duration_nanos(1_999_000_000), "2s");
+    // 59.949999999 seconds stays below the minute boundary
+    assert_eq!(format_duration_nanos(59_949_999_999), "59.9s");
+    // 59.95 seconds rounds to 1 minute
+    assert_eq!(format_duration_nanos(59_950_000_000), "1m");
     // 1 minute
     assert_eq!(format_duration_nanos(60_000_000_000), "1m");
+    // Durations of at least 1 minute round to whole seconds
+    assert_eq!(format_duration_nanos(60_499_999_999), "1m");
+    assert_eq!(format_duration_nanos(60_500_000_000), "1m 1s");
     // 1 hour
     assert_eq!(format_duration_nanos(3_600_000_000_000), "1h");
 }
@@ -126,7 +151,7 @@ fn test_format_duration_nanos_seconds_and_above() {
 fn test_format_duration_nanos_extreme_positive_value() {
     assert_eq!(
         format_duration_nanos(i128::MAX),
-        "47261439850130342147690917h 41m 55s",
+        "47261439850130342147690917h 41m 56s",
     );
 }
 
