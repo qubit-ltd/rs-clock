@@ -8,9 +8,27 @@
  ******************************************************************************/
 //! Tests for the Clock trait.
 
+use chrono::{DateTime, Utc};
 use qubit_clock::{Clock, MockClock, MonotonicClock, SystemClock};
 use std::thread;
 use std::time::Duration;
+
+#[derive(Debug, Clone, Copy)]
+struct FixedClock {
+    millis: i64,
+}
+
+impl FixedClock {
+    const fn new(millis: i64) -> Self {
+        Self { millis }
+    }
+}
+
+impl Clock for FixedClock {
+    fn millis(&self) -> i64 {
+        self.millis
+    }
+}
 
 #[test]
 fn test_clock_millis_returns_positive() {
@@ -64,6 +82,15 @@ fn test_clock_millis_and_time_consistency() {
             diff
         );
     }
+}
+
+#[test]
+fn test_clock_time_clamps_out_of_range_millis() {
+    let max_clock = FixedClock::new(i64::MAX);
+    assert_eq!(max_clock.time(), DateTime::<Utc>::MAX_UTC);
+
+    let min_clock = FixedClock::new(i64::MIN);
+    assert_eq!(min_clock.time(), DateTime::<Utc>::MIN_UTC);
 }
 
 #[test]

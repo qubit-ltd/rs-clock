@@ -17,6 +17,15 @@
 
 use chrono::{DateTime, Utc};
 
+/// Clamps an out-of-range millisecond timestamp to chrono's nearest boundary.
+fn clamp_out_of_range_millis(millis: i64) -> DateTime<Utc> {
+    if millis < 0 {
+        DateTime::<Utc>::MIN_UTC
+    } else {
+        DateTime::<Utc>::MAX_UTC
+    }
+}
+
 /// A trait representing a clock that provides UTC time.
 ///
 /// This is the base trait for all clock implementations. It provides methods
@@ -69,6 +78,8 @@ pub trait Clock: Send + Sync {
     ///
     /// This method has a default implementation that constructs a
     /// `DateTime<Utc>` from the result of [`millis()`](Clock::millis).
+    /// If the millisecond timestamp is outside chrono's representable range,
+    /// the result is clamped to the nearest representable UTC datetime.
     ///
     /// # Returns
     ///
@@ -85,6 +96,7 @@ pub trait Clock: Send + Sync {
     /// ```
     #[inline]
     fn time(&self) -> DateTime<Utc> {
-        DateTime::from_timestamp_millis(self.millis()).unwrap_or_else(Utc::now)
+        let millis = self.millis();
+        DateTime::from_timestamp_millis(millis).unwrap_or_else(|| clamp_out_of_range_millis(millis))
     }
 }
