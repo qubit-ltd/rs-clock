@@ -306,7 +306,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// Returns the elapsed duration in milliseconds.
     ///
     /// This method is based on the result of `nanos()`, converting
-    /// nanoseconds to milliseconds.
+    /// nanoseconds to whole milliseconds by truncating toward zero.
     ///
     /// If the meter has not been started (by calling `start()`), returns
     /// 0.
@@ -328,13 +328,13 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// ```
     #[inline]
     pub fn millis(&self) -> i64 {
-        saturating_i64_from_i128(self.nanos().div_euclid(1_000_000))
+        saturating_i64_from_i128(self.nanos() / NANOS_PER_MILLISECOND)
     }
 
     /// Returns the elapsed duration in seconds.
     ///
     /// This method is based on the result of `nanos()`, converting
-    /// nanoseconds to seconds (rounded down).
+    /// nanoseconds to whole seconds by truncating toward zero.
     ///
     /// # Returns
     ///
@@ -353,13 +353,13 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// ```
     #[inline]
     pub fn seconds(&self) -> i64 {
-        saturating_i64_from_i128(self.nanos().div_euclid(1_000_000_000))
+        saturating_i64_from_i128(self.nanos() / NANOS_PER_SECOND)
     }
 
     /// Returns the elapsed duration in minutes.
     ///
     /// This method is based on the result of `nanos()`, converting
-    /// nanoseconds to minutes (rounded down).
+    /// nanoseconds to whole minutes by truncating toward zero.
     ///
     /// # Returns
     ///
@@ -377,7 +377,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// ```
     #[inline]
     pub fn minutes(&self) -> i64 {
-        saturating_i64_from_i128(self.nanos().div_euclid(60_000_000_000))
+        saturating_i64_from_i128(self.nanos() / (60 * NANOS_PER_SECOND))
     }
 
     /// Returns the elapsed duration as a `Duration` object.

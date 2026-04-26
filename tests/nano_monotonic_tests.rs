@@ -10,37 +10,56 @@
 
 use chrono::Datelike;
 use qubit_clock::{Clock, NanoClock, NanoMonotonicClock};
+use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
-/// Extracts the base timestamp's sub-millisecond nanoseconds from debug output.
-fn nano_monotonic_base_sub_millis(clock: &NanoMonotonicClock) -> u32 {
-    let debug = format!("{clock:?}");
-    let marker = "system_time_base_nanos: ";
+/// Parses a numeric field from the derived debug output.
+fn parse_debug_number<T>(debug: &str, field: &str) -> T
+where
+    T: FromStr,
+    T::Err: std::fmt::Debug,
+{
+    let marker = format!("{field}: ");
     let start = debug
-        .find(marker)
-        .expect("debug output should include system_time_base_nanos")
+        .find(&marker)
+        .unwrap_or_else(|| panic!("debug output should include {field}"))
         + marker.len();
     let digits: String = debug[start..]
         .chars()
-        .take_while(|ch| ch.is_ascii_digit())
+        .take_while(|ch| *ch == '-' || ch.is_ascii_digit())
         .collect();
-    let base_nanos = digits
-        .parse::<u32>()
-        .expect("system_time_base_nanos should parse as u32");
-    base_nanos % 1_000_000
+    digits
+        .parse::<T>()
+        .unwrap_or_else(|err| panic!("{field} should parse: {err:?}"))
 }
 
-/// Creates a clock whose base sub-millisecond value exposes rollover behavior.
-fn create_clock_with_large_base_sub_millis() -> (NanoMonotonicClock, u32) {
-    for _ in 0..10_000 {
+/// Extracts the base timestamp in nanoseconds from debug output.
+fn nano_monotonic_base_nanos(clock: &NanoMonotonicClock) -> i128 {
+    let debug = format!("{clock:?}");
+    let seconds = parse_debug_number::<i64>(&debug, "system_time_base_seconds");
+    let nanos = parse_debug_number::<u32>(&debug, "system_time_base_nanos");
+    i128::from(seconds) * 1_000_000_000 + i128::from(nanos)
+}
+
+/// Observes a clock after base and elapsed sub-millisecond values cross a millisecond boundary.
+fn observe_clock_after_sub_millisecond_rollover() -> (i64, i64, i64) {
+    for _ in 0..100_000 {
         let clock = NanoMonotonicClock::new();
-        let base_sub_millis = nano_monotonic_base_sub_millis(&clock);
-        if (500_000..900_000).contains(&base_sub_millis) {
-            return (clock, base_sub_millis);
+        let base_nanos = nano_monotonic_base_nanos(&clock);
+        let elapsed_nanos = clock.monotonic_nanos();
+        let combined_millis = (base_nanos + elapsed_nanos).div_euclid(1_000_000);
+        let separated_millis =
+            base_nanos.div_euclid(1_000_000) + elapsed_nanos.div_euclid(1_000_000);
+
+        if combined_millis > separated_millis {
+            let before_millis = (clock.nanos() / 1_000_000) as i64;
+            let millis = clock.millis();
+            let after_millis = (clock.nanos() / 1_000_000) as i64;
+            return (before_millis, millis, after_millis);
         }
     }
-    panic!("could not create NanoMonotonicClock with suitable sub-millisecond base");
+    panic!("could not observe NanoMonotonicClock after sub-millisecond rollover");
 }
 
 #[test]
@@ -182,28 +201,11 @@ fn test_nano_monotonic_clock_nanos_millis_consistency() {
 
 #[test]
 fn test_nano_monotonic_clock_millis_does_not_lag_nanos_after_rollover() {
-    let (clock, base_sub_millis) = create_clock_with_large_base_sub_millis();
-    let rollover_nanos = 1_000_000 - i128::from(base_sub_millis);
-    let started = std::time::Instant::now();
-
-    loop {
-        let elapsed_sub_millis = clock.monotonic_nanos().rem_euclid(1_000_000);
-        if elapsed_sub_millis >= rollover_nanos && elapsed_sub_millis < 950_000 {
-            break;
-        }
-        assert!(
-            started.elapsed() < Duration::from_secs(1),
-            "timed out waiting for sub-millisecond rollover window"
-        );
-        std::hint::spin_loop();
-    }
-
-    let nanos_as_millis = (clock.nanos() / 1_000_000) as i64;
-    let millis = clock.millis();
+    let (before_millis, millis, after_millis) = observe_clock_after_sub_millisecond_rollover();
 
     assert!(
-        millis >= nanos_as_millis,
-        "millis() should not lag nanos() after sub-millisecond rollover: millis={millis}, nanos_as_millis={nanos_as_millis}",
+        (before_millis..=after_millis).contains(&millis),
+        "millis() should stay within surrounding nanos() readings after sub-millisecond rollover: before={before_millis}, millis={millis}, after={after_millis}",
     );
 }
 

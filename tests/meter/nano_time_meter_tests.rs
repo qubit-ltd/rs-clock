@@ -517,6 +517,34 @@ fn test_conversion_saturates_on_negative_overflow() {
 }
 
 #[test]
+fn test_unit_conversions_truncate_negative_subunit_durations_toward_zero() {
+    let clock = SequenceNanoClock::new(vec![0, -1]);
+    let mut meter = NanoTimeMeter::with_clock(clock);
+    meter.start();
+    meter.stop();
+
+    assert_eq!(meter.nanos(), -1);
+    assert_eq!(meter.micros(), 0);
+    assert_eq!(meter.millis(), 0);
+    assert_eq!(meter.seconds(), 0);
+    assert_eq!(meter.minutes(), 0);
+}
+
+#[test]
+fn test_unit_conversions_truncate_negative_fractional_durations_toward_zero() {
+    let clock = SequenceNanoClock::new(vec![0, -1_500_000_000]);
+    let mut meter = NanoTimeMeter::with_clock(clock);
+    meter.start();
+    meter.stop();
+
+    assert_eq!(meter.nanos(), -1_500_000_000);
+    assert_eq!(meter.micros(), -1_500_000);
+    assert_eq!(meter.millis(), -1500);
+    assert_eq!(meter.seconds(), -1);
+    assert_eq!(meter.minutes(), 0);
+}
+
+#[test]
 fn test_duration_preserves_representable_large_positive_nanos() {
     let elapsed_nanos = i64::MAX as i128 + 1_000_000_000;
     let clock = SequenceNanoClock::new(vec![0, elapsed_nanos]);
