@@ -42,6 +42,14 @@
 /// assert_eq!(format_duration_millis(3665000), "1h 1m 5s");
 /// ```
 pub fn format_duration_millis(millis: i64) -> String {
+    format_duration_millis_i128(i128::from(millis))
+}
+
+/// Formats a millisecond duration stored as `i128`.
+///
+/// This helper keeps [`format_duration_nanos`] from truncating very large
+/// nanosecond values before formatting them.
+fn format_duration_millis_i128(millis: i128) -> String {
     if millis < 0 {
         return "0 ms".to_string();
     }
@@ -133,8 +141,8 @@ pub fn format_duration_nanos(nanos: i128) -> String {
             format!("{} ms", millis)
         }
     } else {
-        let millis = (nanos / 1_000_000) as i64;
-        format_duration_millis(millis)
+        let millis = nanos / 1_000_000;
+        format_duration_millis_i128(millis)
     }
 }
 
