@@ -155,10 +155,20 @@ fn test_nano_clock_time_precise_handles_negative_nanos() {
 }
 
 #[test]
-fn test_nano_clock_time_precise_out_of_range_falls_back_to_unix_epoch() {
-    let clock = FixedNanoClock::new(i128::MAX);
-    let time = clock.time_precise();
-    assert_eq!(time, DateTime::<Utc>::UNIX_EPOCH);
+fn test_nano_clock_time_precise_clamps_out_of_range_nanos() {
+    let max_clock = FixedNanoClock::new(i128::MAX);
+    assert_eq!(max_clock.time_precise(), DateTime::<Utc>::MAX_UTC);
+
+    let min_clock = FixedNanoClock::new(i128::MIN);
+    assert_eq!(min_clock.time_precise(), DateTime::<Utc>::MIN_UTC);
+
+    let beyond_chrono_max = (DateTime::<Utc>::MAX_UTC.timestamp() as i128 + 1) * 1_000_000_000;
+    let max_clock = FixedNanoClock::new(beyond_chrono_max);
+    assert_eq!(max_clock.time_precise(), DateTime::<Utc>::MAX_UTC);
+
+    let beyond_chrono_min = (DateTime::<Utc>::MIN_UTC.timestamp() as i128 - 1) * 1_000_000_000;
+    let min_clock = FixedNanoClock::new(beyond_chrono_min);
+    assert_eq!(min_clock.time_precise(), DateTime::<Utc>::MIN_UTC);
 }
 
 #[test]

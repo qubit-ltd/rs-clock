@@ -74,6 +74,8 @@ pub trait NanoClock: Clock {
     ///
     /// This method has a default implementation that constructs a
     /// `DateTime<Utc>` from the result of [`nanos()`](NanoClock::nanos).
+    /// If the nanosecond timestamp is outside chrono's representable range,
+    /// the result is clamped to the nearest representable UTC datetime.
     ///
     /// # Returns
     ///
@@ -96,8 +98,15 @@ pub trait NanoClock: Clock {
         let nsecs = nanos.rem_euclid(1_000_000_000) as u32;
         let secs = match i64::try_from(secs) {
             Ok(value) => value,
-            Err(_) => return DateTime::<Utc>::UNIX_EPOCH,
+            Err(_) if nanos < 0 => return DateTime::<Utc>::MIN_UTC,
+            Err(_) => return DateTime::<Utc>::MAX_UTC,
         };
-        DateTime::from_timestamp(secs, nsecs).unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
+        DateTime::from_timestamp(secs, nsecs).unwrap_or({
+            if nanos < 0 {
+                DateTime::<Utc>::MIN_UTC
+            } else {
+                DateTime::<Utc>::MAX_UTC
+            }
+        })
     }
 }
