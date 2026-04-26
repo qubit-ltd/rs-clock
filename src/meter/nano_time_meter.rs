@@ -20,6 +20,12 @@ use crate::meter::format::{format_duration_nanos, format_speed};
 use crate::{NanoClock, NanoMonotonicClock};
 use chrono::Duration;
 
+/// The number of nanoseconds in one millisecond.
+const NANOS_PER_MILLISECOND: i128 = 1_000_000;
+
+/// The number of nanoseconds in one second.
+const NANOS_PER_SECOND: i128 = 1_000_000_000;
+
 /// Converts an `i128` value to `i64` using saturation.
 ///
 /// Values above `i64::MAX` are clamped to `i64::MAX`, and values below
@@ -33,6 +39,24 @@ fn saturating_i64_from_i128(value: i128) -> i64 {
     } else {
         value as i64
     }
+}
+
+/// Converts nanoseconds to a chrono `Duration`, clamping only at chrono bounds.
+fn duration_from_nanos(nanos: i128) -> Duration {
+    let max_nanos = i128::from(i64::MAX) * NANOS_PER_MILLISECOND;
+    let min_nanos = -i128::from(i64::MAX) * NANOS_PER_MILLISECOND;
+
+    if nanos >= max_nanos {
+        return Duration::MAX;
+    }
+    if nanos <= min_nanos {
+        return Duration::MIN;
+    }
+
+    let seconds = nanos.div_euclid(NANOS_PER_SECOND);
+    let sub_nanos = nanos.rem_euclid(NANOS_PER_SECOND) as u32;
+    Duration::new(seconds as i64, sub_nanos)
+        .expect("nanos within chrono bounds should construct Duration")
 }
 
 /// A time meter for measuring elapsed time with nanosecond precision.
@@ -382,7 +406,7 @@ impl<C: NanoClock> NanoTimeMeter<C> {
     /// ```
     #[inline]
     pub fn duration(&self) -> Duration {
-        Duration::nanoseconds(saturating_i64_from_i128(self.nanos()))
+        duration_from_nanos(self.nanos())
     }
 
     /// Returns a human-readable string representation of the elapsed

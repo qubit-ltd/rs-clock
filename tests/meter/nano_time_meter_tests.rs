@@ -498,7 +498,7 @@ fn test_conversion_saturates_on_positive_overflow() {
     assert_eq!(meter.millis(), i64::MAX);
     assert_eq!(meter.seconds(), i64::MAX);
     assert_eq!(meter.minutes(), i64::MAX);
-    assert_eq!(meter.duration(), Duration::nanoseconds(i64::MAX));
+    assert_eq!(meter.duration(), Duration::MAX);
 }
 
 #[test]
@@ -513,7 +513,41 @@ fn test_conversion_saturates_on_negative_overflow() {
     assert_eq!(meter.millis(), i64::MIN);
     assert_eq!(meter.seconds(), i64::MIN);
     assert_eq!(meter.minutes(), i64::MIN);
-    assert_eq!(meter.duration(), Duration::nanoseconds(i64::MIN));
+    assert_eq!(meter.duration(), Duration::MIN);
+}
+
+#[test]
+fn test_duration_preserves_representable_large_positive_nanos() {
+    let elapsed_nanos = i64::MAX as i128 + 1_000_000_000;
+    let clock = SequenceNanoClock::new(vec![0, elapsed_nanos]);
+    let mut meter = NanoTimeMeter::with_clock(clock);
+    meter.start();
+    meter.stop();
+
+    let seconds = elapsed_nanos.div_euclid(1_000_000_000);
+    let sub_nanos = elapsed_nanos.rem_euclid(1_000_000_000);
+    let expected = Duration::new(seconds as i64, sub_nanos as u32)
+        .expect("elapsed nanos should fit chrono Duration");
+
+    assert_eq!(meter.duration(), expected);
+    assert!(meter.duration() > Duration::nanoseconds(i64::MAX));
+}
+
+#[test]
+fn test_duration_preserves_representable_large_negative_nanos() {
+    let elapsed_nanos = i64::MIN as i128 - 1_000_000_000;
+    let clock = SequenceNanoClock::new(vec![0, elapsed_nanos]);
+    let mut meter = NanoTimeMeter::with_clock(clock);
+    meter.start();
+    meter.stop();
+
+    let seconds = elapsed_nanos.div_euclid(1_000_000_000);
+    let sub_nanos = elapsed_nanos.rem_euclid(1_000_000_000);
+    let expected = Duration::new(seconds as i64, sub_nanos as u32)
+        .expect("elapsed nanos should fit chrono Duration");
+
+    assert_eq!(meter.duration(), expected);
+    assert!(meter.duration() < Duration::nanoseconds(i64::MIN));
 }
 
 #[test]
