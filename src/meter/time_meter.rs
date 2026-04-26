@@ -350,7 +350,7 @@ impl<C: Clock> TimeMeter<C> {
     /// ```
     #[inline]
     pub fn duration(&self) -> Duration {
-        Duration::milliseconds(self.millis())
+        Duration::milliseconds(self.millis().max(-i64::MAX))
     }
 
     /// Returns a human-readable string representation of the elapsed

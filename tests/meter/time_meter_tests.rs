@@ -561,3 +561,14 @@ fn test_millis_saturates_on_negative_elapsed_overflow() {
 
     assert_eq!(meter.millis(), i64::MIN);
 }
+
+#[test]
+fn test_duration_clamps_negative_elapsed_overflow() {
+    let mut meter = TimeMeter::with_clock(FixedClock::new(i64::MAX));
+    meter.start();
+    *meter.clock_mut() = FixedClock::new(i64::MIN);
+    meter.stop();
+
+    assert_eq!(meter.millis(), i64::MIN);
+    assert_eq!(meter.duration(), Duration::milliseconds(-i64::MAX));
+}
