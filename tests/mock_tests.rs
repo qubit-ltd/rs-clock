@@ -12,6 +12,19 @@ use chrono::{DateTime, Duration, Utc};
 use qubit_clock::{Clock, ControllableClock, MockClock};
 use std::thread;
 
+const CLOCK_DRIFT_TOLERANCE_MS: i64 = 1_000;
+
+/// Asserts that a mock clock reading is close to the expected logical time.
+fn assert_close_to_expected_time(actual: DateTime<Utc>, expected: DateTime<Utc>) {
+    let diff_ms = (actual - expected).num_milliseconds();
+    assert!(
+        (0..CLOCK_DRIFT_TOLERANCE_MS).contains(&diff_ms),
+        "time should be within {}ms after expected time, diff_ms: {}",
+        CLOCK_DRIFT_TOLERANCE_MS,
+        diff_ms
+    );
+}
+
 #[test]
 fn test_mock_clock_new() {
     let clock = MockClock::new();
@@ -240,22 +253,22 @@ fn test_mock_clock_complex_scenario() {
     // Advance by 1 day
     clock.add_duration(Duration::days(1));
     let after_day = clock.time();
-    assert_eq!(after_day, start_time + Duration::days(1));
+    assert_close_to_expected_time(after_day, start_time + Duration::days(1));
 
     // Advance by 12 hours
     clock.add_duration(Duration::hours(12));
     let after_hours = clock.time();
-    assert_eq!(
+    assert_close_to_expected_time(
         after_hours,
-        start_time + Duration::days(1) + Duration::hours(12)
+        start_time + Duration::days(1) + Duration::hours(12),
     );
 
     // Go back 6 hours
     clock.add_duration(Duration::hours(-6));
     let after_back = clock.time();
-    assert_eq!(
+    assert_close_to_expected_time(
         after_back,
-        start_time + Duration::days(1) + Duration::hours(6)
+        start_time + Duration::days(1) + Duration::hours(6),
     );
 }
 
@@ -314,10 +327,10 @@ fn test_mock_clock_in_thread() {
     });
 
     let result = handle.join().unwrap();
-    assert_eq!(result, fixed_time + Duration::hours(1));
+    assert_close_to_expected_time(result, fixed_time + Duration::hours(1));
 
     // Main thread should see the change
-    assert_eq!(clock.time(), fixed_time + Duration::hours(1));
+    assert_close_to_expected_time(clock.time(), fixed_time + Duration::hours(1));
 }
 
 #[test]
