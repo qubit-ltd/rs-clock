@@ -278,6 +278,31 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 - `1m 23s` - 超过 1 分钟
 - `1h 1m 5s` - 超过 1 小时
 
+## 为什么不直接使用 `std::time::Instant`？
+
+`std::time::Instant` 是生产代码中测量真实耗时的正确基础工具。它单调、
+快速且简单：
+
+```rust
+let start = std::time::Instant::now();
+// 执行工作
+let elapsed = start.elapsed();
+```
+
+本 crate 关注的是“计时”之外的几个常见需求：
+
+- 当测试需要确定性地控制时间时，使用 `MockClock`。测试可以直接设置当前
+  时间、瞬间推进时间、重置时间，或让每次读取自动推进时间，而不需要真的
+  `sleep` 几秒或几分钟。
+- 当应用代码需要可复用的 start/stop 计量器、可读耗时、速度计算以及可注入
+  的时钟源时，使用 `TimeMeter` 或 `NanoTimeMeter`。它们默认使用单调时钟，
+  测试时也可以注入 `MockClock`。
+- 当业务逻辑依赖“当前时间”且需要可测试时，使用 `Clock` 系列 trait，避免
+  直接耦合到系统时钟或 `Instant::now()`。
+
+简而言之，`Instant` 用来测量真实流逝的时间；`MockClock` 让测试中的时间
+可控；`TimeMeter` 把耗时测量封装成可复用、可格式化、可测试的抽象。
+
 ## API 参考
 
 ### Clock Trait

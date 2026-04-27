@@ -278,6 +278,34 @@ Example output formats:
 - `1m 23s` - More than 1 minute
 - `1h 1m 5s` - More than 1 hour
 
+## Why Not Just Use `std::time::Instant`?
+
+`std::time::Instant` is the right primitive for measuring real elapsed time in
+production code. It is monotonic, fast, and simple:
+
+```rust
+let start = std::time::Instant::now();
+// do work
+let elapsed = start.elapsed();
+```
+
+This crate exists for the cases where elapsed-time measurement is only part of
+the problem:
+
+- Use `MockClock` when tests need deterministic control over time. Instead of
+  sleeping for real seconds or minutes, tests can set the current time, advance
+  it instantly, reset it, or enable auto-advance on each read.
+- Use `TimeMeter` or `NanoTimeMeter` when application code needs a reusable
+  start/stop meter with formatted durations, speed calculations, and an
+  injectable clock source. They use monotonic clocks by default, but can accept
+  `MockClock` in tests.
+- Use the `Clock` traits when business logic depends on "current time" and must
+  be testable without coupling directly to the system clock or `Instant::now()`.
+
+In short, `Instant` measures real elapsed time; `MockClock` makes time
+controllable for tests; `TimeMeter` turns elapsed-time measurement into a
+reusable, formatted, testable abstraction.
+
 ## API Reference
 
 ### Clock Trait
