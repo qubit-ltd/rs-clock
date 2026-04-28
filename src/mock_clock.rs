@@ -17,8 +17,7 @@
 
 use crate::{Clock, ControllableClock, MonotonicClock};
 use chrono::{DateTime, Duration, Utc};
-use parking_lot::Mutex;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 /// A controllable clock implementation for testing.
 ///
@@ -86,6 +85,13 @@ struct MockClockInner {
 }
 
 impl MockClock {
+    #[inline]
+    fn lock_inner(&self) -> MutexGuard<'_, MockClockInner> {
+        self.inner
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     /// Creates a new `MockClock`.
     ///
     /// The clock is initialized with the current system time and uses a
@@ -176,7 +182,7 @@ impl MockClock {
     /// assert_eq!(clock.millis(), before + 1000);
     /// ```
     pub fn advance_millis(&self, millis: i64) {
-        let mut inner = self.inner.lock();
+        let mut inner = self.lock_inner();
         inner.millis_to_add = inner.millis_to_add.saturating_add(millis);
     }
 
@@ -201,7 +207,7 @@ impl MockClock {
     /// assert_eq!(t2 - t1, 100);
     /// ```
     pub fn set_auto_advance_millis(&self, millis: i64) {
-        let mut inner = self.inner.lock();
+        let mut inner = self.lock_inner();
         inner.millis_to_add_each_time = millis;
         inner.add_every_time = true;
     }
@@ -225,7 +231,7 @@ impl MockClock {
     /// assert!((t2 - t1).abs() < 10);
     /// ```
     pub fn clear_auto_advance(&self) {
-        let mut inner = self.inner.lock();
+        let mut inner = self.lock_inner();
         inner.millis_to_add_each_time = 0;
         inner.add_every_time = false;
     }
@@ -240,7 +246,7 @@ impl Default for MockClock {
 
 impl Clock for MockClock {
     fn millis(&self) -> i64 {
-        let mut inner = self.inner.lock();
+        let mut inner = self.lock_inner();
         let elapsed = inner
             .monotonic_clock
             .millis()
@@ -262,7 +268,7 @@ impl Clock for MockClock {
 
 impl ControllableClock for MockClock {
     fn set_time(&self, instant: DateTime<Utc>) {
-        let mut inner = self.inner.lock();
+        let mut inner = self.lock_inner();
         let current_monotonic = inner.monotonic_clock.millis();
         let elapsed = current_monotonic.saturating_sub(inner.create_time);
         inner.epoch = instant.timestamp_millis().saturating_sub(elapsed);
@@ -278,7 +284,7 @@ impl ControllableClock for MockClock {
     }
 
     fn reset(&self) {
-        let mut inner = self.inner.lock();
+        let mut inner = self.lock_inner();
         inner.epoch = inner.create_time;
         inner.millis_to_add = 0;
         inner.millis_to_add_each_time = 0;

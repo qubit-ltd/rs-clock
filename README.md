@@ -399,7 +399,6 @@ cargo test
 
 - **chrono**: Date and time handling with serialization support
 - **chrono-tz**: Comprehensive timezone database
-- **parking_lot**: Efficient mutex implementation for mock clock
 
 ## Use Cases
 
