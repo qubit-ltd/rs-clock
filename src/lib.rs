@@ -156,16 +156,16 @@ pub use nano_clock::NanoClock;
 pub use zoned_clock::ZonedClock;
 
 // Implementations
-mod mock;
-mod monotonic;
-mod nano_monotonic;
-mod system;
+mod mock_clock;
+mod monotonic_clock;
+mod nano_monotonic_clock;
+mod system_clock;
 mod zoned;
 
-pub use mock::MockClock;
-pub use monotonic::MonotonicClock;
-pub use nano_monotonic::NanoMonotonicClock;
-pub use system::SystemClock;
+pub use mock_clock::MockClock;
+pub use monotonic_clock::MonotonicClock;
+pub use nano_monotonic_clock::NanoMonotonicClock;
+pub use system_clock::SystemClock;
 pub use zoned::Zoned;
 
 // Time meters
