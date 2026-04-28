@@ -28,7 +28,6 @@ doctest = true
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
-parking_lot = "0.12"
 
 [dev-dependencies]
 serde_json = "1.0"
