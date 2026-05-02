@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! Monotonic clock implementation.
@@ -12,9 +13,6 @@
 //! guarantees monotonically increasing time values, unaffected by system time
 //! adjustments.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use crate::Clock;
 use chrono::Utc;
@@ -64,9 +62,6 @@ use std::time::{Duration, Instant};
 /// assert!(elapsed >= 100);
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Debug, Clone)]
 pub struct MonotonicClock {
     /// The base instant when this clock was created.

@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! Millisecond-precision time meter implementation.
@@ -12,9 +13,6 @@
 //! measurement tool with millisecond precision. For nanosecond precision,
 //! use [`NanoTimeMeter`](super::NanoTimeMeter).
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use crate::meter::format::{format_duration_millis, format_speed};
 use crate::{Clock, MonotonicClock};
@@ -94,9 +92,6 @@ use chrono::Duration;
 /// }
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 pub struct TimeMeter<C: Clock> {
     /// The clock used by this meter.
     clock: C,

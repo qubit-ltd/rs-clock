@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! Thread-safe clock abstractions for Rust.
@@ -136,9 +137,6 @@
 //! - **Composition over Inheritance**: Extend functionality through wrappers
 //! - **Zero-Cost Abstractions**: Pay only for what you use
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 // Re-export chrono types for convenience
 pub use chrono::{DateTime, Duration, Utc};
