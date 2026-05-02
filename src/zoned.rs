@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! Timezone wrapper for clocks.
@@ -11,9 +12,6 @@
 //! This module provides [`Zoned`], a generic wrapper that adds timezone
 //! support to any clock implementation.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use crate::{Clock, ZonedClock};
 use chrono::{DateTime, TimeZone, Utc};
@@ -66,9 +64,6 @@ use std::ops::Deref;
 /// clock.set_time(time);
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Debug, Clone)]
 pub struct Zoned<C: Clock> {
     /// The wrapped clock.

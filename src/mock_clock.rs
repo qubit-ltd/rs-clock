@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! Mock clock implementation for testing.
@@ -11,9 +12,6 @@
 //! This module provides [`MockClock`], a controllable clock implementation
 //! designed for testing scenarios where precise control over time is needed.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use crate::{Clock, ControllableClock, MonotonicClock};
 use chrono::{DateTime, Duration, Utc};
@@ -60,9 +58,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// clock.reset();
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Debug, Clone)]
 pub struct MockClock {
     inner: Arc<Mutex<MockClockInner>>,
@@ -87,9 +82,10 @@ struct MockClockInner {
 impl MockClock {
     #[inline]
     fn lock_inner(&self) -> MutexGuard<'_, MockClockInner> {
-        self.inner
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        match self.inner.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
     }
 
     /// Creates a new `MockClock`.

@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! High-precision monotonic clock implementation.
@@ -11,9 +12,6 @@
 //! This module provides [`NanoMonotonicClock`], a clock implementation that
 //! provides nanosecond-precision monotonic time measurements.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use crate::{Clock, NanoClock};
 use chrono::Utc;
@@ -54,9 +52,6 @@ use std::time::{Duration, Instant};
 /// println!("Elapsed: {} ns", elapsed);
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Debug, Clone)]
 pub struct NanoMonotonicClock {
     /// The base instant when this clock was created.

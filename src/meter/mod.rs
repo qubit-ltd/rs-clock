@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! Time measurement utilities.
@@ -43,9 +44,6 @@
 //! println!("Elapsed: {} ns", meter.nanos());
 //! ```
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 mod format;
 mod nano_time_meter;

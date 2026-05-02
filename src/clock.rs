@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! The base clock trait providing UTC time.
@@ -11,9 +12,6 @@
 //! This module defines the [`Clock`] trait, which is the foundation of the
 //! clock abstraction. All clock implementations must implement this trait.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use chrono::{DateTime, Utc};
 
@@ -50,9 +48,6 @@ fn clamp_out_of_range_millis(millis: i64) -> DateTime<Utc> {
 /// println!("Current time: {}", time);
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 pub trait Clock: Send + Sync {
     /// Returns the current time as a Unix timestamp in milliseconds (UTC).
     ///

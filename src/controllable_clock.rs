@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! Controllable clock trait for testing.
@@ -12,9 +13,6 @@
 //! [`Clock`] to provide methods for controlling the clock's time. This is
 //! primarily useful for testing scenarios.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use crate::Clock;
 use chrono::{DateTime, Duration, Utc};
@@ -53,9 +51,6 @@ use chrono::{DateTime, Duration, Utc};
 /// );
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 pub trait ControllableClock: Clock {
     /// Sets the clock to a specific time.
     ///

@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! System clock implementation.
@@ -12,9 +13,6 @@
 //! system's wall clock time. The time is subject to system time adjustments
 //! (e.g., NTP synchronization, manual changes).
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use crate::Clock;
 use chrono::{DateTime, Utc};
@@ -46,9 +44,6 @@ use chrono::{DateTime, Utc};
 /// println!("Current system time: {}", time);
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemClock;
 
