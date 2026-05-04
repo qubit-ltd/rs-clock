@@ -13,8 +13,15 @@
 //! support to any clock implementation.
 //!
 
-use crate::{Clock, ZonedClock};
-use chrono::{DateTime, TimeZone, Utc};
+use crate::{
+    Clock,
+    ZonedClock,
+};
+use chrono::{
+    DateTime,
+    TimeZone,
+    Utc,
+};
 use chrono_tz::Tz;
 use std::ops::Deref;
 

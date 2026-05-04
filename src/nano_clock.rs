@@ -14,7 +14,10 @@
 //!
 
 use crate::Clock;
-use chrono::{DateTime, Utc};
+use chrono::{
+    DateTime,
+    Utc,
+};
 
 /// A trait representing a clock with nanosecond precision.
 ///

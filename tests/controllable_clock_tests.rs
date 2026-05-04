@@ -9,8 +9,16 @@
  ******************************************************************************/
 //! Tests for the ControllableClock trait.
 
-use chrono::{DateTime, Duration, Utc};
-use qubit_clock::{Clock, ControllableClock, MockClock};
+use chrono::{
+    DateTime,
+    Duration,
+    Utc,
+};
+use qubit_clock::{
+    Clock,
+    ControllableClock,
+    MockClock,
+};
 
 #[test]
 fn test_controllable_clock_set_time() {

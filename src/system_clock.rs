@@ -15,7 +15,10 @@
 //!
 
 use crate::Clock;
-use chrono::{DateTime, Utc};
+use chrono::{
+    DateTime,
+    Utc,
+};
 
 /// A clock implementation that uses the system's wall clock time.
 ///

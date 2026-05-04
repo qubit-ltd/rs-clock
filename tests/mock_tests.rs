@@ -9,8 +9,16 @@
  ******************************************************************************/
 //! Tests for MockClock.
 
-use chrono::{DateTime, Duration, Utc};
-use qubit_clock::{Clock, ControllableClock, MockClock};
+use chrono::{
+    DateTime,
+    Duration,
+    Utc,
+};
+use qubit_clock::{
+    Clock,
+    ControllableClock,
+    MockClock,
+};
 use std::thread;
 
 const CLOCK_DRIFT_TOLERANCE_MS: i64 = 1_000;
