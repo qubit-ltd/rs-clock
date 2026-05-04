@@ -139,7 +139,11 @@
 //!
 
 // Re-export chrono types for convenience
-pub use chrono::{DateTime, Duration, Utc};
+pub use chrono::{
+    DateTime,
+    Duration,
+    Utc,
+};
 pub use chrono_tz::Tz;
 
 // Traits

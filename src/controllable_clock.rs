@@ -15,7 +15,11 @@
 //!
 
 use crate::Clock;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{
+    DateTime,
+    Duration,
+    Utc,
+};
 
 /// A trait representing a clock that can be controlled.
 ///

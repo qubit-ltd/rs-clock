@@ -10,7 +10,10 @@
 //! Tests for SystemClock.
 
 use chrono::Datelike;
-use qubit_clock::{Clock, SystemClock};
+use qubit_clock::{
+    Clock,
+    SystemClock,
+};
 use std::thread;
 use std::time::Duration;
 
