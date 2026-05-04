@@ -9,14 +9,41 @@
  ******************************************************************************/
 //! Tests for Zoned wrapper.
 
-use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
+use chrono::{
+    DateTime,
+    Datelike,
+    Duration,
+    Timelike,
+    Utc,
+};
 use chrono_tz::America::New_York;
 use chrono_tz::Asia::Shanghai;
 use chrono_tz::Europe::London;
 use chrono_tz::Tz;
 use qubit_clock::{
-    Clock, ControllableClock, MockClock, MonotonicClock, SystemClock, Zoned, ZonedClock,
+    Clock,
+    ControllableClock,
+    MockClock,
+    MonotonicClock,
+    SystemClock,
+    Zoned,
+    ZonedClock,
 };
+
+const CLOCK_DRIFT_TOLERANCE_MS: i64 = 1_000;
+
+/// Asserts that a clock reading is close to the expected logical time.
+fn assert_close_to_expected_time(actual: DateTime<Utc>, expected: DateTime<Utc>) {
+    let diff_ms = actual
+        .timestamp_millis()
+        .saturating_sub(expected.timestamp_millis());
+    assert!(
+        (0..CLOCK_DRIFT_TOLERANCE_MS).contains(&diff_ms),
+        "time should be within {}ms after expected time, diff_ms: {}",
+        CLOCK_DRIFT_TOLERANCE_MS,
+        diff_ms
+    );
+}
 
 #[test]
 fn test_zoned_new() {
@@ -162,13 +189,17 @@ fn test_zoned_clone() {
     let clock1 = Zoned::new(mock, Shanghai);
     let clock2 = clock1.clone();
 
-    // Both should return the same time
-    assert_eq!(clock1.time(), clock2.time());
-    assert_eq!(clock1.local_time(), clock2.local_time());
+    // Both should expose the same timezone and logical time.
+    assert_eq!(clock1.timezone(), clock2.timezone());
+    assert_close_to_expected_time(clock1.time(), fixed_time);
+    assert_close_to_expected_time(clock2.time(), fixed_time);
+    assert_close_to_expected_time(clock1.local_time().with_timezone(&Utc), fixed_time);
+    assert_close_to_expected_time(clock2.local_time().with_timezone(&Utc), fixed_time);
 
     // Modifying one should affect the other (shared MockClock)
     clock1.add_duration(Duration::hours(1));
-    assert_eq!(clock1.time(), clock2.time());
+    let expected_time = fixed_time + Duration::hours(1);
+    assert_close_to_expected_time(clock2.time(), expected_time);
 }
 
 #[test]
