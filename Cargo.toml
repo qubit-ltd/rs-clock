@@ -13,12 +13,14 @@ readme = "README.md"
 keywords = ["clock", "time", "monotonic", "mock", "testing"]
 categories = ["date-and-time", "development-tools::testing"]
 exclude = [
-    "coverage.sh",
-    "COVERAGE.md",
-    "COVERAGE.zh_CN.md",
-    ".circleci/*",
+    "align-ci.sh",
     "ci-check.sh",
+    "coverage.sh",
+    "style-check.sh",
+    "update-submodule.sh",
+    ".github/*",
     ".llvm-cov.toml",
+    ".cargo-audit.toml.example",
 ]
 
 [lib]
