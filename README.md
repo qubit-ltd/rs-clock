@@ -1,7 +1,7 @@
 # Qubit Clock
 
-[![CircleCI](https://circleci.com/gh/qubit-ltd/rs-clock.svg?style=shield)](https://circleci.com/gh/qubit-ltd/rs-clock)
-[![Coverage Status](https://coveralls.io/repos/github/qubit-ltd/rs-clock/badge.svg?branch=main)](https://coveralls.io/github/qubit-ltd/rs-clock?branch=main)
+[![Rust CI](https://github.com/qubit-ltd/rs-clock/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-clock/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-clock/coverage-badge.json)](https://qubit-ltd.github.io/rs-clock/coverage/)
 [![Crates.io](https://img.shields.io/crates/v/qubit-clock.svg?color=blue)](https://crates.io/crates/qubit-clock)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -58,7 +58,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-qubit-clock = "0.2.0"
+qubit-clock = "0.3.1"
 ```
 
 ## Quick Start
