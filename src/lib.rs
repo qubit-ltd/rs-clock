@@ -35,6 +35,8 @@
 //! - [`MonotonicClock`]: Monotonic time (unaffected by system time changes)
 //! - [`NanoMonotonicClock`]: Monotonic time with nanosecond precision
 //! - [`MockClock`]: Controllable clock for testing
+//! - [`MockNanoClock`]: Nanosecond-precision controllable clock for testing
+//! - [`MockClockProgression`]: Frozen or monotonic mock-clock progression mode
 //! - [`Zoned<C>`](Zoned): Wrapper that adds timezone support to any clock
 //!
 //! # Examples
@@ -159,12 +161,16 @@ pub use zoned_clock::ZonedClock;
 
 // Implementations
 mod mock_clock;
+mod mock_clock_progression;
+mod mock_nano_clock;
 mod monotonic_clock;
 mod nano_monotonic_clock;
 mod system_clock;
 mod zoned;
 
 pub use mock_clock::MockClock;
+pub use mock_clock_progression::MockClockProgression;
+pub use mock_nano_clock::MockNanoClock;
 pub use monotonic_clock::MonotonicClock;
 pub use nano_monotonic_clock::NanoMonotonicClock;
 pub use system_clock::SystemClock;

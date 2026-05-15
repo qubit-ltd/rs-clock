@@ -18,6 +18,7 @@ use qubit_clock::{
     Clock,
     ControllableClock,
     MockClock,
+    MockClockProgression,
 };
 use std::thread;
 
@@ -102,8 +103,7 @@ fn test_mock_clock_add_millis_once() {
 
     // Should not add again
     let after2 = clock.millis();
-    let diff = (after2 - after).abs();
-    assert!(diff < 10, "Should not add again");
+    assert_eq!(after2, after, "Should not add again");
 }
 
 #[test]
@@ -143,7 +143,7 @@ fn test_mock_clock_set_and_clear_auto_advance() {
     clock.clear_auto_advance();
     let t3 = clock.millis();
     let t4 = clock.millis();
-    assert!((t4 - t3).abs() < 10);
+    assert_eq!(t4, t3);
 }
 
 #[test]
@@ -205,11 +205,7 @@ fn test_mock_clock_reset() {
     clock.reset();
 
     let after_reset = clock.time();
-    let diff = (after_reset - initial).num_milliseconds().abs();
-    assert!(
-        diff < 100,
-        "After reset, time should be close to initial time"
-    );
+    assert_eq!(after_reset, initial);
 }
 
 #[test]
@@ -225,11 +221,7 @@ fn test_mock_clock_reset_after_set_time() {
     clock.reset();
 
     let after_reset = clock.time();
-    let diff = (after_reset - initial).num_milliseconds().abs();
-    assert!(
-        diff < 100,
-        "After reset, time should be close to initial time"
-    );
+    assert_eq!(after_reset, initial);
 }
 
 #[test]
@@ -245,8 +237,7 @@ fn test_mock_clock_reset_clears_add_every_time() {
 
     let t3 = clock.millis();
     let t4 = clock.millis();
-    let diff = (t4 - t3).abs();
-    assert!(diff < 10, "After reset, should not add every time");
+    assert_eq!(t4, t3, "After reset, should not add every time");
 }
 
 #[test]
@@ -379,43 +370,95 @@ fn test_mock_clock_multiple_threads() {
 }
 
 #[test]
-fn test_mock_clock_progresses_after_set_time() {
+fn test_mock_clock_freezes_after_set_time() {
     let clock = MockClock::new();
     let fixed_time = DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
         .unwrap()
         .with_timezone(&Utc);
     clock.set_time(fixed_time);
 
-    // Sleep and verify time has progressed naturally
     thread::sleep(std::time::Duration::from_millis(50));
 
     let current = clock.time();
-    let diff = (current - fixed_time).num_milliseconds();
+    assert_eq!(current, fixed_time);
+}
+
+#[test]
+fn test_mock_clock_freezes_after_creation() {
+    let clock = MockClock::new();
+    let start = clock.millis();
+
+    thread::sleep(std::time::Duration::from_millis(50));
+
+    let elapsed = clock.millis() - start;
+    assert_eq!(elapsed, 0, "MockClock should stay frozen by default");
+}
+
+#[test]
+fn test_mock_clock_monotonic_progression_can_be_enabled() {
+    let clock = MockClock::with_progression(MockClockProgression::Monotonic);
+    assert_eq!(clock.progression(), MockClockProgression::Monotonic);
+    assert!(clock.monotonic_progression_enabled());
+
+    let start = clock.millis();
+    thread::sleep(std::time::Duration::from_millis(50));
+    let elapsed = clock.millis() - start;
+
+    assert!(
+        elapsed >= 50,
+        "Monotonic progression should advance with elapsed time, got: {}",
+        elapsed
+    );
+}
+
+#[test]
+fn test_mock_clock_set_time_uses_current_progression_mode() {
+    let clock = MockClock::new();
+    let fixed_time = DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+
+    clock.set_time(fixed_time);
+    thread::sleep(std::time::Duration::from_millis(20));
+    assert_eq!(clock.time(), fixed_time);
+
+    clock.set_monotonic_progression_enabled(true);
+    clock.set_time(fixed_time);
+    thread::sleep(std::time::Duration::from_millis(50));
+
+    let diff = (clock.time() - fixed_time).num_milliseconds();
     assert!(
         diff >= 50,
-        "Time should progress naturally after set_time, diff: {}",
-        diff
-    );
-    assert!(
-        diff < 150,
-        "Time should not progress too much, diff: {}",
+        "set_time should progress when monotonic mode is enabled, diff: {}",
         diff
     );
 }
 
 #[test]
-fn test_mock_clock_progresses_naturally() {
-    let clock = MockClock::new();
+fn test_mock_clock_disabling_monotonic_progression_freezes_current_reading() {
+    let clock = MockClock::with_progression(MockClockProgression::Monotonic);
+
+    thread::sleep(std::time::Duration::from_millis(30));
+    clock.set_progression(MockClockProgression::Frozen);
+    assert_eq!(clock.progression(), MockClockProgression::Frozen);
+
+    let frozen = clock.millis();
+    thread::sleep(std::time::Duration::from_millis(30));
+
+    assert_eq!(clock.millis(), frozen);
+}
+
+#[test]
+fn test_mock_clock_reset_restores_initial_progression() {
+    let clock = MockClock::with_progression(MockClockProgression::Monotonic);
+
+    clock.set_progression(MockClockProgression::Frozen);
+    clock.add_duration(Duration::hours(1));
+    clock.reset();
+
+    assert_eq!(clock.progression(), MockClockProgression::Monotonic);
+
     let start = clock.millis();
-
-    // Without any manipulation, time should progress naturally
-    // (based on the internal monotonic clock)
-    thread::sleep(std::time::Duration::from_millis(50));
-
-    let elapsed = clock.millis() - start;
-    assert!(
-        elapsed >= 50,
-        "Time should progress naturally, elapsed: {}",
-        elapsed
-    );
+    thread::sleep(std::time::Duration::from_millis(30));
+    assert!(clock.millis() - start >= 30);
 }

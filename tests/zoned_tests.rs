@@ -24,7 +24,10 @@ use qubit_clock::{
     Clock,
     ControllableClock,
     MockClock,
+    MockClockProgression,
     MonotonicClock,
+    NanoClock,
+    NanoMonotonicClock,
     SystemClock,
     Zoned,
     ZonedClock,
@@ -57,8 +60,12 @@ fn test_zoned_with_system_clock() {
     let utc = clock.time();
     let local = clock.local_time();
 
-    // Both should represent the same instant
-    assert_eq!(utc.timestamp_millis(), local.timestamp_millis());
+    // Both reads should represent nearly the same instant.
+    let diff = (utc.timestamp_millis() - local.timestamp_millis()).abs();
+    assert!(
+        diff <= 10,
+        "timestamp drift too large between UTC and local reads: diff={diff}ms"
+    );
 }
 
 #[test]
@@ -67,8 +74,12 @@ fn test_zoned_with_monotonic_clock() {
     let utc = clock.time();
     let local = clock.local_time();
 
-    // Both should represent the same instant
-    assert_eq!(utc.timestamp_millis(), local.timestamp_millis());
+    // Both reads should represent nearly the same instant.
+    let diff = (utc.timestamp_millis() - local.timestamp_millis()).abs();
+    assert!(
+        diff <= 10,
+        "timestamp drift too large between UTC and local reads: diff={diff}ms"
+    );
 }
 
 #[test]
@@ -112,7 +123,13 @@ fn test_zoned_deref_to_inner_clock() {
     let mock = MockClock::new();
     let clock = Zoned::new(mock, Shanghai);
 
-    // Can call MockClock methods directly via Deref
+    // Can call MockClock-specific methods directly via Deref.
+    assert_eq!(clock.progression(), MockClockProgression::Frozen);
+    clock.set_monotonic_progression_enabled(true);
+    assert_eq!(clock.progression(), MockClockProgression::Monotonic);
+    clock.set_progression(MockClockProgression::Frozen);
+
+    // Can call controllable methods directly as well.
     let fixed_time = DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
         .unwrap()
         .with_timezone(&Utc);
@@ -322,4 +339,33 @@ fn test_zoned_preserves_controllable_clock_interface() {
     clock.reset();
 
     // All should work without error
+}
+
+#[test]
+fn test_zoned_preserves_controllable_clock_trait_object() {
+    fn use_controllable_clock(clock: &dyn ControllableClock, fixed_time: DateTime<Utc>) {
+        clock.set_time(fixed_time);
+        clock.add_duration(Duration::hours(1));
+        assert_close_to_expected_time(clock.time(), fixed_time + Duration::hours(1));
+    }
+
+    let clock = Zoned::new(MockClock::new(), Shanghai);
+    let fixed_time = DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+
+    use_controllable_clock(&clock, fixed_time);
+}
+
+#[test]
+fn test_zoned_preserves_nano_clock_interface() {
+    fn use_nano_clock(clock: &dyn NanoClock) -> i128 {
+        clock.nanos()
+    }
+
+    let clock = Zoned::new(NanoMonotonicClock::new(), Shanghai);
+    let nanos = use_nano_clock(&clock);
+
+    assert!(nanos > 0);
+    assert!(clock.time_precise().timestamp_millis() > 0);
 }

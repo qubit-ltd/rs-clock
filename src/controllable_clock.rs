@@ -56,7 +56,14 @@ use chrono::{
 /// ```
 ///
 pub trait ControllableClock: Clock {
-    /// Sets the clock to a specific time.
+    /// Sets or aligns the clock to a specific time.
+    ///
+    /// The exact progression semantics depend on the implementation. For
+    /// [`MockClock`](crate::MockClock) and
+    /// [`MockNanoClock`](crate::MockNanoClock), this sets the current logical
+    /// reading to `instant`; whether subsequent reads stay frozen or progress
+    /// with monotonic time is controlled by
+    /// [`MockClockProgression`](crate::MockClockProgression).
     ///
     /// # Arguments
     ///
@@ -103,8 +110,9 @@ pub trait ControllableClock: Clock {
     /// Resets the clock to its initial state.
     ///
     /// The exact behavior of this method depends on the implementation. For
-    /// [`MockClock`](crate::MockClock), it resets to the time when the clock
-    /// was created.
+    /// [`MockClock`](crate::MockClock) and
+    /// [`MockNanoClock`](crate::MockNanoClock), it resets to the logical
+    /// reading and progression mode captured when the clock was created.
     ///
     /// # Examples
     ///
@@ -118,9 +126,8 @@ pub trait ControllableClock: Clock {
     /// clock.add_duration(Duration::hours(1));
     /// clock.reset();
     ///
-    /// // After reset, time should be close to initial time
-    /// let diff = (clock.time() - initial).num_milliseconds().abs();
-    /// assert!(diff < 100); // Allow small difference
+    /// // After reset, time should return to the initial frozen value.
+    /// assert_eq!(clock.time(), initial);
     /// ```
     fn reset(&self);
 }

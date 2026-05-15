@@ -42,11 +42,7 @@ fn test_mock_clock_set_time_clears_auto_advance() {
     let first_read = clock.millis();
     let second_read = clock.millis();
     assert_eq!(first_read, replacement_time.timestamp_millis());
-    assert!(
-        second_read - first_read < 10,
-        "set_time should disable auto-advance, diff: {}",
-        second_read - first_read
-    );
+    assert_eq!(second_read, first_read);
 }
 
 #[test]
