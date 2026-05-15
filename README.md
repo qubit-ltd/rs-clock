@@ -26,6 +26,8 @@ Qubit Clock provides a flexible and type-safe clock abstraction system for Rust 
 - **MonotonicClock**: Monotonic time (unaffected by system time changes)
 - **NanoMonotonicClock**: Monotonic time with nanosecond precision
 - **MockClock**: Controllable clock for testing
+- **MockNanoClock**: Nanosecond-precision controllable clock for testing
+- **MockClockProgression**: Switch mock clocks between frozen and monotonic progression
 - **Zoned\<C\>**: Wrapper that adds timezone support to any clock
 
 ### ⏱️ **Time Meters**
@@ -58,7 +60,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-qubit-clock = "0.3.1"
+qubit-clock = "0.4.0"
 ```
 
 ## Quick Start
@@ -231,8 +233,18 @@ This design follows the **Interface Segregation Principle**, ensuring that imple
 - Controllable clock for testing
 - Thread-safe with `Arc<Mutex<>>`
 - Supports time setting, advancement, and auto-increment
-- Based on `MonotonicClock` for stability
+- Frozen by default for deterministic tests
+- Can switch to monotonic progression when natural elapsed time is needed
 - Use for: unit tests, integration tests, time-dependent logic testing
+
+### MockNanoClock
+
+- Nanosecond-precision controllable clock for testing
+- Implements `Clock`, `NanoClock`, and `ControllableClock`
+- Frozen by default for deterministic tests
+- Can switch to monotonic progression when natural elapsed time is needed
+- Supports nanosecond advancement and auto-increment
+- Use for: deterministic tests around `NanoClock` and `NanoTimeMeter`
 
 ### Zoned\<C\>
 
@@ -268,7 +280,7 @@ A nanosecond-precision time meter with features similar to `TimeMeter`:
 - **Default to NanoMonotonicClock**: Uses high-precision monotonic time
 - **Human-Readable Output**: Automatically chooses appropriate unit (ns, μs, ms, s, m, h)
 - **Speed Calculation**: High-precision speed calculation
-- **Test-Friendly**: Supports mock clock injection
+- **Test-Friendly**: Supports any injected test clock that implements `NanoClock`
 
 Example output formats:
 - `123 ns` - Less than 1 microsecond
@@ -292,18 +304,20 @@ let elapsed = start.elapsed();
 This crate exists for the cases where elapsed-time measurement is only part of
 the problem:
 
-- Use `MockClock` when tests need deterministic control over time. Instead of
-  sleeping for real seconds or minutes, tests can set the current time, advance
-  it instantly, reset it, or enable auto-advance on each read.
+- Use `MockClock` or `MockNanoClock` when tests need controllable logical time.
+  They freeze by default, support instant manual advancement, can auto-advance
+  on each read, and can opt into monotonic progression when a test needs
+  natural elapsed time.
 - Use `TimeMeter` or `NanoTimeMeter` when application code needs a reusable
   start/stop meter with formatted durations, speed calculations, and an
-  injectable clock source. They use monotonic clocks by default, but can accept
-  `MockClock` in tests.
+  injectable clock source. They use monotonic clocks by default; `TimeMeter`
+  can accept `MockClock`, while `NanoTimeMeter` can accept `MockNanoClock` or
+  any other `NanoClock` implementation.
 - Use the `Clock` traits when business logic depends on "current time" and must
   be testable without coupling directly to the system clock or `Instant::now()`.
 
-In short, `Instant` measures real elapsed time; `MockClock` makes time
-controllable for tests; `TimeMeter` turns elapsed-time measurement into a
+In short, `Instant` measures real elapsed time; mock clocks make time
+controllable for tests; time meters turn elapsed-time measurement into a
 reusable, formatted, testable abstraction.
 
 ## API Reference
@@ -335,7 +349,7 @@ Use `Zoned::new(clock, tz)` to select the timezone for a clock.
 
 Extension trait for controllable clocks (testing):
 
-- `set_time(instant)` - Sets the clock to a specific time
+- `set_time(instant)` - Sets controllable mock clocks to a logical time; the progression mode controls subsequent reads
 - `add_duration(duration)` - Advances the clock by a duration
 - `reset()` - Resets the clock to initial state
 

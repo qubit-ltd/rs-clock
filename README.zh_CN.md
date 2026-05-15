@@ -26,6 +26,8 @@ Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象�
 - **MonotonicClock**：单调时间（不受系统时间变化影响）
 - **NanoMonotonicClock**：纳秒精度的单调时间
 - **MockClock**：可控制的测试时钟
+- **MockNanoClock**：纳秒精度的可控制测试时钟
+- **MockClockProgression**：在冻结和单调自然推进之间切换 mock 时钟
 - **Zoned\<C\>**：为任何时钟添加时区支持的包装器
 
 ### ⏱️ **时间计量器**
@@ -58,7 +60,7 @@ Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象�
 
 ```toml
 [dependencies]
-qubit-clock = "0.3.1"
+qubit-clock = "0.4.0"
 ```
 
 ## 快速开始
@@ -231,8 +233,18 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 - 可控制的测试时钟
 - 使用 `Arc<Mutex<>>` 实现线程安全
 - 支持时间设置、推进和自动递增
-- 基于 `MonotonicClock` 保证稳定性
+- 默认冻结，便于确定性测试
+- 需要自然流逝时间时可切换为单调推进
 - 适用于：单元测试、集成测试、时间相关逻辑测试
+
+### MockNanoClock
+
+- 纳秒精度的可控制测试时钟
+- 实现 `Clock`、`NanoClock` 和 `ControllableClock`
+- 默认冻结，便于确定性测试
+- 需要自然流逝时间时可切换为单调推进
+- 支持纳秒级推进和自动递增
+- 适用于：围绕 `NanoClock` 和 `NanoTimeMeter` 的确定性测试
 
 ### Zoned\<C\>
 
@@ -268,7 +280,7 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 - **默认使用 NanoMonotonicClock**：使用高精度单调时间
 - **人类可读输出**：自动选择合适的单位（ns、μs、ms、s、m、h）
 - **速度计算**：高精度速度计算
-- **测试友好**：支持模拟时钟注入
+- **测试友好**：支持注入任何实现 `NanoClock` 的测试时钟
 
 输出格式示例：
 - `123 ns` - 小于 1 微秒
@@ -291,17 +303,18 @@ let elapsed = start.elapsed();
 
 本 crate 关注的是“计时”之外的几个常见需求：
 
-- 当测试需要确定性地控制时间时，使用 `MockClock`。测试可以直接设置当前
-  时间、瞬间推进时间、重置时间，或让每次读取自动推进时间，而不需要真的
-  `sleep` 几秒或几分钟。
+- 当测试需要可控逻辑时间时，使用 `MockClock` 或 `MockNanoClock`。它们默认
+  冻结，支持瞬间手动推进时间，也可以让每次读取自动推进；如果测试需要
+  自然流逝时间，可以显式切换为单调推进。
 - 当应用代码需要可复用的 start/stop 计量器、可读耗时、速度计算以及可注入
-  的时钟源时，使用 `TimeMeter` 或 `NanoTimeMeter`。它们默认使用单调时钟，
-  测试时也可以注入 `MockClock`。
+  的时钟源时，使用 `TimeMeter` 或 `NanoTimeMeter`。它们默认使用单调时钟；
+  `TimeMeter` 可以注入 `MockClock`，`NanoTimeMeter` 可以注入 `MockNanoClock`
+  或其他实现 `NanoClock` 的测试时钟。
 - 当业务逻辑依赖“当前时间”且需要可测试时，使用 `Clock` 系列 trait，避免
   直接耦合到系统时钟或 `Instant::now()`。
 
-简而言之，`Instant` 用来测量真实流逝的时间；`MockClock` 让测试中的时间
-可控；`TimeMeter` 把耗时测量封装成可复用、可格式化、可测试的抽象。
+简而言之，`Instant` 用来测量真实流逝的时间；mock 时钟让测试中的时间
+可控；时间计量器把耗时测量封装成可复用、可格式化、可测试的抽象。
 
 ## API 参考
 
@@ -332,7 +345,7 @@ let elapsed = start.elapsed();
 
 可控制时钟的扩展 trait（用于测试）：
 
-- `set_time(instant)` - 将时钟设置到特定时间
+- `set_time(instant)` - 将可控 mock 时钟设置到指定逻辑时间；后续读数由 progression 模式决定
 - `add_duration(duration)` - 将时钟推进指定时长
 - `reset()` - 将时钟重置到初始状态
 
