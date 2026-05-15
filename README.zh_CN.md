@@ -345,7 +345,7 @@ let elapsed = start.elapsed();
 
 可控制时钟的扩展 trait（用于测试）：
 
-- `set_time(instant)` - 将可控 mock 时钟重新锚定到指定逻辑时间，并保留当前推进设置
+- `set_time(instant)` - 将可控 mock 时钟重新锚定到指定逻辑时间，并保留当前推进和自动递增设置
 - `add_duration(duration)` - 将时钟推进指定时长
 - `reset()` - 将时钟重置到初始状态
 

@@ -60,7 +60,7 @@ fn test_mock_nano_clock_default() {
 }
 
 #[test]
-fn test_mock_nano_clock_set_time_preserves_nanoseconds_and_freezes() {
+fn test_mock_nano_clock_set_time_preserves_nanoseconds_in_default_frozen_progression() {
     let clock = MockNanoClock::new();
     let fixed = fixed_time("2024-01-01T00:00:00.123456789Z");
 
