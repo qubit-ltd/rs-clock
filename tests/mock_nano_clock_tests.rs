@@ -151,7 +151,7 @@ fn test_mock_nano_clock_negative_auto_advance() {
 }
 
 #[test]
-fn test_mock_nano_clock_set_time_clears_auto_advance() {
+fn test_mock_nano_clock_set_time_preserves_auto_advance() {
     let clock = MockNanoClock::new();
     let first = fixed_time("2024-01-01T00:00:00Z");
     let second = fixed_time("2024-02-01T00:00:00.000000042Z");
@@ -166,7 +166,7 @@ fn test_mock_nano_clock_set_time_clears_auto_advance() {
     let read1 = clock.nanos();
     let read2 = clock.nanos();
     assert_eq!(read1, nanos_of(second));
-    assert_eq!(read2, read1);
+    assert_eq!(read2, read1 + 250);
 }
 
 #[test]
@@ -303,9 +303,12 @@ fn test_mock_nano_clock_set_time_uses_current_progression_mode() {
     assert_eq!(clock.time_precise(), fixed);
 
     clock.set_monotonic_progression_enabled(true);
+    assert_eq!(clock.progression(), MockClockProgression::Monotonic);
     clock.set_time(fixed);
     thread::sleep(std::time::Duration::from_millis(20));
 
+    assert_eq!(clock.progression(), MockClockProgression::Monotonic);
+    assert!(clock.monotonic_progression_enabled());
     let diff = clock.nanos() - nanos_of(fixed);
     assert!(
         diff >= 20_000_000,

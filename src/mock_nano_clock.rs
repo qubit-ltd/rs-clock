@@ -66,10 +66,9 @@ fn millis_from_nanos(nanos: i128) -> i64 {
 ///
 /// `MockNanoClock` is the high-precision counterpart of
 /// [`MockClock`](crate::MockClock). It implements [`Clock`], [`NanoClock`],
-/// and [`ControllableClock`]. Readings are frozen after construction and after
-/// [`set_time()`](ControllableClock::set_time) by default. If monotonic
-/// progression is enabled, readings naturally progress from the current
-/// logical time using an internal [`NanoMonotonicClock`].
+/// and [`ControllableClock`]. Readings are frozen after construction by
+/// default. [`set_time()`](ControllableClock::set_time) reanchors the logical
+/// time without changing the current progression mode or auto-advance settings.
 ///
 /// # Features
 ///
@@ -450,8 +449,6 @@ impl ControllableClock for MockNanoClock {
         inner.epoch_nanos = datetime_to_nanos(instant);
         inner.monotonic_base_nanos = inner.monotonic_clock.monotonic_nanos();
         inner.nanos_to_add = 0;
-        inner.nanos_to_add_each_time = 0;
-        inner.add_every_time = false;
     }
 
     #[inline]

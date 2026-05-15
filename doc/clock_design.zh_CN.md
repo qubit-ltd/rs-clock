@@ -419,11 +419,11 @@ impl ControllableClock for MockClock { /* ... */ }
 - 默认使用冻结模式，保证测试可重复
 - 通过 `MockClockProgression` 可切换到基于内部 `MonotonicClock` 的自然推进模式
 - 切换冻结/单调推进时会先把当前逻辑读数重新锚定，避免开关造成时间跳变
-- `set_time()` 设置当前逻辑读数；后续是否继续推进由当前 progression 模式决定
+- `set_time()` 设置当前逻辑读数，并保留当前 progression 与自动递增设置；后续是否自然推进由当前 progression 模式决定
 - `reset()` 会恢复到创建时捕获的读数和初始 progression，并清除附加偏移和自动递增
 
 **核心功能**：
-1. **设置时间**：`set_time(instant)` - 将当前逻辑时间设置到指定时间点
+1. **设置时间**：`set_time(instant)` - 将当前逻辑时间重新锚定到指定时间点，并保留推进策略
 2. **增加时间**：`add_duration(duration)` - 前进指定时间
 3. **自动递增**：`add_millis(millis, true)` - 每次调用自动增加
 4. **推进模式**：`set_progression(mode)` / `set_monotonic_progression_enabled(enabled)` - 在冻结和单调自然推进之间切换
@@ -487,10 +487,10 @@ impl ControllableClock for MockNanoClock { /* ... */ }
 - 默认使用冻结模式，保证测试可重复
 - 通过 `MockClockProgression` 可切换到基于内部 `NanoMonotonicClock` 的自然推进模式
 - 切换冻结/单调推进时会先把当前逻辑读数重新锚定，避免开关造成时间跳变
-- `set_time()` 设置当前逻辑读数；后续是否继续推进由当前 progression 模式决定
+- `set_time()` 设置当前逻辑读数，并保留当前 progression 与自动递增设置；后续是否自然推进由当前 progression 模式决定
 
 **核心功能**：
-1. **设置时间**：`set_time(instant)` - 将纳秒级当前逻辑时间设置到指定时间点
+1. **设置时间**：`set_time(instant)` - 将纳秒级当前逻辑时间重新锚定到指定时间点，并保留推进策略
 2. **增加时间**：`add_duration(duration)` - 按 chrono duration 前进，尽量保留纳秒精度
 3. **纳秒推进**：`advance_nanos(nanos)` / `add_nanos(nanos, false)` - 一次性推进纳秒数
 4. **自动递增**：`set_auto_advance_nanos(nanos)` / `add_nanos(nanos, true)` - 每次读取后推进下一次读数

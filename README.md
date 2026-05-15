@@ -349,7 +349,7 @@ Use `Zoned::new(clock, tz)` to select the timezone for a clock.
 
 Extension trait for controllable clocks (testing):
 
-- `set_time(instant)` - Sets controllable mock clocks to a logical time; the progression mode controls subsequent reads
+- `set_time(instant)` - Reanchors controllable mock clocks to a logical time while preserving progression settings
 - `add_duration(duration)` - Advances the clock by a duration
 - `reset()` - Resets the clock to initial state
 
