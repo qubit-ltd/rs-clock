@@ -15,10 +15,13 @@
 
 use crate::{
     Clock,
+    ControllableClock,
+    NanoClock,
     ZonedClock,
 };
 use chrono::{
     DateTime,
+    Duration,
     TimeZone,
     Utc,
 };
@@ -36,6 +39,13 @@ use std::ops::Deref;
 /// This type implements [`Deref`] to allow direct access to the wrapped
 /// clock's methods. This is particularly useful when wrapping controllable
 /// clocks like [`MockClock`](crate::MockClock).
+///
+/// # Trait Forwarding
+///
+/// When the wrapped clock implements [`NanoClock`] or [`ControllableClock`],
+/// `Zoned<C>` implements the same trait and delegates calls to the wrapped
+/// clock. This lets `Zoned<MockClock>` be used as `dyn ControllableClock` and
+/// `Zoned<NanoMonotonicClock>` be used as `dyn NanoClock`.
 ///
 /// # Examples
 ///
@@ -171,6 +181,35 @@ impl<C: Clock> ZonedClock for Zoned<C> {
     #[inline]
     fn local_time(&self) -> DateTime<Tz> {
         self.timezone.from_utc_datetime(&self.time().naive_utc())
+    }
+}
+
+impl<C: NanoClock> NanoClock for Zoned<C> {
+    #[inline]
+    fn nanos(&self) -> i128 {
+        self.clock.nanos()
+    }
+
+    #[inline]
+    fn time_precise(&self) -> DateTime<Utc> {
+        self.clock.time_precise()
+    }
+}
+
+impl<C: ControllableClock> ControllableClock for Zoned<C> {
+    #[inline]
+    fn set_time(&self, instant: DateTime<Utc>) {
+        self.clock.set_time(instant);
+    }
+
+    #[inline]
+    fn add_duration(&self, duration: Duration) {
+        self.clock.add_duration(duration);
+    }
+
+    #[inline]
+    fn reset(&self) {
+        self.clock.reset();
     }
 }
 

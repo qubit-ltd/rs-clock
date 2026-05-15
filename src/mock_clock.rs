@@ -16,7 +16,9 @@
 use crate::{
     Clock,
     ControllableClock,
+    MockClockProgression,
     MonotonicClock,
+    SystemClock,
 };
 use chrono::{
     DateTime,
@@ -31,16 +33,19 @@ use std::sync::{
 
 /// A controllable clock implementation for testing.
 ///
-/// `MockClock` allows you to manually control the passage of time, making it
-/// ideal for testing time-dependent code. It uses [`MonotonicClock`] as its
-/// internal time base to ensure stability during tests.
+/// `MockClock` allows you to adjust logical time, making it useful for testing
+/// time-dependent code. Readings are frozen after construction and after
+/// [`set_time()`](ControllableClock::set_time) by default. If monotonic
+/// progression is enabled, readings naturally progress from the current
+/// logical time using an internal [`MonotonicClock`].
 ///
 /// # Features
 ///
-/// - Set the clock to a specific time
+/// - Align the logical current time to a specific time
 /// - Advance the clock by a duration
 /// - Automatically advance time on each call
-/// - Reset to initial state
+/// - Switch between frozen and monotonic progression
+/// - Reset to the initial creation state
 ///
 /// # Thread Safety
 ///
@@ -77,12 +82,18 @@ pub struct MockClock {
 
 #[derive(Debug)]
 struct MockClockInner {
-    /// The monotonic clock used as the time base.
-    monotonic_clock: MonotonicClock,
-    /// The time when this clock was created (milliseconds since epoch).
-    create_time: i64,
+    /// The frozen time captured when this clock was created.
+    initial_time: i64,
+    /// The progression mode captured when this clock was created.
+    initial_progression: MockClockProgression,
     /// The epoch time to use as the base (milliseconds since epoch).
     epoch: i64,
+    /// The monotonic clock used when monotonic progression is enabled.
+    monotonic_clock: MonotonicClock,
+    /// The monotonic reading corresponding to `epoch`.
+    monotonic_base_millis: i64,
+    /// The current progression mode.
+    progression: MockClockProgression,
     /// Additional milliseconds to add to the current time.
     millis_to_add: i64,
     /// Milliseconds to add on each call to `millis()`.
@@ -100,10 +111,35 @@ impl MockClock {
         }
     }
 
+    #[inline]
+    fn current_millis(inner: &MockClockInner) -> i64 {
+        let elapsed = if inner.progression.is_monotonic() {
+            inner
+                .monotonic_clock
+                .millis()
+                .saturating_sub(inner.monotonic_base_millis)
+        } else {
+            0
+        };
+        inner
+            .epoch
+            .saturating_add(elapsed)
+            .saturating_add(inner.millis_to_add)
+    }
+
+    #[inline]
+    fn rebase_at_current(inner: &mut MockClockInner) {
+        let current = Self::current_millis(inner);
+        inner.epoch = current;
+        inner.millis_to_add = 0;
+        inner.monotonic_base_millis = inner.monotonic_clock.millis();
+    }
+
     /// Creates a new `MockClock`.
     ///
-    /// The clock is initialized with the current system time and uses a
-    /// [`MonotonicClock`] as its internal time base.
+    /// The clock is initialized with the current system time and remains
+    /// frozen at that instant until adjusted by the control methods or switched
+    /// to monotonic progression.
     ///
     /// # Returns
     ///
@@ -118,18 +154,126 @@ impl MockClock {
     /// ```
     ///
     pub fn new() -> Self {
+        Self::with_progression(MockClockProgression::Frozen)
+    }
+
+    /// Creates a new `MockClock` with the specified progression mode.
+    ///
+    /// The clock starts at the current system time. In
+    /// [`Frozen`](MockClockProgression::Frozen) mode, readings stay fixed until
+    /// explicitly advanced. In [`Monotonic`](MockClockProgression::Monotonic)
+    /// mode, readings progress naturally from the initial system time.
+    ///
+    /// # Arguments
+    ///
+    /// * `progression` - The initial progression mode.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::{MockClock, MockClockProgression};
+    ///
+    /// let clock = MockClock::with_progression(MockClockProgression::Monotonic);
+    /// assert_eq!(clock.progression(), MockClockProgression::Monotonic);
+    /// ```
+    ///
+    pub fn with_progression(progression: MockClockProgression) -> Self {
+        let initial_time = SystemClock::new().millis();
         let monotonic_clock = MonotonicClock::new();
-        let create_time = monotonic_clock.millis();
+        let monotonic_base_millis = monotonic_clock.millis();
         MockClock {
             inner: Arc::new(Mutex::new(MockClockInner {
+                initial_time,
+                initial_progression: progression,
+                epoch: initial_time,
                 monotonic_clock,
-                create_time,
-                epoch: create_time,
+                monotonic_base_millis,
+                progression,
                 millis_to_add: 0,
                 millis_to_add_each_time: 0,
                 add_every_time: false,
             })),
         }
+    }
+
+    /// Returns the current progression mode.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::{MockClock, MockClockProgression};
+    ///
+    /// let clock = MockClock::new();
+    /// assert_eq!(clock.progression(), MockClockProgression::Frozen);
+    /// ```
+    pub fn progression(&self) -> MockClockProgression {
+        self.lock_inner().progression
+    }
+
+    /// Switches the clock progression mode without changing the current reading.
+    ///
+    /// The current logical reading is first folded into the clock's base state,
+    /// so changing between frozen and monotonic modes does not cause an
+    /// immediate time jump.
+    ///
+    /// # Arguments
+    ///
+    /// * `progression` - The new progression mode.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::{MockClock, MockClockProgression};
+    ///
+    /// let clock = MockClock::new();
+    /// clock.set_progression(MockClockProgression::Monotonic);
+    /// assert_eq!(clock.progression(), MockClockProgression::Monotonic);
+    /// ```
+    pub fn set_progression(&self, progression: MockClockProgression) {
+        let mut inner = self.lock_inner();
+        Self::rebase_at_current(&mut inner);
+        inner.progression = progression;
+    }
+
+    /// Returns whether monotonic progression is enabled.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::MockClock;
+    ///
+    /// let clock = MockClock::new();
+    /// assert!(!clock.monotonic_progression_enabled());
+    /// ```
+    pub fn monotonic_progression_enabled(&self) -> bool {
+        self.progression().is_monotonic()
+    }
+
+    /// Enables or disables monotonic progression.
+    ///
+    /// This is a boolean convenience wrapper around
+    /// [`set_progression()`](MockClock::set_progression).
+    ///
+    /// # Arguments
+    ///
+    /// * `enabled` - `true` to use monotonic progression, `false` to freeze.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_clock::MockClock;
+    ///
+    /// let clock = MockClock::new();
+    /// clock.set_monotonic_progression_enabled(true);
+    /// assert!(clock.monotonic_progression_enabled());
+    /// ```
+    pub fn set_monotonic_progression_enabled(&self, enabled: bool) {
+        let progression = if enabled {
+            MockClockProgression::Monotonic
+        } else {
+            MockClockProgression::Frozen
+        };
+        self.set_progression(progression);
     }
 
     /// Adds a fixed amount of milliseconds to the clock.
@@ -197,7 +341,8 @@ impl MockClock {
     /// Enables auto-advance on each read operation.
     ///
     /// After calling this method, each call to [`millis()`](Clock::millis) or
-    /// [`time()`](Clock::time) will advance the clock by `millis`.
+    /// [`time()`](Clock::time) returns the current logical time and advances
+    /// the next read by `millis`.
     ///
     /// # Arguments
     ///
@@ -236,7 +381,7 @@ impl MockClock {
     /// clock.clear_auto_advance();
     /// let t1 = clock.millis();
     /// let t2 = clock.millis();
-    /// assert!((t2 - t1).abs() < 10);
+    /// assert_eq!(t2, t1);
     /// ```
     pub fn clear_auto_advance(&self) {
         let mut inner = self.lock_inner();
@@ -255,14 +400,7 @@ impl Default for MockClock {
 impl Clock for MockClock {
     fn millis(&self) -> i64 {
         let mut inner = self.lock_inner();
-        let elapsed = inner
-            .monotonic_clock
-            .millis()
-            .saturating_sub(inner.create_time);
-        let result = inner
-            .epoch
-            .saturating_add(elapsed)
-            .saturating_add(inner.millis_to_add);
+        let result = Self::current_millis(&inner);
 
         if inner.add_every_time {
             inner.millis_to_add = inner
@@ -277,9 +415,8 @@ impl Clock for MockClock {
 impl ControllableClock for MockClock {
     fn set_time(&self, instant: DateTime<Utc>) {
         let mut inner = self.lock_inner();
-        let current_monotonic = inner.monotonic_clock.millis();
-        let elapsed = current_monotonic.saturating_sub(inner.create_time);
-        inner.epoch = instant.timestamp_millis().saturating_sub(elapsed);
+        inner.epoch = instant.timestamp_millis();
+        inner.monotonic_base_millis = inner.monotonic_clock.millis();
         inner.millis_to_add = 0;
         inner.millis_to_add_each_time = 0;
         inner.add_every_time = false;
@@ -293,7 +430,9 @@ impl ControllableClock for MockClock {
 
     fn reset(&self) {
         let mut inner = self.lock_inner();
-        inner.epoch = inner.create_time;
+        inner.epoch = inner.initial_time;
+        inner.progression = inner.initial_progression;
+        inner.monotonic_base_millis = inner.monotonic_clock.millis();
         inner.millis_to_add = 0;
         inner.millis_to_add_each_time = 0;
         inner.add_every_time = false;
