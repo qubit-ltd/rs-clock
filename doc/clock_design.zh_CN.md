@@ -48,7 +48,8 @@ Clock trait 实现：
 ├── SystemClock (系统时钟)
 ├── MonotonicClock (单调时钟)
 ├── NanoMonotonicClock (高精度单调时钟)
-└── MockClock (模拟时钟)
+├── MockClock (模拟时钟)
+└── MockNanoClock (高精度模拟时钟)
 
 包装器：
 └── Zoned<C: Clock> (为任何 Clock 添加时区支持)
@@ -67,6 +68,7 @@ graph TD
     MonotonicClock[MonotonicClock<br/>单调时钟]
     NanoMonotonicClock[NanoMonotonicClock<br/>高精度单调时钟]
     MockClock[MockClock<br/>模拟时钟]
+    MockNanoClock[MockNanoClock<br/>高精度模拟时钟]
     Zoned[Zoned&lt;C&gt;<br/>时区包装器]
 
     Clock --> NanoClock
@@ -77,11 +79,14 @@ graph TD
     Clock -.实现.-> MonotonicClock
     Clock -.实现.-> NanoMonotonicClock
     Clock -.实现.-> MockClock
+    Clock -.实现.-> MockNanoClock
     Clock -.实现.-> Zoned
 
     NanoClock -.实现.-> NanoMonotonicClock
+    NanoClock -.实现.-> MockNanoClock
     ZonedClock -.实现.-> Zoned
     ControllableClock -.实现.-> MockClock
+    ControllableClock -.实现.-> MockNanoClock
 
     style Clock fill:#e1f5ff
     style NanoClock fill:#fff3e0
@@ -103,8 +108,9 @@ pub trait Clock: Send + Sync {
 
     /// 返回当前时间（UTC）
     fn time(&self) -> DateTime<Utc> {
-        DateTime::from_timestamp_millis(self.millis())
-            .unwrap_or_else(Utc::now)
+        let millis = self.millis();
+        DateTime::from_timestamp_millis(millis)
+            .unwrap_or_else(|| clamp_out_of_range_millis(millis))
     }
 }
 ```
@@ -113,6 +119,7 @@ pub trait Clock: Send + Sync {
 - 所有方法返回 **UTC 时间**，不涉及时区
 - `millis()` 是必须实现的方法，返回 Unix 时间戳（毫秒）
 - `time()` 有默认实现，基于 `millis()` 构造 `DateTime<Utc>`
+- 当毫秒时间戳超出 chrono 可表达范围时，`time()` 会 clamp 到最近边界，而不是回退到当前系统时间
 - 要求 `Send + Sync`，确保线程安全
 
 **适用场景**：
@@ -137,9 +144,20 @@ pub trait NanoClock: Clock {
     /// 返回当前时间（UTC，纳秒精度）
     fn time_precise(&self) -> DateTime<Utc> {
         let nanos = self.nanos();
-        let secs = (nanos / 1_000_000_000) as i64;
-        let nsecs = (nanos % 1_000_000_000) as u32;
-        DateTime::from_timestamp(secs, nsecs).unwrap_or_else(Utc::now)
+        let secs = nanos.div_euclid(1_000_000_000);
+        let nsecs = nanos.rem_euclid(1_000_000_000) as u32;
+        let secs = match i64::try_from(secs) {
+            Ok(value) => value,
+            Err(_) if nanos < 0 => return DateTime::<Utc>::MIN_UTC,
+            Err(_) => return DateTime::<Utc>::MAX_UTC,
+        };
+        DateTime::from_timestamp(secs, nsecs).unwrap_or({
+            if nanos < 0 {
+                DateTime::<Utc>::MIN_UTC
+            } else {
+                DateTime::<Utc>::MAX_UTC
+            }
+        })
     }
 }
 ```
@@ -148,6 +166,7 @@ pub trait NanoClock: Clock {
 - 继承自 `Clock`，是 Clock 的特化
 - 使用 `i128` 存储纳秒时间戳，避免溢出
 - 提供 `time_precise()` 方法，返回纳秒精度的 `DateTime`
+- 使用欧几里得除法处理负数纳秒时间戳，超出 chrono 范围时 clamp 到最近边界
 - **接口隔离**：不需要纳秒精度的实现不用提供此 trait
 
 **适用场景**：
@@ -278,9 +297,8 @@ pub struct MonotonicClock {
 
 impl Clock for MonotonicClock {
     fn millis(&self) -> i64 {
-        let elapsed = self.instant_base.elapsed();
-        let elapsed_millis = elapsed.as_millis() as i64;
-        self.system_time_base_millis + elapsed_millis
+        self.system_time_base_millis
+            .saturating_add(self.monotonic_millis())
     }
 }
 ```
@@ -289,6 +307,7 @@ impl Clock for MonotonicClock {
 - 使用 `Instant` 作为时间源，保证单调性
 - 在创建时记录基准点（`instant_base` 和 `system_time_base_millis`）
 - 后续时间通过计算 `elapsed` 得出
+- `millis()` 使用饱和加法，极端长运行或极端基准值下不会整数溢出
 - 只实现 `Clock` trait，**不实现** `ZonedClock`
 
 **为什么不实现 ZonedClock？**
@@ -339,7 +358,8 @@ impl NanoClock for NanoMonotonicClock { /* ... */ }
 **设计要点**：
 - 同时实现 `Clock` 和 `NanoClock`
 - 使用 `Instant` 保证单调性
-- 分别存储秒和纳秒，避免 `i128` 溢出问题
+- 分别存储秒和纳秒作为墙钟基准，后续叠加 `Instant` 流逝时间
+- `nanos()` 使用 `i128` 和饱和加法，`millis()` 转换为 `i64` 时使用饱和转换
 - 只实现 `Clock` 和 `NanoClock`，不实现 `ZonedClock`
 
 **适用场景**：
@@ -376,9 +396,12 @@ pub struct MockClock {
 }
 
 struct MockClockInner {
-    monotonic_clock: MonotonicClock,
-    create_time: i64,
+    initial_time: i64,
+    initial_progression: MockClockProgression,
     epoch: i64,
+    monotonic_clock: MonotonicClock,
+    monotonic_base_millis: i64,
+    progression: MockClockProgression,
     millis_to_add: i64,
     millis_to_add_each_time: i64,
     add_every_time: bool,
@@ -390,15 +413,21 @@ impl ControllableClock for MockClock { /* ... */ }
 
 **设计要点**：
 - 实现 `Clock` 和 `ControllableClock`
-- 内部使用 `MonotonicClock` 作为时间基准，保证测试稳定性
+- 创建时捕获系统时间作为初始冻结读数
 - 使用 `Arc<Mutex<>>` 保证线程安全和可共享
-- 支持设置固定时间、增加时间、自动递增等功能
+- 支持设置逻辑当前时间、增加时间、自动递增等功能
+- 默认使用冻结模式，保证测试可重复
+- 通过 `MockClockProgression` 可切换到基于内部 `MonotonicClock` 的自然推进模式
+- 切换冻结/单调推进时会先把当前逻辑读数重新锚定，避免开关造成时间跳变
+- `set_time()` 设置当前逻辑读数；后续是否继续推进由当前 progression 模式决定
+- `reset()` 会恢复到创建时捕获的读数和初始 progression，并清除附加偏移和自动递增
 
 **核心功能**：
-1. **设置时间**：`set_time(instant)` - 设置为固定时间点
+1. **设置时间**：`set_time(instant)` - 将当前逻辑时间设置到指定时间点
 2. **增加时间**：`add_duration(duration)` - 前进指定时间
 3. **自动递增**：`add_millis(millis, true)` - 每次调用自动增加
-4. **重置**：`reset()` - 恢复到初始状态
+4. **推进模式**：`set_progression(mode)` / `set_monotonic_progression_enabled(enabled)` - 在冻结和单调自然推进之间切换
+5. **重置**：`reset()` - 恢复到创建时的读数和 progression，并清除附加偏移
 
 **适用场景**：
 - 单元测试
@@ -423,7 +452,61 @@ fn test_with_fixed_time() {
 
 ---
 
-### 4.5 Zoned<C> - 时区包装器
+### 4.5 MockNanoClock - 高精度模拟时钟
+
+**职责**：提供纳秒精度、可控制、冻结语义的测试时钟
+
+**定义**：
+```rust
+pub struct MockNanoClock {
+    inner: Arc<Mutex<MockNanoClockInner>>,
+}
+
+struct MockNanoClockInner {
+    initial_nanos: i128,
+    initial_progression: MockClockProgression,
+    epoch_nanos: i128,
+    monotonic_clock: NanoMonotonicClock,
+    monotonic_base_nanos: i128,
+    progression: MockClockProgression,
+    nanos_to_add: i128,
+    nanos_to_add_each_time: i128,
+    add_every_time: bool,
+}
+
+impl Clock for MockNanoClock { /* ... */ }
+impl NanoClock for MockNanoClock { /* ... */ }
+impl ControllableClock for MockNanoClock { /* ... */ }
+```
+
+**设计要点**：
+- 同时实现 `Clock`、`NanoClock` 和 `ControllableClock`
+- 创建时用 `Utc::now()` 捕获纳秒级初始冻结读数
+- 使用 `i128` 表示 Unix 纳秒时间戳，避免常见区间内的溢出问题
+- `Clock::millis()` 由纳秒读数转换而来，超出 `i64` 范围时饱和到边界
+- 默认使用冻结模式，保证测试可重复
+- 通过 `MockClockProgression` 可切换到基于内部 `NanoMonotonicClock` 的自然推进模式
+- 切换冻结/单调推进时会先把当前逻辑读数重新锚定，避免开关造成时间跳变
+- `set_time()` 设置当前逻辑读数；后续是否继续推进由当前 progression 模式决定
+
+**核心功能**：
+1. **设置时间**：`set_time(instant)` - 将纳秒级当前逻辑时间设置到指定时间点
+2. **增加时间**：`add_duration(duration)` - 按 chrono duration 前进，尽量保留纳秒精度
+3. **纳秒推进**：`advance_nanos(nanos)` / `add_nanos(nanos, false)` - 一次性推进纳秒数
+4. **自动递增**：`set_auto_advance_nanos(nanos)` / `add_nanos(nanos, true)` - 每次读取后推进下一次读数
+5. **推进模式**：`set_progression(mode)` / `set_monotonic_progression_enabled(enabled)` - 在冻结和单调自然推进之间切换
+6. **重置**：`reset()` - 恢复到创建时的读数和 progression，并清除附加偏移
+
+**适用场景**：
+- `NanoClock` 相关逻辑的确定性测试
+- `NanoTimeMeter` 的可控测试
+- 需要保留纳秒级 DateTime 精度的测试场景
+
+**文件位置**：`src/mock_nano_clock.rs`
+
+---
+
+### 4.6 Zoned<C> - 时区包装器
 
 **职责**：为任何 `Clock` 添加时区支持
 
@@ -436,6 +519,8 @@ pub struct Zoned<C: Clock> {
 
 impl<C: Clock> Clock for Zoned<C> { /* 委托给 clock */ }
 impl<C: Clock> ZonedClock for Zoned<C> { /* ... */ }
+impl<C: NanoClock> NanoClock for Zoned<C> { /* 委托给 clock */ }
+impl<C: ControllableClock> ControllableClock for Zoned<C> { /* 委托给 clock */ }
 impl<C: Clock> Deref for Zoned<C> { /* ... */ }
 ```
 
@@ -443,22 +528,38 @@ impl<C: Clock> Deref for Zoned<C> { /* ... */ }
 - 泛型包装器，可以包装任何实现了 `Clock` 的类型
 - 实现 `Clock` trait（委托给内部 clock）
 - 实现 `ZonedClock` trait（提供时区功能）
+- 如果内部 clock 实现 `NanoClock`，则 `Zoned<C>` 同样实现 `NanoClock`
+- 如果内部 clock 实现 `ControllableClock`，则 `Zoned<C>` 同样实现 `ControllableClock`
 - **关键特性**：实现 `Deref`，可以直接访问内部 clock 的方法
+
+**扩展 trait 透传的作用**：
+```rust
+let mock = MockClock::new();
+let zoned = Zoned::new(mock, Shanghai);
+
+// ✅ 现在可以作为 trait object 使用
+let controllable: &dyn ControllableClock = &zoned;
+controllable.set_time(some_time);
+
+let nano = Zoned::new(NanoMonotonicClock::new(), Shanghai);
+let precise: &dyn NanoClock = &nano;
+let nanos = precise.nanos();
+```
 
 **Deref 的作用**：
 ```rust
 let mock = MockClock::new();
 let zoned = Zoned::new(mock, Shanghai);
 
-// ✅ 通过 Deref，可以直接调用 MockClock 的方法
+// ✅ 通过 Deref，仍然可以直接调用 MockClock 的方法
 zoned.set_time(some_time);      // ControllableClock 方法
 zoned.add_duration(duration);   // ControllableClock 方法
 zoned.local_time();             // ZonedClock 方法
 ```
 
 **为什么使用 Deref？**
-- 解决了 `Zoned<MockClock>` 的控制问题
-- 提供了极大的便利性，无需手动访问内部 clock
+- 提供便利性，无需手动访问内部 clock
+- trait object 场景由显式 trait 透传解决，Deref 只承担调用便利性
 - 符合 Rust 的智能指针惯例
 
 **同时提供显式访问方法**：
@@ -685,13 +786,19 @@ rs-clock/
 │   ├── monotonic_clock.rs        # MonotonicClock 实现
 │   ├── nano_monotonic_clock.rs   # NanoMonotonicClock 实现
 │   ├── mock_clock.rs             # MockClock 实现
-│   └── zoned.rs                  # Zoned<C> 包装器
+│   ├── mock_clock_progression.rs # MockClockProgression 定义
+│   ├── mock_nano_clock.rs        # MockNanoClock 实现
+│   ├── zoned.rs                  # Zoned<C> 包装器
+│   └── meter/                    # TimeMeter / NanoTimeMeter
 ├── tests/
 │   ├── clock_tests.rs            # Clock trait 测试
+│   ├── *_clock_tests.rs          # 面向具体源文件的行为测试
 │   ├── system_tests.rs           # SystemClock 测试
 │   ├── monotonic_tests.rs        # MonotonicClock 测试
 │   ├── nano_monotonic_tests.rs   # NanoMonotonicClock 测试
 │   ├── mock_tests.rs             # MockClock 测试
+│   ├── mock_nano_clock_tests.rs  # MockNanoClock 测试
+│   ├── meter/                    # 时间计量器测试
 │   └── zoned_tests.rs            # Zoned 测试
 ├── doc/
 │   └── clock_design.zh_CN.md     # 本设计文档
@@ -732,11 +839,11 @@ fn need_zoned_wrong(clock: &dyn Clock) {
 ### 7.3 零成本抽象
 
 ```rust
-// 不需要时区？不付出任何代价
-let clock = MonotonicClock::new();  // 零字段开销
+// 不需要时区？不引入时区包装
+let clock = MonotonicClock::new();  // 小对象，只保存基准时间
 
 // 需要时区？只在需要时添加
-let clock = Zoned::new(MonotonicClock::new(), Shanghai);  // 只增加一个 Tz 字段
+let clock = Zoned::new(MonotonicClock::new(), Shanghai);  // 包装 clock 并增加一个 Tz 字段
 ```
 
 ### 7.4 灵活组合
@@ -778,14 +885,15 @@ clock.millis();             // Clock
 
 **结论**：收益大于成本，类型数量是必要的复杂度
 
-### 8.2 Deref 的语义
+### 8.2 Deref 与 trait 透传的语义
 
-**争议**：Deref 通常用于智能指针，这里用于方法转发可能引起语义争议
+**争议**：Deref 通常用于智能指针，仅靠 Deref 做能力转发会导致 trait object 场景不完整
 
 **解决方案**：
-1. 同时提供 `inner()` 方法供显式访问
-2. 在文档中明确说明 Deref 的用途
-3. Deref 的便利性大于语义争议
+1. `Zoned<C>` 显式透传 `NanoClock` 和 `ControllableClock`
+2. Deref 只作为调用便利性保留，不作为能力边界的唯一表达方式
+3. 同时提供 `inner()` 和 `into_inner()` 方法供显式访问
+4. 在文档中明确说明 Deref 的用途
 
 ### 8.3 MonotonicClock 与 ZonedClock
 
@@ -805,9 +913,8 @@ clock.millis();             // Clock
 ### 9.1 可能的扩展方向
 
 1. **OffsetClock**：支持固定偏移量的时钟
-2. **FixedClock**：固定时间的时钟（简化版 MockClock）
-3. **TickClock**：按固定间隔跳动的时钟
-4. **SystemClockWithOffset**：系统时钟 + 偏移量
+2. **TickClock**：按固定间隔跳动的时钟
+3. **SystemClockWithOffset**：系统时钟 + 偏移量
 
 ### 9.2 兼容性考虑
 
@@ -837,7 +944,6 @@ clock.millis();             // Clock
 2. **类型安全**：编译期保证功能支持
 3. **零成本抽象**：不需要的功能不付出代价
 4. **灵活组合**：通过 `Zoned<C>` 包装器灵活组合功能
-5. **测试友好**：`MockClock` + `Zoned` 完美支持测试
+5. **测试友好**：`MockClock` / `MockNanoClock` + `Zoned` 支持确定性测试
 
 这个设计在简洁性、灵活性、类型安全之间取得了良好的平衡，适合各种使用场景。
-
