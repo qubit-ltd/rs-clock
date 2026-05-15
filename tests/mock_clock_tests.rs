@@ -426,7 +426,7 @@ fn test_mock_clock_multiple_threads() {
 }
 
 #[test]
-fn test_mock_clock_freezes_after_set_time() {
+fn test_mock_clock_set_time_preserves_default_frozen_progression() {
     let clock = MockClock::new();
     let fixed_time = DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
         .unwrap()
