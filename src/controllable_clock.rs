@@ -60,10 +60,9 @@ pub trait ControllableClock: Clock {
     ///
     /// The exact progression semantics depend on the implementation. For
     /// [`MockClock`](crate::MockClock) and
-    /// [`MockNanoClock`](crate::MockNanoClock), this sets the current logical
-    /// reading to `instant`; whether subsequent reads stay frozen or progress
-    /// with monotonic time is controlled by
-    /// [`MockClockProgression`](crate::MockClockProgression).
+    /// [`MockNanoClock`](crate::MockNanoClock), this reanchors the current
+    /// logical reading to `instant` while preserving the current progression
+    /// and auto-advance settings.
     ///
     /// # Arguments
     ///

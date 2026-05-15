@@ -34,10 +34,9 @@ use std::sync::{
 /// A controllable clock implementation for testing.
 ///
 /// `MockClock` allows you to adjust logical time, making it useful for testing
-/// time-dependent code. Readings are frozen after construction and after
-/// [`set_time()`](ControllableClock::set_time) by default. If monotonic
-/// progression is enabled, readings naturally progress from the current
-/// logical time using an internal [`MonotonicClock`].
+/// time-dependent code. Readings are frozen after construction by default.
+/// [`set_time()`](ControllableClock::set_time) reanchors the logical time
+/// without changing the current progression mode or auto-advance settings.
 ///
 /// # Features
 ///
@@ -418,8 +417,6 @@ impl ControllableClock for MockClock {
         inner.epoch = instant.timestamp_millis();
         inner.monotonic_base_millis = inner.monotonic_clock.millis();
         inner.millis_to_add = 0;
-        inner.millis_to_add_each_time = 0;
-        inner.add_every_time = false;
     }
 
     #[inline]
