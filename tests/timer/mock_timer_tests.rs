@@ -86,8 +86,8 @@ fn test_wait_until_rejects_foreign_deadline() {
     assert!(matches!(
         error,
         TimerError::TimerDomainMismatch {
-            expected: _,
-            actual: _
+            expected_domain_id: _,
+            actual_domain_id: _
         }
     ));
 }

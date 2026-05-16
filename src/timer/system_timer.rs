@@ -36,7 +36,7 @@ use crate::timer::{
 /// measured relative to the instant at which the original timer was created.
 #[derive(Clone)]
 pub struct SystemTimer {
-    domain: TimerDomainId,
+    domain_id: TimerDomainId,
     origin: Instant,
     wait_generation: ArcMonitor<u64>,
     #[cfg(feature = "tokio")]
@@ -54,7 +54,7 @@ impl SystemTimer {
     /// A new [`SystemTimer`] backed by the system monotonic clock.
     pub fn new() -> Self {
         Self {
-            domain: TimerDomainId::new_unique(),
+            domain_id: TimerDomainId::new_unique(),
             origin: Instant::now(),
             wait_generation: ArcMonitor::new(0),
             #[cfg(feature = "tokio")]
@@ -74,13 +74,13 @@ impl SystemTimer {
 }
 
 impl MonotonicTimer for SystemTimer {
-    /// Returns the timer domain owned by this system timer.
+    /// Returns the timer domain ID owned by this system timer.
     ///
     /// # Returns
     ///
     /// The [`TimerDomainId`] assigned when this timer was first created.
-    fn timer_domain(&self) -> TimerDomainId {
-        self.domain
+    fn timer_domain_id(&self) -> TimerDomainId {
+        self.domain_id
     }
 
     /// Returns the current monotonic instant in this timer's domain.
@@ -90,7 +90,7 @@ impl MonotonicTimer for SystemTimer {
     /// Elapsed time since the shared origin [`std::time::Instant`], wrapped as a
     /// [`TimerInstant`].
     fn now(&self) -> TimerInstant {
-        TimerInstant::new(self.domain, self.origin.elapsed())
+        TimerInstant::new(self.domain_id, self.origin.elapsed())
     }
 }
 
@@ -110,7 +110,7 @@ impl BlockingTimer for SystemTimer {
     /// Returns [`TimerError::TimerDomainMismatch`] when `deadline` belongs to
     /// another timer domain.
     fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError> {
-        deadline.ensure_domain(self.domain)?;
+        deadline.ensure_domain_id(self.domain_id)?;
         let deadline_elapsed = deadline.elapsed_since_timer_start();
         let mut generation = self.wait_generation.lock();
 
@@ -164,7 +164,7 @@ impl AsyncTimer for SystemTimer {
         deadline: TimerInstant,
     ) -> Pin<Box<dyn Future<Output = Result<TimerWaitOutcome, TimerError>> + Send + 'a>> {
         Box::pin(async move {
-            deadline.ensure_domain(self.domain)?;
+            deadline.ensure_domain_id(self.domain_id)?;
             let deadline_elapsed = deadline.elapsed_since_timer_start();
             let now_elapsed = self.origin.elapsed();
             if now_elapsed >= deadline_elapsed {

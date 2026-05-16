@@ -21,7 +21,7 @@ use crate::timer::{
 /// incompatible, even if their elapsed durations happen to be equal.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TimerInstant {
-    domain: TimerDomainId,
+    domain_id: TimerDomainId,
     elapsed: Duration,
 }
 
@@ -30,23 +30,23 @@ impl TimerInstant {
     ///
     /// # Arguments
     ///
-    /// * `domain` - The timer domain that owns the instant.
+    /// * `domain_id` - The timer domain ID that owns the instant.
     /// * `elapsed` - The elapsed time since that domain was created.
     ///
     /// # Returns
     ///
     /// A new [`TimerInstant`] on the specified domain axis.
-    pub(crate) fn new(domain: TimerDomainId, elapsed: Duration) -> Self {
-        Self { domain, elapsed }
+    pub(crate) fn new(domain_id: TimerDomainId, elapsed: Duration) -> Self {
+        Self { domain_id, elapsed }
     }
 
-    /// Returns the timer domain that owns this instant.
+    /// Returns the timer domain ID that owns this instant.
     ///
     /// # Returns
     ///
     /// The [`TimerDomainId`] associated with this instant.
-    pub fn domain(self) -> TimerDomainId {
-        self.domain
+    pub fn domain_id(self) -> TimerDomainId {
+        self.domain_id
     }
 
     /// Returns the elapsed duration since the owning timer domain was created.
@@ -72,7 +72,7 @@ impl TimerInstant {
     pub fn checked_add(self, duration: Duration) -> Option<Self> {
         self.elapsed
             .checked_add(duration)
-            .map(|elapsed| Self::new(self.domain, elapsed))
+            .map(|elapsed| Self::new(self.domain_id, elapsed))
     }
 
     /// Returns a new instant after adding the duration, saturating on overflow.
@@ -86,7 +86,7 @@ impl TimerInstant {
     /// A new instant whose elapsed time is the sum of this instant and `duration`,
     /// or [`Duration::MAX`] if the sum would overflow.
     pub fn saturating_add(self, duration: Duration) -> Self {
-        Self::new(self.domain, self.elapsed.saturating_add(duration))
+        Self::new(self.domain_id, self.elapsed.saturating_add(duration))
     }
 
     /// Returns the duration elapsed since an earlier instant in the same domain.
@@ -106,7 +106,7 @@ impl TimerInstant {
     /// Returns [`TimerError::TimerDomainMismatch`] when the two instants belong to
     /// different timer domains.
     pub fn checked_duration_since(self, earlier: Self) -> Result<Option<Duration>, TimerError> {
-        self.ensure_domain(earlier.domain)?;
+        self.ensure_domain_id(earlier.domain_id)?;
         Ok(self.elapsed.checked_sub(earlier.elapsed))
     }
 
@@ -127,7 +127,7 @@ impl TimerInstant {
     /// Returns [`TimerError::TimerDomainMismatch`] when the two instants belong to
     /// different timer domains.
     pub fn saturating_duration_since(self, earlier: Self) -> Result<Duration, TimerError> {
-        self.ensure_domain(earlier.domain)?;
+        self.ensure_domain_id(earlier.domain_id)?;
         Ok(self.elapsed.saturating_sub(earlier.elapsed))
     }
 
@@ -135,20 +135,26 @@ impl TimerInstant {
     ///
     /// # Arguments
     ///
-    /// * `expected` - The timer domain required by the caller.
+    /// * `expected_domain_id` - The timer domain ID required by the caller.
     ///
     /// # Returns
     ///
-    /// `Ok(())` when this instant's domain matches `expected`.
+    /// `Ok(())` when this instant's domain ID matches `expected_domain_id`.
     ///
     /// # Errors
     ///
     /// Returns [`TimerError::TimerDomainMismatch`] when the domains differ.
-    pub(crate) fn ensure_domain(self, expected: TimerDomainId) -> Result<(), TimerError> {
-        if self.domain == expected {
+    pub(crate) fn ensure_domain_id(
+        self,
+        expected_domain_id: TimerDomainId,
+    ) -> Result<(), TimerError> {
+        if self.domain_id == expected_domain_id {
             Ok(())
         } else {
-            Err(TimerError::timer_domain_mismatch(expected, self.domain))
+            Err(TimerError::timer_domain_mismatch(
+                expected_domain_id,
+                self.domain_id,
+            ))
         }
     }
 }

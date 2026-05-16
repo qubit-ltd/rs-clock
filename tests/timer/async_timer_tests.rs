@@ -39,8 +39,8 @@ impl ScriptedAsyncTimer {
 }
 
 impl MonotonicTimer for ScriptedAsyncTimer {
-    fn timer_domain(&self) -> qubit_clock::timer::TimerDomainId {
-        self.timer.timer_domain()
+    fn timer_domain_id(&self) -> qubit_clock::timer::TimerDomainId {
+        self.timer.timer_domain_id()
     }
 
     fn now(&self) -> qubit_clock::timer::TimerInstant {
@@ -151,8 +151,8 @@ async fn test_sleep_until_async_propagates_foreign_deadline_error() {
     assert!(matches!(
         error,
         TimerError::TimerDomainMismatch {
-            expected: _,
-            actual: _
+            expected_domain_id: _,
+            actual_domain_id: _
         }
     ));
 }

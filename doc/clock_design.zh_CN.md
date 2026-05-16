@@ -296,7 +296,7 @@ elapsed time。不同 timer 拥有不同的 timer domain，它们的 `TimerInsta
 **定义**：
 ```rust
 pub trait MonotonicTimer: Send + Sync {
-    fn timer_domain(&self) -> TimerDomainId;
+    fn timer_domain_id(&self) -> TimerDomainId;
     fn now(&self) -> TimerInstant;
     fn deadline_after(&self, duration: Duration) -> TimerInstant;
     fn duration_until(&self, deadline: TimerInstant) -> Result<Option<Duration>, TimerError>;
@@ -322,7 +322,7 @@ pub trait AsyncTimer: MonotonicTimer {
 ```
 
 **设计要点**：
-- `TimerInstant` 内部携带 `TimerDomainId` 和相对于该 domain 零点的 elapsed time
+- `TimerInstant` 内部携带 `domain_id: TimerDomainId` 和相对于该 domain 零点的 elapsed time
 - 所有接收外部 `TimerInstant` 的 API 都先校验 timer domain，不匹配时返回 `TimerError::TimerDomainMismatch`
 - `Duration` 参数（如 `sleep_for(duration)`）表示“相对于当前 timer instant 的一段时长”
 - `TimerWaitOutcome::Notified` 表示 wait 被显式通知提前唤醒，`sleep_*` 方法会忽略通知并继续等待 deadline
@@ -700,7 +700,7 @@ let local = clock.local_time();
 **定义**：
 ```rust
 pub struct SystemTimer {
-    domain: TimerDomainId,
+    domain_id: TimerDomainId,
     origin: Instant,
     wait_generation: ArcMonitor<u64>,
     async_notifier: Arc<Notify>, // tokio feature
@@ -733,7 +733,7 @@ pub struct SystemTimer {
 **定义**：
 ```rust
 pub struct MockTimer {
-    domain: TimerDomainId,
+    domain_id: TimerDomainId,
     state: Arc<(Mutex<(Duration, u64)>, Condvar)>,
     async_generation_sender: watch::Sender<u64>, // tokio feature
 }

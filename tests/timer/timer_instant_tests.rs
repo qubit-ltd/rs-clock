@@ -16,14 +16,14 @@ use qubit_clock::timer::{
 };
 
 #[test]
-fn test_checked_add_keeps_timer_domain() {
+fn test_checked_add_keeps_timer_domain_id() {
     let timer = MockTimer::new();
     let instant = timer.now();
     let later = instant
         .checked_add(Duration::from_millis(250))
         .expect("adding a small duration should succeed");
 
-    assert_eq!(instant.domain(), later.domain());
+    assert_eq!(instant.domain_id(), later.domain_id());
     assert_eq!(
         Duration::from_millis(250),
         later
@@ -34,7 +34,7 @@ fn test_checked_add_keeps_timer_domain() {
 }
 
 #[test]
-fn test_checked_duration_since_rejects_foreign_timer_domain() {
+fn test_checked_duration_since_rejects_foreign_timer_domain_id() {
     let first = MockTimer::new();
     let second = MockTimer::new();
 
@@ -46,8 +46,8 @@ fn test_checked_duration_since_rejects_foreign_timer_domain() {
     assert!(matches!(
         error,
         TimerError::TimerDomainMismatch {
-            expected: _,
-            actual: _
+            expected_domain_id: _,
+            actual_domain_id: _
         }
     ));
 }

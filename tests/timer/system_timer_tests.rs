@@ -34,7 +34,7 @@ fn test_wait_for_reaches_real_deadline() {
 fn test_default_creates_system_timer() {
     let timer = SystemTimer::default();
 
-    assert_eq!(timer.timer_domain(), timer.now().domain());
+    assert_eq!(timer.timer_domain_id(), timer.now().domain_id());
 }
 
 #[test]
