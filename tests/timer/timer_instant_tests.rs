@@ -11,12 +11,12 @@ use std::time::Duration;
 
 use qubit_clock::timer::{
     MockTimer,
-    MonotonicTimer,
+    TimerDomain,
     TimerError,
 };
 
 #[test]
-fn test_checked_add_keeps_timer_domain_id() {
+fn test_checked_add_keeps_id() {
     let timer = MockTimer::new();
     let instant = timer.now();
     let later = instant
@@ -34,7 +34,7 @@ fn test_checked_add_keeps_timer_domain_id() {
 }
 
 #[test]
-fn test_checked_duration_since_rejects_foreign_timer_domain_id() {
+fn test_checked_duration_since_rejects_foreign_id() {
     let first = MockTimer::new();
     let second = MockTimer::new();
 

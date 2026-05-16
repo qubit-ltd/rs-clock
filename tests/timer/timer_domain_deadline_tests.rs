@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use qubit_clock::timer::{
     MockTimer,
-    MonotonicTimer,
+    TimerDomain,
 };
 
 #[test]
@@ -21,7 +21,7 @@ fn test_deadline_after_uses_timer_domain_relative_time() {
 
     let deadline = timer.deadline_after(Duration::from_millis(60));
 
-    assert_eq!(timer.timer_domain_id(), deadline.domain_id());
+    assert_eq!(timer.id(), deadline.domain_id());
     assert_eq!(
         Some(Duration::from_millis(60)),
         timer

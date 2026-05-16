@@ -13,8 +13,8 @@ use std::time::Duration;
 
 use qubit_clock::timer::{
     BlockingTimer,
-    MonotonicTimer,
     SystemTimer,
+    TimerDomain,
     TimerWaitOutcome,
 };
 
@@ -47,7 +47,7 @@ fn test_wait_until_reaches_real_deadline() {
 fn test_default_creates_system_timer() {
     let timer = SystemTimer::default();
 
-    assert_eq!(timer.timer_domain_id(), timer.now().domain_id());
+    assert_eq!(timer.id(), timer.now().domain_id());
 }
 
 #[test]
@@ -74,7 +74,7 @@ fn test_wait_until_can_be_notified_before_deadline() {
         .recv_timeout(Duration::from_secs(1))
         .expect("worker should start waiting promptly");
     for _ in 0..100 {
-        timer.notify_waiters();
+        timer.notify_all_waiters();
         if let Ok(outcome) = outcome_receiver.recv_timeout(Duration::from_millis(10)) {
             assert_eq!(TimerWaitOutcome::Notified, outcome);
             worker.join().expect("worker thread should finish cleanly");

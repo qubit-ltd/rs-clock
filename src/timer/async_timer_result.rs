@@ -7,15 +7,10 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for the timer module.
+use std::future::Future;
+use std::pin::Pin;
 
-#[cfg(feature = "tokio")]
-mod async_timer_tests;
-mod blocking_timer_tests;
-mod mock_timer_tests;
-mod system_timer_tests;
-mod timer_domain_deadline_tests;
-mod timer_domain_tests;
-mod timer_error_tests;
-mod timer_instant_tests;
-mod timer_wait_outcome_tests;
+use crate::timer::TimerResult;
+
+/// Boxed future returned by asynchronous timer operations.
+pub type AsyncTimerResult<'a, T> = Pin<Box<dyn Future<Output = TimerResult<T>> + Send + 'a>>;

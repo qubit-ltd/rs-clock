@@ -9,7 +9,7 @@
  ******************************************************************************/
 use qubit_clock::timer::{
     MockTimer,
-    MonotonicTimer,
+    TimerDomain,
 };
 
 #[test]

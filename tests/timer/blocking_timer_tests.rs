@@ -7,8 +7,6 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-use std::collections::VecDeque;
-use std::sync::Mutex;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -16,56 +14,15 @@ use std::time::Duration;
 use qubit_clock::timer::{
     BlockingTimer,
     MockTimer,
-    MonotonicTimer,
-    TimerError,
-    TimerInstant,
+    TimerDomain,
     TimerWaitOutcome,
 };
 
-struct ScriptedBlockingTimer {
-    timer: MockTimer,
-    outcomes: Mutex<VecDeque<TimerWaitOutcome>>,
-}
-
-impl ScriptedBlockingTimer {
-    fn new(outcomes: impl IntoIterator<Item = TimerWaitOutcome>) -> Self {
-        Self {
-            timer: MockTimer::new(),
-            outcomes: Mutex::new(outcomes.into_iter().collect()),
-        }
-    }
-}
-
-impl MonotonicTimer for ScriptedBlockingTimer {
-    fn timer_domain_id(&self) -> qubit_clock::timer::TimerDomainId {
-        self.timer.timer_domain_id()
-    }
-
-    fn now(&self) -> qubit_clock::timer::TimerInstant {
-        self.timer.now()
-    }
-}
-
-impl BlockingTimer for ScriptedBlockingTimer {
-    fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError> {
-        let _ = self.timer.duration_until(deadline)?;
-        let mut outcomes = self
-            .outcomes
-            .lock()
-            .expect("scripted timer outcomes should not be poisoned");
-        let outcome = outcomes
-            .pop_front()
-            .expect("scripted timer should have enough wait outcomes");
-        Ok(outcome)
-    }
-
-    fn notify_waiters(&self) {}
-}
-
 #[test]
-fn test_sleep_for_ignores_notifications_until_deadline_is_reached() {
+fn test_sleep_until_ignores_notifications_until_deadline_is_reached() {
     let timer = MockTimer::new();
     let worker_timer = timer.clone();
+    let deadline = timer.deadline_after(Duration::from_millis(100));
     let (started_sender, started_receiver) = mpsc::channel();
     let (done_sender, done_receiver) = mpsc::channel();
 
@@ -74,7 +31,7 @@ fn test_sleep_for_ignores_notifications_until_deadline_is_reached() {
             .send(())
             .expect("worker should report when it starts waiting");
         worker_timer
-            .sleep_for(Duration::from_millis(100))
+            .sleep_until(deadline)
             .expect("sleeping with the timer's own deadline should succeed");
         done_sender
             .send(())
@@ -84,28 +41,77 @@ fn test_sleep_for_ignores_notifications_until_deadline_is_reached() {
     started_receiver
         .recv_timeout(Duration::from_secs(1))
         .expect("worker should start waiting promptly");
-    timer.notify_waiters();
+    timer.notify_all_waiters();
     assert!(
         done_receiver.try_recv().is_err(),
-        "notification should not complete sleep_for before the deadline",
+        "notification should not complete sleep_until before the deadline",
     );
 
     timer.advance(Duration::from_millis(100));
     done_receiver
         .recv_timeout(Duration::from_secs(1))
-        .expect("advancing mock time should complete sleep_for");
+        .expect("advancing mock time should complete sleep_until");
     worker.join().expect("worker thread should finish cleanly");
 }
 
 #[test]
-fn test_sleep_until_continues_after_notified_outcome() {
-    let timer = ScriptedBlockingTimer::new([
-        TimerWaitOutcome::Notified,
-        TimerWaitOutcome::DeadlineReached,
-    ]);
-    let deadline = timer.deadline_after(Duration::from_millis(10));
+fn test_wait_for_returns_notified_after_notification() {
+    let timer = MockTimer::new();
+    let worker_timer = timer.clone();
+    let (outcome_sender, outcome_receiver) = mpsc::channel();
 
-    timer
-        .sleep_until(deadline)
-        .expect("scripted same-domain deadline should succeed");
+    let worker = thread::spawn(move || {
+        let outcome = worker_timer
+            .wait_for(Duration::from_millis(100))
+            .expect("waiting with a self-created deadline should succeed");
+        outcome_sender
+            .send(outcome)
+            .expect("worker should report the wait outcome");
+    });
+
+    for _ in 0..100 {
+        timer.notify_all_waiters();
+        if let Ok(outcome) = outcome_receiver.recv_timeout(Duration::from_millis(10)) {
+            assert_eq!(TimerWaitOutcome::Notified, outcome);
+            worker.join().expect("worker thread should finish cleanly");
+            return;
+        }
+    }
+
+    panic!("notification should complete wait_for");
+}
+
+#[test]
+fn test_wait_until_continues_after_time_advance_before_deadline() {
+    let timer = MockTimer::new();
+    let worker_timer = timer.clone();
+    let deadline = timer.deadline_after(Duration::from_millis(100));
+    let (outcome_sender, outcome_receiver) = mpsc::channel();
+
+    let worker = thread::spawn(move || {
+        let outcome = worker_timer
+            .wait_until(deadline)
+            .expect("waiting with a same-domain deadline should succeed");
+        outcome_sender
+            .send(outcome)
+            .expect("worker should report the wait outcome");
+    });
+
+    timer.advance(Duration::from_millis(50));
+    assert!(
+        outcome_receiver
+            .recv_timeout(Duration::from_millis(20))
+            .is_err(),
+        "time advancement before the deadline should only re-check wait_for",
+    );
+
+    timer.advance(Duration::from_millis(50));
+
+    assert_eq!(
+        TimerWaitOutcome::DeadlineReached,
+        outcome_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("reaching the deadline should complete wait_for"),
+    );
+    worker.join().expect("worker thread should finish cleanly");
 }

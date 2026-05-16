@@ -7,15 +7,7 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for the timer module.
+use crate::timer::TimerError;
 
-#[cfg(feature = "tokio")]
-mod async_timer_tests;
-mod blocking_timer_tests;
-mod mock_timer_tests;
-mod system_timer_tests;
-mod timer_domain_deadline_tests;
-mod timer_domain_tests;
-mod timer_error_tests;
-mod timer_instant_tests;
-mod timer_wait_outcome_tests;
+/// Result type returned by timer operations.
+pub type TimerResult<T> = Result<T, TimerError>;

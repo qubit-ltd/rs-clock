@@ -10,8 +10,8 @@
 use std::time::Duration;
 
 use crate::timer::{
-    TimerDomainId,
     TimerError,
+    TimerResult,
 };
 
 /// A monotonic instant inside one timer domain.
@@ -21,7 +21,7 @@ use crate::timer::{
 /// incompatible, even if their elapsed durations happen to be equal.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TimerInstant {
-    domain_id: TimerDomainId,
+    domain_id: u64,
     elapsed: Duration,
 }
 
@@ -36,7 +36,7 @@ impl TimerInstant {
     /// # Returns
     ///
     /// A new [`TimerInstant`] on the specified domain axis.
-    pub(crate) fn new(domain_id: TimerDomainId, elapsed: Duration) -> Self {
+    pub(crate) fn new(domain_id: u64, elapsed: Duration) -> Self {
         Self { domain_id, elapsed }
     }
 
@@ -44,8 +44,8 @@ impl TimerInstant {
     ///
     /// # Returns
     ///
-    /// The [`TimerDomainId`] associated with this instant.
-    pub fn domain_id(self) -> TimerDomainId {
+    /// The numeric timer domain ID associated with this instant.
+    pub fn domain_id(self) -> u64 {
         self.domain_id
     }
 
@@ -105,7 +105,7 @@ impl TimerInstant {
     ///
     /// Returns [`TimerError::TimerDomainMismatch`] when the two instants belong to
     /// different timer domains.
-    pub fn checked_duration_since(self, earlier: Self) -> Result<Option<Duration>, TimerError> {
+    pub fn checked_duration_since(self, earlier: Self) -> TimerResult<Option<Duration>> {
         self.ensure_domain_id(earlier.domain_id)?;
         Ok(self.elapsed.checked_sub(earlier.elapsed))
     }
@@ -126,7 +126,7 @@ impl TimerInstant {
     ///
     /// Returns [`TimerError::TimerDomainMismatch`] when the two instants belong to
     /// different timer domains.
-    pub fn saturating_duration_since(self, earlier: Self) -> Result<Duration, TimerError> {
+    pub fn saturating_duration_since(self, earlier: Self) -> TimerResult<Duration> {
         self.ensure_domain_id(earlier.domain_id)?;
         Ok(self.elapsed.saturating_sub(earlier.elapsed))
     }
@@ -144,10 +144,7 @@ impl TimerInstant {
     /// # Errors
     ///
     /// Returns [`TimerError::TimerDomainMismatch`] when the domains differ.
-    pub(crate) fn ensure_domain_id(
-        self,
-        expected_domain_id: TimerDomainId,
-    ) -> Result<(), TimerError> {
+    pub(crate) fn ensure_domain_id(self, expected_domain_id: u64) -> TimerResult<()> {
         if self.domain_id == expected_domain_id {
             Ok(())
         } else {

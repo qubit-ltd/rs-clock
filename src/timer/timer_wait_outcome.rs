@@ -17,7 +17,7 @@ pub enum TimerWaitOutcome {
     /// The wait was woken by an explicit notification before the deadline.
     ///
     /// Returned when a blocking or asynchronous wait is interrupted by
-    /// [`notify_waiters`](crate::timer::BlockingTimer::notify_waiters) before the
+    /// [`notify_all_waiters`](crate::timer::BlockingTimer::notify_all_waiters) before the
     /// deadline is reached.
     Notified,
 }
