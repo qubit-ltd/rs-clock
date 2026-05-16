@@ -7,11 +7,11 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-Thread-safe clock abstractions for Rust with monotonic and mock implementations.
+Thread-safe clock and timer abstractions for Rust with monotonic and mock implementations.
 
 ## Overview
 
-Qubit Clock provides a flexible and type-safe clock abstraction system for Rust applications. It offers robust, thread-safe clock implementations with support for basic time access, high-precision measurements, timezone handling, monotonic time, and testing support.
+Qubit Clock provides a flexible and type-safe clock abstraction system for Rust applications. It offers robust, thread-safe clock implementations with support for basic time access, high-precision measurements, timezone handling, monotonic time, timer-domain deadlines, and testing support.
 
 ## Features
 
@@ -37,6 +37,13 @@ Qubit Clock provides a flexible and type-safe clock abstraction system for Rust 
 - **Speed Calculation**: Calculate processing speed (items per second/minute)
 - **Test-Friendly**: Support injecting mock clocks for deterministic testing
 
+### ⏲️ **Timer Domains**
+- **MonotonicTimer**: Creates domain-branded monotonic instants and deadlines
+- **BlockingTimer**: Blocking wait, sleep, and notification APIs
+- **AsyncTimer**: Optional Tokio-compatible async wait APIs with the `tokio` feature
+- **SystemTimer**: Real timer backed by `std::time::Instant`
+- **MockTimer**: Deterministic timer whose elapsed time is manually controlled by tests
+
 ### 🔒 **Thread Safety**
 - All clock implementations are `Send + Sync`
 - Immutable design for system and monotonic clocks
@@ -50,6 +57,7 @@ Qubit Clock provides a flexible and type-safe clock abstraction system for Rust 
 
 ### 🧪 **Testing Support**
 - Mock clock with controllable time
+- Mock timer with controllable monotonic elapsed time
 - Set time to specific points
 - Advance time programmatically
 - Auto-increment support
@@ -155,6 +163,19 @@ meter.stop();
 println!("Elapsed: {}", meter.readable_duration());
 ```
 
+### Timer Domains for Mockable Timeouts
+
+```rust
+use qubit_clock::timer::{BlockingTimer, MockTimer, MonotonicTimer};
+use std::time::Duration;
+
+let timer = MockTimer::new();
+let deadline = timer.deadline_after(Duration::from_secs(5));
+
+timer.advance(Duration::from_secs(5));
+timer.sleep_until(deadline).expect("deadline belongs to this timer");
+```
+
 ### High-Precision Time Meter
 
 ```rust
@@ -201,6 +222,9 @@ The crate is built around several orthogonal traits:
 - **NanoClock**: Extension for nanosecond precision
 - **ZonedClock**: Extension for timezone support
 - **ControllableClock**: Extension for time control (testing)
+- **MonotonicTimer**: Base trait for timer-domain instants and deadlines
+- **BlockingTimer**: Extension for blocking wait and sleep operations
+- **AsyncTimer**: Optional Tokio extension enabled by the `tokio` feature
 
 This design follows the **Interface Segregation Principle**, ensuring that implementations only need to provide the features they actually support.
 
@@ -252,6 +276,25 @@ This design follows the **Interface Segregation Principle**, ensuring that imple
 - Generic over any `Clock` implementation
 - Converts UTC time to local time in specified timezone
 - Use for: displaying local time, timezone conversions
+
+## Timer Implementations
+
+### SystemTimer
+
+- Based on `std::time::Instant`
+- Creates `TimerInstant` values in its own timer domain
+- Supports blocking waits and explicit notifications
+- Supports asynchronous waits when the `tokio` feature is enabled
+- Use for: production deadlines, timeout control, interruptible sleeps
+
+### MockTimer
+
+- Manually controlled monotonic timer for deterministic tests
+- Starts at elapsed time zero
+- Clones share the same timer domain, elapsed time, and notification state
+- Supports manual `set_elapsed`, `advance`, `reset`, and `notify_waiters`
+- Supports asynchronous waits when the `tokio` feature is enabled
+- Use for: testing timeout and retry logic without waiting for real time
 
 ## Time Meters
 
@@ -313,6 +356,10 @@ the problem:
   injectable clock source. They use monotonic clocks by default; `TimeMeter`
   can accept `MockClock`, while `NanoTimeMeter` can accept `MockNanoClock` or
   any other `NanoClock` implementation.
+- Use `SystemTimer` or `MockTimer` when code needs deadlines, sleeps, or
+  interruptible waits. `TimerInstant` values are branded with the timer domain
+  that produced them, so unrelated timers cannot accidentally compare or wait
+  on each other's deadlines.
 - Use the `Clock` traits when business logic depends on "current time" and must
   be testable without coupling directly to the system clock or `Instant::now()`.
 
@@ -353,6 +400,16 @@ Extension trait for controllable clocks (testing):
 - `add_duration(duration)` - Advances the clock by a duration
 - `reset()` - Resets the clock to initial state
 
+### Timer Traits
+
+Timer-domain APIs are available under `qubit_clock::timer`:
+
+- `MonotonicTimer` - Returns the current `TimerInstant`, creates deadlines, and computes remaining duration
+- `BlockingTimer` - Provides `wait_until`, `wait_for`, `sleep_until`, `sleep_for`, and `notify_waiters`
+- `AsyncTimer` - Provides Tokio-compatible async waits when the `tokio` feature is enabled
+- `TimerInstant` - Represents an instant relative to the creating timer domain
+- `TimerError` - Reports timer-domain mismatches
+
 ## Design Principles
 
 ### Interface Segregation
@@ -362,6 +419,7 @@ The crate follows the Interface Segregation Principle by providing separate trai
 - Not all clocks need nanosecond precision → `NanoClock` is separate
 - Not all clocks need timezone support → `ZonedClock` is separate
 - Only test clocks need controllability → `ControllableClock` is separate
+- Only timer users need deadlines and waits → timer traits live under `timer`
 
 This allows implementations to provide only the features they need, keeping the API clean and focused.
 
@@ -373,6 +431,9 @@ Each trait and type has one clear purpose:
 - `NanoClock` - Provide high-precision time
 - `ZonedClock` - Provide timezone conversion
 - `ControllableClock` - Provide time control for testing
+- `MonotonicTimer` - Provide domain-branded monotonic instants
+- `BlockingTimer` - Provide blocking deadline waits
+- `AsyncTimer` - Provide optional Tokio deadline waits
 
 ### Composition over Inheritance
 
@@ -413,6 +474,7 @@ cargo test
 
 - **chrono**: Date and time handling with serialization support
 - **chrono-tz**: Comprehensive timezone database
+- **tokio**: Optional dependency for `timer::AsyncTimer` when the `tokio` feature is enabled
 
 ## Use Cases
 
@@ -434,16 +496,17 @@ log::info!("Processing took: {}", meter.readable_duration());
 ### Timeout Control
 
 ```rust
-use qubit_clock::{Clock, MonotonicClock};
+use qubit_clock::timer::{BlockingTimer, MonotonicTimer, SystemTimer};
 use std::time::Duration;
 
-let clock = MonotonicClock::new();
-let deadline = clock.millis() + 5000; // 5 seconds from now
+let timer = SystemTimer::new();
+let deadline = timer.deadline_after(Duration::from_secs(5));
 
-while clock.millis() < deadline {
+while timer.duration_until(deadline).expect("deadline belongs to this timer").is_some() {
     if try_operation() {
         break;
     }
+    timer.wait_for(Duration::from_millis(10)).expect("self-created deadline should be valid");
 }
 ```
 
