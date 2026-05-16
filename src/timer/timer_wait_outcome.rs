@@ -1,0 +1,17 @@
+/*******************************************************************************
+ *
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
+ *
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
+ *
+ ******************************************************************************/
+/// Describes why a timer wait operation returned.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum TimerWaitOutcome {
+    /// The requested deadline has been reached.
+    DeadlineReached,
+    /// The wait was woken by an explicit notification before the deadline.
+    Notified,
+}

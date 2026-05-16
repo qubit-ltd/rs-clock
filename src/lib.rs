@@ -17,6 +17,7 @@
 //! - **Timezone support**: Convert to local time in any timezone
 //! - **Monotonic time**: Time that never goes backwards
 //! - **Testing support**: Controllable mock clocks for tests
+//! - **Timer domains**: Monotonic deadlines and sleeps with mockable time
 //!
 //! # Architecture
 //!
@@ -26,6 +27,7 @@
 //! - [`NanoClock`]: Extension for nanosecond precision
 //! - [`ZonedClock`]: Extension for timezone support
 //! - [`ControllableClock`]: Extension for time control (testing)
+//! - [`timer::MonotonicTimer`]: Timer-domain based monotonic deadlines
 //!
 //! # Implementations
 //!
@@ -38,6 +40,8 @@
 //! - [`MockNanoClock`]: Nanosecond-precision controllable clock for testing
 //! - [`MockClockProgression`]: Frozen or monotonic mock-clock progression mode
 //! - [`Zoned<C>`](Zoned): Wrapper that adds timezone support to any clock
+//! - [`timer::SystemTimer`]: Real monotonic timer based on [`std::time::Instant`]
+//! - [`timer::MockTimer`]: Manually controlled monotonic timer for tests
 //!
 //! # Examples
 //!
@@ -178,3 +182,6 @@ pub use zoned::Zoned;
 
 // Time meters
 pub mod meter;
+
+// Timer-domain based deadlines and sleeps
+pub mod timer;
