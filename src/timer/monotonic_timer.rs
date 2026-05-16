@@ -20,13 +20,13 @@ use crate::timer::{
 /// Implementations expose instants on a per-timer-domain monotonic axis. A
 /// [`TimerInstant`] produced by one timer must not be used with another timer.
 pub trait MonotonicTimer: Send + Sync {
-    /// Returns the timer domain owned by this timer.
+    /// Returns the timer domain ID owned by this timer.
     ///
     /// # Returns
     ///
     /// The [`TimerDomainId`] of the monotonic axis used by this timer. Clones of
-    /// the same timer share this domain.
-    fn timer_domain(&self) -> TimerDomainId;
+    /// the same timer share this timer domain ID.
+    fn timer_domain_id(&self) -> TimerDomainId;
 
     /// Returns the current instant in this timer's domain.
     ///
@@ -69,7 +69,7 @@ pub trait MonotonicTimer: Send + Sync {
     /// Returns [`TimerError::TimerDomainMismatch`] when `deadline` was created by
     /// a different timer domain.
     fn duration_until(&self, deadline: TimerInstant) -> Result<Option<Duration>, TimerError> {
-        deadline.ensure_domain(self.timer_domain())?;
+        deadline.ensure_domain_id(self.timer_domain_id())?;
         deadline.checked_duration_since(self.now())
     }
 }

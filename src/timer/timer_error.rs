@@ -17,10 +17,10 @@ use crate::timer::TimerDomainId;
 pub enum TimerError {
     /// The operation received an instant from another timer domain.
     TimerDomainMismatch {
-        /// The timer domain required by the operation.
-        expected: TimerDomainId,
-        /// The timer domain carried by the provided instant.
-        actual: TimerDomainId,
+        /// The timer domain ID required by the operation.
+        expected_domain_id: TimerDomainId,
+        /// The timer domain ID carried by the provided instant.
+        actual_domain_id: TimerDomainId,
     },
 }
 
@@ -29,14 +29,20 @@ impl TimerError {
     ///
     /// # Arguments
     ///
-    /// * `expected` - The timer domain required by the operation.
-    /// * `actual` - The timer domain carried by the provided instant.
+    /// * `expected_domain_id` - The timer domain ID required by the operation.
+    /// * `actual_domain_id` - The timer domain ID carried by the provided instant.
     ///
     /// # Returns
     ///
     /// A [`TimerError::TimerDomainMismatch`] value containing both domains.
-    pub(crate) fn timer_domain_mismatch(expected: TimerDomainId, actual: TimerDomainId) -> Self {
-        Self::TimerDomainMismatch { expected, actual }
+    pub(crate) fn timer_domain_mismatch(
+        expected_domain_id: TimerDomainId,
+        actual_domain_id: TimerDomainId,
+    ) -> Self {
+        Self::TimerDomainMismatch {
+            expected_domain_id,
+            actual_domain_id,
+        }
     }
 }
 
@@ -52,9 +58,12 @@ impl fmt::Display for TimerError {
     /// `Ok(())` on success, or the formatter's error otherwise.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TimerDomainMismatch { expected, actual } => write!(
+            Self::TimerDomainMismatch {
+                expected_domain_id,
+                actual_domain_id,
+            } => write!(
                 formatter,
-                "timer domain mismatch: expected domain {expected}, got domain {actual}",
+                "timer domain mismatch: expected domain {expected_domain_id}, got domain {actual_domain_id}",
             ),
         }
     }

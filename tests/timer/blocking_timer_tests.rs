@@ -37,8 +37,8 @@ impl ScriptedBlockingTimer {
 }
 
 impl MonotonicTimer for ScriptedBlockingTimer {
-    fn timer_domain(&self) -> qubit_clock::timer::TimerDomainId {
-        self.timer.timer_domain()
+    fn timer_domain_id(&self) -> qubit_clock::timer::TimerDomainId {
+        self.timer.timer_domain_id()
     }
 
     fn now(&self) -> qubit_clock::timer::TimerInstant {

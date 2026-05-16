@@ -39,7 +39,7 @@ use crate::timer::{
 /// elapsed time, sets it directly, resets it, or sends an explicit notification.
 #[derive(Clone)]
 pub struct MockTimer {
-    domain: TimerDomainId,
+    domain_id: TimerDomainId,
     state: Arc<(Mutex<(Duration, u64)>, Condvar)>,
     #[cfg(feature = "tokio")]
     async_generation_sender: watch::Sender<u64>,
@@ -56,7 +56,7 @@ impl MockTimer {
         let (async_generation_sender, _) = watch::channel(0);
 
         Self {
-            domain: TimerDomainId::new_unique(),
+            domain_id: TimerDomainId::new_unique(),
             state: Arc::new((Mutex::new((Duration::ZERO, 0)), Condvar::new())),
             #[cfg(feature = "tokio")]
             async_generation_sender,
@@ -155,23 +155,23 @@ impl Default for MockTimer {
 }
 
 impl MonotonicTimer for MockTimer {
-    /// Returns the timer domain owned by this mock timer.
+    /// Returns the timer domain ID owned by this mock timer.
     ///
     /// # Returns
     ///
     /// The [`TimerDomainId`] assigned when this timer was first created.
-    fn timer_domain(&self) -> TimerDomainId {
-        self.domain
+    fn timer_domain_id(&self) -> TimerDomainId {
+        self.domain_id
     }
 
     /// Returns the current mock instant.
     ///
     /// # Returns
     ///
-    /// A [`TimerInstant`] reflecting the mock elapsed time under this domain.
+    /// A [`TimerInstant`] reflecting the mock elapsed time under this timer domain ID.
     fn now(&self) -> TimerInstant {
         let (elapsed, _) = self.current_state();
-        TimerInstant::new(self.domain, elapsed)
+        TimerInstant::new(self.domain_id, elapsed)
     }
 }
 
@@ -196,7 +196,7 @@ impl BlockingTimer for MockTimer {
     /// Returns [`TimerError::TimerDomainMismatch`] when `deadline` belongs to
     /// another timer domain.
     fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError> {
-        deadline.ensure_domain(self.domain)?;
+        deadline.ensure_domain_id(self.domain_id)?;
         let deadline_elapsed = deadline.elapsed_since_timer_start();
         let (state_lock, condition) = self.state.as_ref();
         let mut guard = state_lock
@@ -264,7 +264,7 @@ impl AsyncTimer for MockTimer {
         deadline: TimerInstant,
     ) -> Pin<Box<dyn Future<Output = Result<TimerWaitOutcome, TimerError>> + Send + 'a>> {
         Box::pin(async move {
-            deadline.ensure_domain(self.domain)?;
+            deadline.ensure_domain_id(self.domain_id)?;
             let deadline_elapsed = deadline.elapsed_since_timer_start();
             let (elapsed, observed_generation) = self.current_state();
             if elapsed >= deadline_elapsed {
