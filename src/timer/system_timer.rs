@@ -11,13 +11,11 @@
 use std::future::Future;
 #[cfg(feature = "tokio")]
 use std::pin::Pin;
-use std::sync::{
-    Arc,
-    Condvar,
-    Mutex,
-};
+#[cfg(feature = "tokio")]
+use std::sync::Arc;
 use std::time::Instant;
 
+use qubit_lock::ArcMonitor;
 #[cfg(feature = "tokio")]
 use tokio::sync::Notify;
 
@@ -40,7 +38,7 @@ use crate::timer::{
 pub struct SystemTimer {
     domain: TimerDomainId,
     origin: Instant,
-    wait_state: Arc<(Mutex<u64>, Condvar)>,
+    wait_generation: ArcMonitor<u64>,
     #[cfg(feature = "tokio")]
     async_notifier: Arc<Notify>,
 }
@@ -58,7 +56,7 @@ impl SystemTimer {
         Self {
             domain: TimerDomainId::new_unique(),
             origin: Instant::now(),
-            wait_state: Arc::new((Mutex::new(0), Condvar::new())),
+            wait_generation: ArcMonitor::new(0),
             #[cfg(feature = "tokio")]
             async_notifier: Arc::new(Notify::new()),
         }
@@ -69,13 +67,9 @@ impl SystemTimer {
     /// Waiters blocked in [`BlockingTimer::wait_until`] observe a generation change
     /// and return [`TimerWaitOutcome::Notified`].
     fn wake_blocking_waiters(&self) {
-        let (generation_lock, condition) = self.wait_state.as_ref();
-        let mut generation = generation_lock
-            .lock()
-            .expect("system timer notification state should not be poisoned");
-        *generation = generation.wrapping_add(1);
-        drop(generation);
-        condition.notify_all();
+        self.wait_generation.write_notify_all(|generation| {
+            *generation = generation.wrapping_add(1);
+        });
     }
 }
 
@@ -118,10 +112,7 @@ impl BlockingTimer for SystemTimer {
     fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError> {
         deadline.ensure_domain(self.domain)?;
         let deadline_elapsed = deadline.elapsed_since_timer_start();
-        let (generation_lock, condition) = self.wait_state.as_ref();
-        let mut generation = generation_lock
-            .lock()
-            .expect("system timer notification state should not be poisoned");
+        let mut generation = self.wait_generation.lock();
 
         loop {
             let now_elapsed = self.origin.elapsed();
@@ -131,16 +122,11 @@ impl BlockingTimer for SystemTimer {
 
             let remaining = deadline_elapsed - now_elapsed;
             let observed_generation = *generation;
-            let (next_generation, wait_result) = condition
-                .wait_timeout(generation, remaining)
-                .expect("system timer notification state should not be poisoned");
+            let (next_generation, _status) = generation.wait_timeout(remaining);
             generation = next_generation;
 
             if *generation != observed_generation {
                 return Ok(TimerWaitOutcome::Notified);
-            }
-            if wait_result.timed_out() {
-                continue;
             }
         }
     }
