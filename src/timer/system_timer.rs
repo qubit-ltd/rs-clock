@@ -15,7 +15,10 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 
-use qubit_lock::ArcMonitor;
+use qubit_lock::{
+    ArcMonitor,
+    WaitTimeoutResult,
+};
 #[cfg(feature = "tokio")]
 use tokio::sync::Notify;
 
@@ -112,22 +115,29 @@ impl BlockingTimer for SystemTimer {
     fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError> {
         deadline.ensure_domain_id(self.domain_id)?;
         let deadline_elapsed = deadline.elapsed_since_timer_start();
-        let mut generation = self.wait_generation.lock();
+        let now_elapsed = self.origin.elapsed();
+        if now_elapsed >= deadline_elapsed {
+            return Ok(TimerWaitOutcome::DeadlineReached);
+        }
 
-        loop {
-            let now_elapsed = self.origin.elapsed();
-            if now_elapsed >= deadline_elapsed {
-                return Ok(TimerWaitOutcome::DeadlineReached);
-            }
-
-            let remaining = deadline_elapsed - now_elapsed;
-            let observed_generation = *generation;
-            let (next_generation, _status) = generation.wait_timeout(remaining);
-            generation = next_generation;
-
-            if *generation != observed_generation {
-                return Ok(TimerWaitOutcome::Notified);
-            }
+        let remaining = deadline_elapsed - now_elapsed;
+        // Capture the baseline inside the monitor wait so notifications cannot
+        // be lost between a separate generation read and wait registration.
+        let mut observed_generation = None;
+        let result = self.wait_generation.wait_timeout_until(
+            remaining,
+            |generation| match observed_generation {
+                Some(observed_generation) => *generation != observed_generation,
+                None => {
+                    observed_generation = Some(*generation);
+                    false
+                }
+            },
+            |_| TimerWaitOutcome::Notified,
+        );
+        match result {
+            WaitTimeoutResult::Ready(outcome) => Ok(outcome),
+            WaitTimeoutResult::TimedOut => Ok(TimerWaitOutcome::DeadlineReached),
         }
     }
 
