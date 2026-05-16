@@ -38,9 +38,11 @@ Qubit Clock provides a flexible and type-safe clock abstraction system for Rust 
 - **Test-Friendly**: Support injecting mock clocks for deterministic testing
 
 ### ⏲️ **Timer Domains**
-- **MonotonicTimer**: Creates domain-branded monotonic instants and deadlines
-- **BlockingTimer**: Blocking wait, sleep, and notification APIs
-- **AsyncTimer**: Optional Tokio-compatible async wait APIs with the `tokio` feature
+- **TimerDomain**: Creates domain-branded monotonic instants and deadlines
+- **BlockingSleeper / AsyncSleeper**: Sleep until a deadline without treating notifications as completion
+- **BlockingWaiter / AsyncWaiter**: Wait until a deadline or explicit notification
+- **WaitNotifier**: Broadcasts notifications to waiters
+- **BlockingTimer / AsyncTimer**: Convenience facades over the sleep and wait traits
 - **SystemTimer**: Real timer backed by `std::time::Instant`
 - **MockTimer**: Deterministic timer whose elapsed time is manually controlled by tests
 
@@ -68,7 +70,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-qubit-clock = "0.4"
+qubit-clock = "0.5"
 ```
 
 ## Quick Start
@@ -166,7 +168,7 @@ println!("Elapsed: {}", meter.readable_duration());
 ### Timer Domains for Mockable Timeouts
 
 ```rust
-use qubit_clock::timer::{BlockingTimer, MockTimer, MonotonicTimer};
+use qubit_clock::timer::{BlockingTimer, MockTimer, TimerDomain};
 use std::time::Duration;
 
 let timer = MockTimer::new();
@@ -222,9 +224,11 @@ The crate is built around several orthogonal traits:
 - **NanoClock**: Extension for nanosecond precision
 - **ZonedClock**: Extension for timezone support
 - **ControllableClock**: Extension for time control (testing)
-- **MonotonicTimer**: Base trait for timer-domain instants and deadlines
-- **BlockingTimer**: Extension for blocking wait and sleep operations; `wait_*` returns when the deadline is reached or waiters are notified, while `sleep_*` ignores notifications as completion signals and continues until the deadline
-- **AsyncTimer**: Optional Tokio extension enabled by the `tokio` feature
+- **TimerDomain**: Base trait for timer-domain instants and deadlines
+- **BlockingSleeper / AsyncSleeper**: Sleep operations that complete only after the deadline
+- **WaitNotifier**: Notification broadcast for waiter operations
+- **BlockingWaiter / AsyncWaiter**: Wait operations that complete after the deadline or notification
+- **BlockingTimer / AsyncTimer**: Convenience facades combining sleep and wait capabilities
 
 This design follows the **Interface Segregation Principle**, ensuring that implementations only need to provide the features they actually support.
 
@@ -292,7 +296,7 @@ This design follows the **Interface Segregation Principle**, ensuring that imple
 - Manually controlled monotonic timer for deterministic tests
 - Starts at elapsed time zero
 - Clones share the same timer domain, elapsed time, and notification state
-- Supports manual `set_elapsed`, `advance`, `reset`, and `notify_waiters`
+- Supports manual `set_elapsed`, `advance`, `reset`, and `notify_all_waiters`
 - Supports asynchronous waits when the `tokio` feature is enabled
 - Use for: testing timeout and retry logic without waiting for real time
 
@@ -404,17 +408,19 @@ Extension trait for controllable clocks (testing):
 
 Timer-domain APIs are available under `qubit_clock::timer`:
 
-- `MonotonicTimer` - Returns the current `TimerInstant`, creates deadlines, and computes remaining duration
-- `BlockingTimer` - Provides `wait_until`, `wait_for`, `sleep_until`, `sleep_for`, and `notify_waiters`
-- `AsyncTimer` - Provides Tokio-compatible async waits when the `tokio` feature is enabled
+- `TimerDomain` - Returns the current `TimerInstant`, creates deadlines, and computes remaining duration
+- `BlockingSleeper` / `AsyncSleeper` - Provide deadline sleeps that ignore notification as a completion signal
+- `WaitNotifier` - Provides `notify_all_waiters`
+- `BlockingWaiter` / `AsyncWaiter` - Provide notification-sensitive wait operations
+- `BlockingTimer` / `AsyncTimer` - Provide facade APIs for common blocking or async timer usage
 - `TimerInstant` - Represents an instant relative to the creating timer domain
 - `TimerError` - Reports timer-domain mismatches
 
-`BlockingTimer` intentionally separates wait and sleep semantics. Use
-`wait_until` or `wait_for` when a notification should wake the caller early and
-return `TimerWaitOutcome::Notified`. Use `sleep_until` or `sleep_for` when the
-operation must complete only after the deadline; notifications only make the
-sleep re-check the deadline and continue waiting.
+Timer APIs intentionally separate wait and sleep semantics. Use `wait_until` or
+`wait_for` when a notification should wake the caller early and return
+`TimerWaitOutcome::Notified`. Use `sleep_until` or `sleep_for` when the operation
+must complete only after the deadline. Notifications target waiters, not
+sleepers.
 
 ## Design Principles
 
@@ -437,9 +443,11 @@ Each trait and type has one clear purpose:
 - `NanoClock` - Provide high-precision time
 - `ZonedClock` - Provide timezone conversion
 - `ControllableClock` - Provide time control for testing
-- `MonotonicTimer` - Provide domain-branded monotonic instants
-- `BlockingTimer` - Provide blocking deadline waits
-- `AsyncTimer` - Provide optional Tokio deadline waits
+- `TimerDomain` - Provide domain-branded monotonic instants
+- `BlockingSleeper` / `AsyncSleeper` - Provide deadline sleeps
+- `BlockingWaiter` / `AsyncWaiter` - Provide notification-sensitive deadline waits
+- `WaitNotifier` - Provide waiter notification
+- `BlockingTimer` / `AsyncTimer` - Provide common facade traits
 
 ### Composition over Inheritance
 
@@ -502,7 +510,7 @@ log::info!("Processing took: {}", meter.readable_duration());
 ### Timeout Control
 
 ```rust
-use qubit_clock::timer::{BlockingTimer, MonotonicTimer, SystemTimer};
+use qubit_clock::timer::{BlockingTimer, TimerDomain, SystemTimer};
 use std::time::Duration;
 
 let timer = SystemTimer::new();
