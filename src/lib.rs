@@ -27,7 +27,7 @@
 //! - [`NanoClock`]: Extension for nanosecond precision
 //! - [`ZonedClock`]: Extension for timezone support
 //! - [`ControllableClock`]: Extension for time control (testing)
-//! - [`timer::MonotonicTimer`]: Timer-domain based monotonic deadlines
+//! - [`timer::TimerDomain`]: Timer-domain based monotonic deadlines
 //!
 //! # Implementations
 //!

@@ -37,17 +37,19 @@ Clock (基础时钟 trait)
 ├── ZonedClock (带时区的时钟 trait)
 └── ControllableClock (可控制的时钟 trait)
 
-MonotonicTimer (timer-domain 单调计时器 trait)
-├── BlockingTimer (阻塞式 wait/sleep trait)
-└── AsyncTimer (Tokio 异步 wait/sleep trait，tokio feature)
+TimerDomain (timer-domain 单调时间域 trait)
+├── BlockingSleeper / AsyncSleeper (只按 deadline 完成的 sleep trait)
+├── WaitNotifier (waiter 通知 trait)
+├── BlockingWaiter / AsyncWaiter (deadline 或 notification wait trait)
+└── BlockingTimer / AsyncTimer (便捷组合 facade)
 ```
 
 **说明**：
 - `Clock` 是基础 trait，提供 UTC 时间
 - `NanoClock`、`ZonedClock`、`ControllableClock` 都继承自 `Clock`
 - 这三个扩展 trait 是**正交的**，互不依赖
-- `MonotonicTimer` 系列不继承 `Clock`，因为它表达的是 timer domain 内的相对单调时间轴，不表达 UTC 当前时间
-- `AsyncTimer` 只在启用 `tokio` feature 时导出
+- `TimerDomain` 系列不继承 `Clock`，因为它表达的是 timer domain 内的相对单调时间轴，不表达 UTC 当前时间
+- 异步 timer trait 只在启用 `tokio` feature 时导出
 
 ### 2.2 实现类型
 
@@ -110,27 +112,45 @@ Timer 模块使用独立的类型关系，不把相对单调时间轴混入 UTC 
 
 ```mermaid
 graph TD
-    MonotonicTimer[MonotonicTimer trait<br/>timer domain]
-    BlockingTimer[BlockingTimer trait<br/>阻塞 wait/sleep]
-    AsyncTimer[AsyncTimer trait<br/>Tokio 异步 wait/sleep]
+    TimerDomain[TimerDomain trait<br/>timer domain]
+    BlockingSleeper[BlockingSleeper trait<br/>阻塞 sleep]
+    BlockingWaiter[BlockingWaiter trait<br/>阻塞 wait]
+    BlockingTimer[BlockingTimer trait<br/>阻塞 facade]
+    AsyncSleeper[AsyncSleeper trait<br/>Tokio 异步 sleep]
+    AsyncWaiter[AsyncWaiter trait<br/>Tokio 异步 wait]
+    AsyncTimer[AsyncTimer trait<br/>Tokio 异步 facade]
+    WaitNotifier[WaitNotifier trait<br/>notify all waiters]
     TimerInstant[TimerInstant<br/>domain-branded instant]
-    TimerDomainId[TimerDomainId<br/>timer domain]
+    DomainId[u64<br/>timer domain id]
     SystemTimer[SystemTimer<br/>真实 timer]
     MockTimer[MockTimer<br/>模拟 timer]
 
-    MonotonicTimer --> BlockingTimer
-    MonotonicTimer --> AsyncTimer
-    TimerInstant --> TimerDomainId
+    TimerDomain --> BlockingSleeper
+    TimerDomain --> WaitNotifier
+    WaitNotifier --> BlockingWaiter
+    BlockingSleeper --> BlockingTimer
+    BlockingWaiter --> BlockingTimer
+    TimerDomain --> AsyncSleeper
+    WaitNotifier --> AsyncWaiter
+    AsyncSleeper --> AsyncTimer
+    AsyncWaiter --> AsyncTimer
+    TimerInstant --> DomainId
 
-    MonotonicTimer -.实现.-> SystemTimer
-    BlockingTimer -.实现.-> SystemTimer
-    AsyncTimer -.tokio feature.-> SystemTimer
+    TimerDomain -.实现.-> SystemTimer
+    BlockingSleeper -.实现.-> SystemTimer
+    BlockingWaiter -.实现.-> SystemTimer
+    WaitNotifier -.实现.-> SystemTimer
+    AsyncSleeper -.tokio feature.-> SystemTimer
+    AsyncWaiter -.tokio feature.-> SystemTimer
 
-    MonotonicTimer -.实现.-> MockTimer
-    BlockingTimer -.实现.-> MockTimer
-    AsyncTimer -.tokio feature.-> MockTimer
+    TimerDomain -.实现.-> MockTimer
+    BlockingSleeper -.实现.-> MockTimer
+    BlockingWaiter -.实现.-> MockTimer
+    WaitNotifier -.实现.-> MockTimer
+    AsyncSleeper -.tokio feature.-> MockTimer
+    AsyncWaiter -.tokio feature.-> MockTimer
 
-    style MonotonicTimer fill:#e1f5ff
+    style TimerDomain fill:#e1f5ff
     style BlockingTimer fill:#fff3e0
     style AsyncTimer fill:#f3e5f5
     style TimerInstant fill:#e8f5e9
@@ -295,37 +315,51 @@ elapsed time。不同 timer 拥有不同的 timer domain，它们的 `TimerInsta
 
 **定义**：
 ```rust
-pub trait MonotonicTimer: Send + Sync {
-    fn timer_domain_id(&self) -> TimerDomainId;
+pub trait TimerDomain: Send + Sync {
+    fn id(&self) -> u64;
     fn now(&self) -> TimerInstant;
     fn deadline_after(&self, duration: Duration) -> TimerInstant;
     fn duration_until(&self, deadline: TimerInstant) -> Result<Option<Duration>, TimerError>;
 }
 
-pub trait BlockingTimer: MonotonicTimer {
-    fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError>;
-    fn notify_waiters(&self);
-    fn wait_for(&self, duration: Duration) -> Result<TimerWaitOutcome, TimerError>;
+pub trait BlockingSleeper: TimerDomain {
     fn sleep_until(&self, deadline: TimerInstant) -> Result<(), TimerError>;
     fn sleep_for(&self, duration: Duration) -> Result<(), TimerError>;
 }
+
+pub trait WaitNotifier: TimerDomain {
+    fn notify_all_waiters(&self);
+}
+
+pub trait BlockingWaiter: WaitNotifier {
+    fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError>;
+    fn wait_for(&self, duration: Duration) -> Result<TimerWaitOutcome, TimerError>;
+}
+
+pub trait BlockingTimer: BlockingSleeper + BlockingWaiter {}
 ```
 
 启用 `tokio` feature 后还会导出：
 
 ```rust
-pub trait AsyncTimer: MonotonicTimer {
-    fn wait_until_async<'a>(&'a self, deadline: TimerInstant) -> Pin<Box<dyn Future<Output = Result<TimerWaitOutcome, TimerError>> + Send + 'a>>;
+pub trait AsyncSleeper: TimerDomain {
     fn sleep_until_async<'a>(&'a self, deadline: TimerInstant) -> Pin<Box<dyn Future<Output = Result<(), TimerError>> + Send + 'a>>;
     fn sleep_for_async<'a>(&'a self, duration: Duration) -> Pin<Box<dyn Future<Output = Result<(), TimerError>> + Send + 'a>>;
 }
+
+pub trait AsyncWaiter: WaitNotifier {
+    fn wait_until_async<'a>(&'a self, deadline: TimerInstant) -> Pin<Box<dyn Future<Output = Result<TimerWaitOutcome, TimerError>> + Send + 'a>>;
+    fn wait_for_async<'a>(&'a self, duration: Duration) -> Pin<Box<dyn Future<Output = Result<TimerWaitOutcome, TimerError>> + Send + 'a>>;
+}
+
+pub trait AsyncTimer: AsyncSleeper + AsyncWaiter {}
 ```
 
 **设计要点**：
-- `TimerInstant` 内部携带 `domain_id: TimerDomainId` 和相对于该 domain 零点的 elapsed time
+- `TimerInstant` 内部携带 `domain_id: u64` 和相对于该 domain 零点的 elapsed time
 - 所有接收外部 `TimerInstant` 的 API 都先校验 timer domain，不匹配时返回 `TimerError::TimerDomainMismatch`
 - `Duration` 参数（如 `sleep_for(duration)`）表示“相对于当前 timer instant 的一段时长”
-- `TimerWaitOutcome::Notified` 表示 wait 被显式通知提前唤醒，`sleep_*` 方法会忽略通知并继续等待 deadline
+- `TimerWaitOutcome::Notified` 表示 wait 被显式通知提前唤醒，`sleep_*` 方法不把 notification 作为事件源或完成信号
 - `AsyncTimer` 不引入 `async-trait` 依赖，而是返回 boxed `Future`，以保持依赖面可控
 
 **适用场景**：
@@ -700,19 +734,21 @@ let local = clock.local_time();
 **定义**：
 ```rust
 pub struct SystemTimer {
-    domain_id: TimerDomainId,
+    domain_id: u64,
     origin: Instant,
-    wait_generation: ArcMonitor<u64>,
+    notification_epoch: ArcMonitor<u64>,
     async_notifier: Arc<Notify>, // tokio feature
 }
 ```
 
 **设计要点**：
-- 创建时生成独立 `TimerDomainId`，并把当前 `Instant` 作为 timer domain 零点
+- 创建时生成独立 `u64` domain ID，并把当前 `Instant` 作为 timer domain 零点
 - `now()` 返回相对于 `origin` 的 `TimerInstant`
 - clone 共享同一个 timer domain 和 notification 状态
-- `wait_until()` 使用 `ArcMonitor` 的 timed wait 等待真实剩余时间
-- `notify_waiters()` 增加 notification generation 并唤醒阻塞 wait；启用 `tokio` feature 时也唤醒异步 wait
+- `sleep_until()` 使用 `std::thread::sleep()` 按真实剩余时间睡眠，不响应 notification
+- `wait_until()` 使用 `ArcMonitor` 的 timed wait 等待真实剩余时间或 notification
+- `notify_all_waiters()` 推进 notification epoch 并唤醒阻塞 wait；启用 `tokio` feature 时也唤醒异步 wait，不唤醒 sleep
+- `sleep_until_async()` 使用 `tokio::time::sleep()`，不响应 notification
 - `wait_until_async()` 使用 `tokio::time::sleep()` 与 `Notify`，只在 `tokio` feature 下编译
 
 **适用场景**：
@@ -733,18 +769,21 @@ pub struct SystemTimer {
 **定义**：
 ```rust
 pub struct MockTimer {
-    domain_id: TimerDomainId,
-    state: Arc<(Mutex<(Duration, u64)>, Condvar)>,
-    async_generation_sender: watch::Sender<u64>, // tokio feature
+    domain_id: u64,
+    shared: Arc<MockTimerShared>,
+    async_time_epoch_sender: watch::Sender<u64>,         // tokio feature
+    async_notification_epoch_sender: watch::Sender<u64>, // tokio feature
 }
 ```
 
 **设计要点**：
 - elapsed time 从 `Duration::ZERO` 开始，不依赖真实时间流逝
 - `set_elapsed()` 直接设置当前 elapsed time，`advance()` 饱和推进 elapsed time，`reset()` 回到零点
-- 每次修改 elapsed time 或调用 `notify_waiters()` 都会推进 generation，并唤醒 waiters
-- `wait_until()` 在 mock time 达到 deadline 时返回 `DeadlineReached`，否则在 generation 改变后返回 `Notified`
-- 异步路径使用 `tokio::sync::watch` 保存 generation，避免 notification 在 subscribe 前后出现竞态时被静默丢失
+- 修改 elapsed time 会推进 time epoch，并唤醒 sleepers 和 waiters 重新检查 deadline
+- `notify_all_waiters()` 只推进 notification epoch，并只唤醒 waiters
+- `sleep_until()` 只等待 time epoch 变化，直到 mock time 到达 deadline
+- `wait_until()` 在 mock time 达到 deadline 时返回 `DeadlineReached`，在 notification epoch 改变且 deadline 未到时返回 `Notified`
+- 异步路径使用两个 `tokio::sync::watch` channel 分别保存 time epoch 和 notification epoch，避免 subscribe 前后出现竞态时静默丢失事件
 - 与 `SystemTimer` 一样，所有外部 deadline 都必须属于当前 timer domain
 
 **适用场景**：
@@ -937,7 +976,7 @@ fn main() {
 ### 5.6 场景 6：可测试超时控制
 
 ```rust
-use qubit_clock::timer::{BlockingTimer, MockTimer, MonotonicTimer};
+use qubit_clock::timer::{BlockingTimer, MockTimer, TimerDomain};
 use std::time::Duration;
 
 fn wait_until_ready<T>(timer: &T) -> bool
@@ -1009,8 +1048,11 @@ rs-clock/
 - **ZonedClock**：只添加时区支持
 - **NanoClock**：只添加纳秒精度
 - **ControllableClock**：只添加控制功能
-- **MonotonicTimer**：只表达 timer domain 内的单调 instant
-- **BlockingTimer / AsyncTimer**：只添加阻塞式或异步 wait/sleep
+- **TimerDomain**：只表达 timer domain 内的单调 instant
+- **BlockingSleeper / AsyncSleeper**：只表达 deadline sleep
+- **BlockingWaiter / AsyncWaiter**：只表达 deadline-or-notification wait
+- **WaitNotifier**：只表达 waiter notification
+- **BlockingTimer / AsyncTimer**：只作为常用组合 facade
 
 每个 trait 职责单一，互不干扰。
 
