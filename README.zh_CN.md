@@ -60,7 +60,7 @@ Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象�
 
 ```toml
 [dependencies]
-qubit-clock = "0.4.0"
+qubit-clock = "0.4"
 ```
 
 ## 快速开始
