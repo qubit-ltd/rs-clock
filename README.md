@@ -223,7 +223,7 @@ The crate is built around several orthogonal traits:
 - **ZonedClock**: Extension for timezone support
 - **ControllableClock**: Extension for time control (testing)
 - **MonotonicTimer**: Base trait for timer-domain instants and deadlines
-- **BlockingTimer**: Extension for blocking wait and sleep operations
+- **BlockingTimer**: Extension for blocking wait and sleep operations; `wait_*` returns when the deadline is reached or waiters are notified, while `sleep_*` ignores notifications as completion signals and continues until the deadline
 - **AsyncTimer**: Optional Tokio extension enabled by the `tokio` feature
 
 This design follows the **Interface Segregation Principle**, ensuring that implementations only need to provide the features they actually support.
@@ -409,6 +409,12 @@ Timer-domain APIs are available under `qubit_clock::timer`:
 - `AsyncTimer` - Provides Tokio-compatible async waits when the `tokio` feature is enabled
 - `TimerInstant` - Represents an instant relative to the creating timer domain
 - `TimerError` - Reports timer-domain mismatches
+
+`BlockingTimer` intentionally separates wait and sleep semantics. Use
+`wait_until` or `wait_for` when a notification should wake the caller early and
+return `TimerWaitOutcome::Notified`. Use `sleep_until` or `sleep_for` when the
+operation must complete only after the deadline; notifications only make the
+sleep re-check the deadline and continue waiting.
 
 ## Design Principles
 

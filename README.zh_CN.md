@@ -223,7 +223,7 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 - **ZonedClock**：时区支持的扩展
 - **ControllableClock**：时间控制的扩展（测试用）
 - **MonotonicTimer**：timer-domain instant 和 deadline 的基础 trait
-- **BlockingTimer**：阻塞式 wait 和 sleep 的扩展
+- **BlockingTimer**：阻塞式 wait 和 sleep 的扩展；`wait_*` 会在到达 deadline 或收到通知时返回，`sleep_*` 不把通知当作完成信号，会继续等到 deadline
 - **AsyncTimer**：启用 `tokio` feature 后可用的 Tokio 异步扩展
 
 这种设计遵循**接口隔离原则**，确保实现只需要提供它们实际支持的功能。
@@ -404,6 +404,11 @@ Timer-domain API 位于 `qubit_clock::timer` 下：
 - `AsyncTimer` - 启用 `tokio` feature 后提供 Tokio 兼容的异步 wait
 - `TimerInstant` - 表示相对于创建它的 timer domain 的 instant
 - `TimerError` - 报告 timer-domain mismatch
+
+`BlockingTimer` 有意区分 wait 和 sleep 语义。需要通知提前唤醒调用方时，
+使用 `wait_until` 或 `wait_for`，它们会返回 `TimerWaitOutcome::Notified`。
+如果操作必须等到 deadline 才算完成，使用 `sleep_until` 或 `sleep_for`；
+通知只会让 sleep 重新检查 deadline，然后继续等待。
 
 ## 设计原则
 

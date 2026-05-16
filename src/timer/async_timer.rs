@@ -23,7 +23,26 @@ pub trait AsyncTimer: MonotonicTimer {
     /// Waits asynchronously until the deadline is reached or waiters are
     /// explicitly notified.
     ///
-    /// Returns `Err` when the deadline belongs to another timer domain.
+    /// Unlike [`sleep_until_async`](Self::sleep_until_async), this method completes
+    /// as soon as waiters are notified, even if the deadline has not been reached
+    /// yet.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The target instant, which must belong to this timer's domain.
+    ///
+    /// # Returns
+    ///
+    /// A future that resolves to:
+    ///
+    /// * `Ok(TimerWaitOutcome::DeadlineReached)` when the deadline has been reached.
+    /// * `Ok(TimerWaitOutcome::Notified)` when blocking or async notification woke
+    ///   the wait before the deadline.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`TimerError::TimerDomainMismatch`] when `deadline`
+    /// was created by a different timer domain.
     fn wait_until_async<'a>(
         &'a self,
         deadline: TimerInstant,
@@ -31,9 +50,22 @@ pub trait AsyncTimer: MonotonicTimer {
 
     /// Waits asynchronously until the deadline has been reached.
     ///
-    /// Explicit notifications wake the underlying wait, but this method keeps
-    /// waiting until the deadline is reached. Returns `Err` when the deadline
-    /// belongs to another timer domain.
+    /// Explicit notifications wake the underlying [`wait_until_async`](Self::wait_until_async)
+    /// call, but this method keeps waiting until the deadline is actually reached.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The target instant, which must belong to this timer's domain.
+    ///
+    /// # Returns
+    ///
+    /// A future that resolves to `Ok(())` once the timer's monotonic time has
+    /// reached or passed `deadline`.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`TimerError::TimerDomainMismatch`] when `deadline`
+    /// was created by a different timer domain.
     fn sleep_until_async<'a>(
         &'a self,
         deadline: TimerInstant,
@@ -51,8 +83,23 @@ pub trait AsyncTimer: MonotonicTimer {
     /// Waits asynchronously for a duration relative to this timer's current
     /// instant.
     ///
-    /// Returns `Err` only if the self-created deadline is rejected by an invalid
-    /// timer implementation.
+    /// This is equivalent to [`sleep_until_async`](Self::sleep_until_async) with a
+    /// deadline created by [`MonotonicTimer::deadline_after`].
+    ///
+    /// # Arguments
+    ///
+    /// * `duration` - The relative delay from the current instant.
+    ///
+    /// # Returns
+    ///
+    /// A future that resolves to `Ok(())` once the timer's monotonic time has
+    /// advanced by at least `duration` from the instant observed when the future
+    /// is polled for the first time.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`TimerError::TimerDomainMismatch`] only if the
+    /// self-created deadline is rejected by an invalid timer implementation.
     fn sleep_for_async<'a>(
         &'a self,
         duration: Duration,

@@ -47,6 +47,10 @@ pub struct MockTimer {
 
 impl MockTimer {
     /// Creates a new mock timer whose elapsed time starts at zero.
+    ///
+    /// # Returns
+    ///
+    /// A new [`MockTimer`] with a unique timer domain and zero elapsed time.
     pub fn new() -> Self {
         #[cfg(feature = "tokio")]
         let (async_generation_sender, _) = watch::channel(0);
@@ -63,6 +67,10 @@ impl MockTimer {
     ///
     /// This wakes both blocking and asynchronous waiters. Waiters whose
     /// deadlines are not reached observe a notification instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `elapsed` - The new elapsed time for this timer domain.
     pub fn set_elapsed(&self, elapsed: Duration) {
         self.update_elapsed(|_| elapsed);
     }
@@ -71,16 +79,26 @@ impl MockTimer {
     ///
     /// This wakes both blocking and asynchronous waiters. The elapsed time
     /// saturates at [`Duration::MAX`] on overflow.
+    ///
+    /// # Arguments
+    ///
+    /// * `duration` - The amount of time to add to the current elapsed time.
     pub fn advance(&self, duration: Duration) {
         self.update_elapsed(|elapsed| elapsed.saturating_add(duration));
     }
 
     /// Resets the elapsed time to zero and wakes waiters.
+    ///
+    /// Equivalent to [`set_elapsed`](Self::set_elapsed) with [`Duration::ZERO`].
     pub fn reset(&self) {
         self.set_elapsed(Duration::ZERO);
     }
 
     /// Returns the current elapsed time and notification generation.
+    ///
+    /// # Returns
+    ///
+    /// A tuple of `(elapsed, generation)` read under the timer's internal lock.
     fn current_state(&self) -> (Duration, u64) {
         let (state_lock, _) = self.state.as_ref();
         let guard = state_lock
@@ -91,6 +109,11 @@ impl MockTimer {
     }
 
     /// Updates elapsed time, increments the generation, and wakes waiters.
+    ///
+    /// # Arguments
+    ///
+    /// * `update` - A function that receives the current elapsed time and returns
+    ///   the new elapsed time.
     fn update_elapsed(&self, update: impl FnOnce(Duration) -> Duration) {
         let (state_lock, condition) = self.state.as_ref();
         let generation = {
@@ -108,6 +131,10 @@ impl MockTimer {
     }
 
     /// Updates the async generation when Tokio support is enabled.
+    ///
+    /// # Arguments
+    ///
+    /// * `generation` - The notification generation to publish to async waiters.
     fn notify_async_waiters(&self, generation: u64) {
         #[cfg(feature = "tokio")]
         self.async_generation_sender.send_replace(generation);
@@ -118,6 +145,10 @@ impl MockTimer {
 
 impl Default for MockTimer {
     /// Creates a new mock timer.
+    ///
+    /// # Returns
+    ///
+    /// A timer equivalent to [`MockTimer::new`].
     fn default() -> Self {
         Self::new()
     }
@@ -125,11 +156,19 @@ impl Default for MockTimer {
 
 impl MonotonicTimer for MockTimer {
     /// Returns the timer domain owned by this mock timer.
+    ///
+    /// # Returns
+    ///
+    /// The [`TimerDomainId`] assigned when this timer was first created.
     fn timer_domain(&self) -> TimerDomainId {
         self.domain
     }
 
     /// Returns the current mock instant.
+    ///
+    /// # Returns
+    ///
+    /// A [`TimerInstant`] reflecting the mock elapsed time under this domain.
     fn now(&self) -> TimerInstant {
         let (elapsed, _) = self.current_state();
         TimerInstant::new(self.domain, elapsed)
@@ -139,6 +178,23 @@ impl MonotonicTimer for MockTimer {
 impl BlockingTimer for MockTimer {
     /// Blocks until the mock elapsed time reaches the deadline or waiters are
     /// notified.
+    ///
+    /// Progress requires test code to call [`advance`](MockTimer::advance),
+    /// [`set_elapsed`](MockTimer::set_elapsed), [`reset`](MockTimer::reset), or
+    /// [`notify_waiters`](BlockingTimer::notify_waiters).
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The target instant in this timer's domain.
+    ///
+    /// # Returns
+    ///
+    /// The same outcomes as [`BlockingTimer::wait_until`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimerError::TimerDomainMismatch`] when `deadline` belongs to
+    /// another timer domain.
     fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError> {
         deadline.ensure_domain(self.domain)?;
         let deadline_elapsed = deadline.elapsed_since_timer_start();
@@ -163,6 +219,10 @@ impl BlockingTimer for MockTimer {
     }
 
     /// Wakes current waiters without changing the mock elapsed time.
+    ///
+    /// Blocking and, when the `tokio` feature is enabled, asynchronous waiters
+    /// return [`TimerWaitOutcome::Notified`] unless the deadline has already been
+    /// reached.
     fn notify_waiters(&self) {
         let (state_lock, condition) = self.state.as_ref();
         let generation = {
@@ -183,6 +243,22 @@ impl BlockingTimer for MockTimer {
 impl AsyncTimer for MockTimer {
     /// Waits asynchronously until mock elapsed time reaches the deadline or
     /// waiters are notified.
+    ///
+    /// Progress requires test code to advance or notify the mock timer, as for
+    /// the blocking [`wait_until`](BlockingTimer::wait_until) implementation.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The target instant in this timer's domain.
+    ///
+    /// # Returns
+    ///
+    /// A future with the same outcomes as [`AsyncTimer::wait_until_async`].
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`TimerError::TimerDomainMismatch`] when `deadline`
+    /// belongs to another timer domain.
     fn wait_until_async<'a>(
         &'a self,
         deadline: TimerInstant,
@@ -212,6 +288,15 @@ impl AsyncTimer for MockTimer {
 #[cfg(feature = "tokio")]
 impl MockTimer {
     /// Returns the wait outcome after an async notification has been observed.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline_elapsed` - The elapsed duration of the waited-for deadline.
+    ///
+    /// # Returns
+    ///
+    /// [`TimerWaitOutcome::DeadlineReached`] when mock elapsed time has reached
+    /// `deadline_elapsed`, otherwise [`TimerWaitOutcome::Notified`].
     fn outcome_after_async_wake(&self, deadline_elapsed: Duration) -> TimerWaitOutcome {
         let (elapsed, _) = self.current_state();
         if elapsed >= deadline_elapsed {

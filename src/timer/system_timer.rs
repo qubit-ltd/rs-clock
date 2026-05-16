@@ -47,6 +47,13 @@ pub struct SystemTimer {
 
 impl SystemTimer {
     /// Creates a new system timer with its own timer domain.
+    ///
+    /// The domain's zero point is the [`std::time::Instant`] captured at
+    /// construction. Clones share the same domain, origin, and notification state.
+    ///
+    /// # Returns
+    ///
+    /// A new [`SystemTimer`] backed by the system monotonic clock.
     pub fn new() -> Self {
         Self {
             domain: TimerDomainId::new_unique(),
@@ -58,6 +65,9 @@ impl SystemTimer {
     }
 
     /// Advances the notification generation and wakes blocking waiters.
+    ///
+    /// Waiters blocked in [`BlockingTimer::wait_until`] observe a generation change
+    /// and return [`TimerWaitOutcome::Notified`].
     fn wake_blocking_waiters(&self) {
         let (generation_lock, condition) = self.wait_state.as_ref();
         let mut generation = generation_lock
@@ -69,20 +79,22 @@ impl SystemTimer {
     }
 }
 
-impl Default for SystemTimer {
-    /// Creates a new system timer.
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl MonotonicTimer for SystemTimer {
     /// Returns the timer domain owned by this system timer.
+    ///
+    /// # Returns
+    ///
+    /// The [`TimerDomainId`] assigned when this timer was first created.
     fn timer_domain(&self) -> TimerDomainId {
         self.domain
     }
 
     /// Returns the current monotonic instant in this timer's domain.
+    ///
+    /// # Returns
+    ///
+    /// Elapsed time since the shared origin [`std::time::Instant`], wrapped as a
+    /// [`TimerInstant`].
     fn now(&self) -> TimerInstant {
         TimerInstant::new(self.domain, self.origin.elapsed())
     }
@@ -90,6 +102,19 @@ impl MonotonicTimer for SystemTimer {
 
 impl BlockingTimer for SystemTimer {
     /// Blocks until the deadline is reached or waiters are notified.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The target instant in this timer's domain.
+    ///
+    /// # Returns
+    ///
+    /// The same outcomes as [`BlockingTimer::wait_until`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimerError::TimerDomainMismatch`] when `deadline` belongs to
+    /// another timer domain.
     fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError> {
         deadline.ensure_domain(self.domain)?;
         let deadline_elapsed = deadline.elapsed_since_timer_start();
@@ -121,6 +146,9 @@ impl BlockingTimer for SystemTimer {
     }
 
     /// Wakes current waiters without changing the timer's monotonic time.
+    ///
+    /// Blocking waiters and, when the `tokio` feature is enabled, asynchronous
+    /// waiters registered on this timer are notified.
     fn notify_waiters(&self) {
         self.wake_blocking_waiters();
         #[cfg(feature = "tokio")]
@@ -132,6 +160,19 @@ impl BlockingTimer for SystemTimer {
 impl AsyncTimer for SystemTimer {
     /// Waits asynchronously until the deadline is reached or waiters are
     /// notified.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The target instant in this timer's domain.
+    ///
+    /// # Returns
+    ///
+    /// A future with the same outcomes as [`AsyncTimer::wait_until_async`].
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`TimerError::TimerDomainMismatch`] when `deadline`
+    /// belongs to another timer domain.
     fn wait_until_async<'a>(
         &'a self,
         deadline: TimerInstant,
@@ -155,5 +196,16 @@ impl AsyncTimer for SystemTimer {
             };
             Ok(outcome)
         })
+    }
+}
+
+impl Default for SystemTimer {
+    /// Creates a new system timer.
+    ///
+    /// # Returns
+    ///
+    /// A timer equivalent to [`SystemTimer::new`].
+    fn default() -> Self {
+        Self::new()
     }
 }

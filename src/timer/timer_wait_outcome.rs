@@ -11,7 +11,13 @@
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TimerWaitOutcome {
     /// The requested deadline has been reached.
+    ///
+    /// The timer's monotonic time is at or past the waited-for instant.
     DeadlineReached,
     /// The wait was woken by an explicit notification before the deadline.
+    ///
+    /// Returned when a blocking or asynchronous wait is interrupted by
+    /// [`notify_waiters`](crate::timer::BlockingTimer::notify_waiters) before the
+    /// deadline is reached.
     Notified,
 }
