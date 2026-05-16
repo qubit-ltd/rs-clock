@@ -169,7 +169,7 @@ pub trait Clock: Send + Sync {
 - 性能监控
 - 任何只需要 UTC 时间的场景
 
-**文件位置**：`src/clock.rs`
+**文件位置**：`src/clock/clock.rs`
 
 ---
 
@@ -216,7 +216,7 @@ pub trait NanoClock: Clock {
 - 微基准测试（microbenchmark）
 - 需要纳秒级精度的时间测量
 
-**文件位置**：`src/nano_clock.rs`
+**文件位置**：`src/clock/nano_clock.rs`
 
 ---
 
@@ -248,7 +248,7 @@ pub trait ZonedClock: Clock {
 - 业务逻辑（订单创建时间、记录时间等）
 - 任何需要显示本地时间的场景
 
-**文件位置**：`src/zoned_clock.rs`
+**文件位置**：`src/clock/zoned_clock.rs`
 
 ---
 
@@ -280,7 +280,7 @@ pub trait ControllableClock: Clock {
 - 集成测试
 - 任何需要模拟时间的测试场景
 
-**文件位置**：`src/controllable_clock.rs`
+**文件位置**：`src/clock/controllable_clock.rs`
 
 ---
 
@@ -375,7 +375,7 @@ let local = clock.local_time();
 
 **线程安全性**：完全线程安全，无可变状态
 
-**文件位置**：`src/system_clock.rs`
+**文件位置**：`src/clock/system_clock.rs`
 
 ---
 
@@ -430,7 +430,7 @@ println!("耗时: {} ms", elapsed);
 
 **线程安全性**：完全线程安全，所有字段不可变
 
-**文件位置**：`src/monotonic_clock.rs`
+**文件位置**：`src/clock/monotonic_clock.rs`
 
 ---
 
@@ -476,7 +476,7 @@ println!("耗时: {} ns", elapsed);
 
 **线程安全性**：完全线程安全，所有字段不可变
 
-**文件位置**：`src/nano_monotonic_clock.rs`
+**文件位置**：`src/clock/nano_monotonic_clock.rs`
 
 ---
 
@@ -543,7 +543,7 @@ fn test_with_fixed_time() {
 
 **线程安全性**：完全线程安全，使用 `Mutex` 保护内部状态
 
-**文件位置**：`src/mock_clock.rs`
+**文件位置**：`src/clock/mock_clock.rs`
 
 ---
 
@@ -597,7 +597,7 @@ impl ControllableClock for MockNanoClock { /* ... */ }
 - `NanoTimeMeter` 的可控测试
 - 需要保留纳秒级 DateTime 精度的测试场景
 
-**文件位置**：`src/mock_nano_clock.rs`
+**文件位置**：`src/clock/mock_nano_clock.rs`
 
 ---
 
@@ -689,7 +689,7 @@ let local = clock.local_time();
 
 **线程安全性**：取决于内部 Clock 的线程安全性
 
-**文件位置**：`src/zoned.rs`
+**文件位置**：`src/clock/zoned.rs`
 
 ---
 
@@ -976,31 +976,17 @@ fn test_timeout_without_real_sleep() {
 rs-clock/
 ├── src/
 │   ├── lib.rs                    # 模块导出和文档
-│   ├── clock.rs                  # Clock trait
-│   ├── nano_clock.rs             # NanoClock trait
-│   ├── zoned_clock.rs            # ZonedClock trait
-│   ├── controllable_clock.rs     # ControllableClock trait
-│   ├── system_clock.rs           # SystemClock 实现
-│   ├── monotonic_clock.rs        # MonotonicClock 实现
-│   ├── nano_monotonic_clock.rs   # NanoMonotonicClock 实现
-│   ├── mock_clock.rs             # MockClock 实现
-│   ├── mock_clock_progression.rs # MockClockProgression 定义
-│   ├── mock_nano_clock.rs        # MockNanoClock 实现
-│   ├── zoned.rs                  # Zoned<C> 包装器
+│   ├── clock/                    # Clock trait 和实现
 │   ├── meter/                    # TimeMeter / NanoTimeMeter
 │   └── timer/                    # Timer domain / SystemTimer / MockTimer
 ├── tests/
-│   ├── clock_tests.rs            # Clock trait 测试
-│   ├── *_clock_tests.rs          # 面向具体源文件的行为测试
-│   ├── system_tests.rs           # SystemClock 测试
-│   ├── monotonic_tests.rs        # MonotonicClock 测试
-│   ├── nano_monotonic_tests.rs   # NanoMonotonicClock 测试
-│   ├── mock_tests.rs             # MockClock 测试
-│   ├── mock_nano_clock_tests.rs  # MockNanoClock 测试
+│   ├── clock/                    # Clock trait 和实现测试
+│   ├── clock_tests.rs            # Clock 测试入口
 │   ├── meter/                    # 时间计量器测试
+│   ├── meter_tests.rs            # Meter 测试入口
 │   ├── timer/                    # Timer 模块测试
 │   ├── timer_tests.rs            # Timer 测试入口
-│   └── zoned_tests.rs            # Zoned 测试
+│   └── readme_api_tests.rs       # README API 回归测试
 ├── doc/
 │   └── clock_design.zh_CN.md     # 本设计文档
 ├── Cargo.toml
@@ -1010,9 +996,10 @@ rs-clock/
 **组织原则**：
 1. 每个 trait 单独一个文件
 2. 每个实现类型单独一个文件
-3. `src/timer/xxx.rs` 对应 `tests/timer/xxx_tests.rs`
-4. 测试代码与源代码分离
-5. 所有组件在同一个 crate 中
+3. `src/clock/xxx.rs` 对应 `tests/clock/xxx_tests.rs`
+4. `src/timer/xxx.rs` 对应 `tests/timer/xxx_tests.rs`
+5. 测试代码与源代码分离
+6. 所有组件在同一个 crate 中
 
 ## 7. 设计优势
 
