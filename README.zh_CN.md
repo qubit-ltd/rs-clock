@@ -7,11 +7,11 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-为 Rust 提供线程安全的时钟抽象，包含单调时钟和模拟时钟实现。
+为 Rust 提供线程安全的时钟与计时器抽象，包含单调时钟和模拟时钟实现。
 
 ## 概述
 
-Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象系统。它提供强大的、线程安全的时钟实现，支持基本时间访问、高精度测量、时区处理、单调时间和测试支持。
+Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象系统。它提供强大的、线程安全的时钟实现，支持基本时间访问、高精度测量、时区处理、单调时间、timer-domain deadline 和测试支持。
 
 ## 特性
 
@@ -37,6 +37,13 @@ Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象�
 - **速度计算**：计算处理速度（每秒/每分钟处理项数）
 - **测试友好**：支持注入模拟时钟以实现确定性测试
 
+### ⏲️ **Timer Domain**
+- **MonotonicTimer**：创建带 timer domain 标记的单调 instant 和 deadline
+- **BlockingTimer**：提供阻塞式 wait、sleep 和 notification API
+- **AsyncTimer**：启用 `tokio` feature 后提供 Tokio 兼容的异步 wait API
+- **SystemTimer**：基于 `std::time::Instant` 的真实计时器
+- **MockTimer**：由测试手动控制 elapsed time 的确定性计时器
+
 ### 🔒 **线程安全**
 - 所有时钟实现都是 `Send + Sync`
 - 系统时钟和单调时钟采用不可变设计
@@ -50,6 +57,7 @@ Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象�
 
 ### 🧪 **测试支持**
 - 可控时间的模拟时钟
+- 可控单调 elapsed time 的模拟计时器
 - 设置时间到特定时间点
 - 编程方式推进时间
 - 自动递增支持
@@ -155,6 +163,19 @@ meter.stop();
 println!("耗时: {}", meter.readable_duration());
 ```
 
+### 使用 Timer Domain 测试可控超时
+
+```rust
+use qubit_clock::timer::{BlockingTimer, MockTimer, MonotonicTimer};
+use std::time::Duration;
+
+let timer = MockTimer::new();
+let deadline = timer.deadline_after(Duration::from_secs(5));
+
+timer.advance(Duration::from_secs(5));
+timer.sleep_until(deadline).expect("deadline belongs to this timer");
+```
+
 ### 高精度时间计量器
 
 ```rust
@@ -201,6 +222,9 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 - **NanoClock**：纳秒精度的扩展
 - **ZonedClock**：时区支持的扩展
 - **ControllableClock**：时间控制的扩展（测试用）
+- **MonotonicTimer**：timer-domain instant 和 deadline 的基础 trait
+- **BlockingTimer**：阻塞式 wait 和 sleep 的扩展
+- **AsyncTimer**：启用 `tokio` feature 后可用的 Tokio 异步扩展
 
 这种设计遵循**接口隔离原则**，确保实现只需要提供它们实际支持的功能。
 
@@ -252,6 +276,25 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 - 泛型支持任何 `Clock` 实现
 - 将 UTC 时间转换为指定时区的本地时间
 - 适用于：显示本地时间、时区转换
+
+## Timer 实现
+
+### SystemTimer
+
+- 基于 `std::time::Instant`
+- 在自己的 timer domain 中创建 `TimerInstant`
+- 支持阻塞等待和显式通知
+- 启用 `tokio` feature 后支持异步等待
+- 适用于：生产环境 deadline、超时控制、可中断 sleep
+
+### MockTimer
+
+- 面向确定性测试的手动控制单调计时器
+- elapsed time 从零开始
+- clone 共享同一个 timer domain、elapsed time 和 notification 状态
+- 支持手动 `set_elapsed`、`advance`、`reset` 和 `notify_waiters`
+- 启用 `tokio` feature 后支持异步等待
+- 适用于：不等待真实时间就测试 timeout 和 retry 逻辑
 
 ## 时间计量器
 
@@ -310,6 +353,9 @@ let elapsed = start.elapsed();
   的时钟源时，使用 `TimeMeter` 或 `NanoTimeMeter`。它们默认使用单调时钟；
   `TimeMeter` 可以注入 `MockClock`，`NanoTimeMeter` 可以注入 `MockNanoClock`
   或其他实现 `NanoClock` 的测试时钟。
+- 当代码需要 deadline、sleep 或可中断等待时，使用 `SystemTimer` 或
+  `MockTimer`。`TimerInstant` 会带有创建它的 timer domain 标记，因此不同
+  timer 的 deadline 不能被误比较，也不能被误用于对方的 wait 操作。
 - 当业务逻辑依赖“当前时间”且需要可测试时，使用 `Clock` 系列 trait，避免
   直接耦合到系统时钟或 `Instant::now()`。
 
@@ -349,6 +395,16 @@ let elapsed = start.elapsed();
 - `add_duration(duration)` - 将时钟推进指定时长
 - `reset()` - 将时钟重置到初始状态
 
+### Timer Trait
+
+Timer-domain API 位于 `qubit_clock::timer` 下：
+
+- `MonotonicTimer` - 返回当前 `TimerInstant`，创建 deadline，并计算剩余时间
+- `BlockingTimer` - 提供 `wait_until`、`wait_for`、`sleep_until`、`sleep_for` 和 `notify_waiters`
+- `AsyncTimer` - 启用 `tokio` feature 后提供 Tokio 兼容的异步 wait
+- `TimerInstant` - 表示相对于创建它的 timer domain 的 instant
+- `TimerError` - 报告 timer-domain mismatch
+
 ## 设计原则
 
 ### 接口隔离
@@ -358,6 +414,7 @@ let elapsed = start.elapsed();
 - 并非所有时钟都需要纳秒精度 → `NanoClock` 是独立的
 - 并非所有时钟都需要时区支持 → `ZonedClock` 是独立的
 - 只有测试时钟需要可控性 → `ControllableClock` 是独立的
+- 只有 timer 用户需要 deadline 和 wait → timer trait 放在 `timer` 模块下
 
 这使得实现只需提供它们需要的功能，保持 API 简洁和专注。
 
@@ -369,6 +426,9 @@ let elapsed = start.elapsed();
 - `NanoClock` - 提供高精度时间
 - `ZonedClock` - 提供时区转换
 - `ControllableClock` - 提供测试用的时间控制
+- `MonotonicTimer` - 提供带 timer domain 标记的单调 instant
+- `BlockingTimer` - 提供阻塞式 deadline wait
+- `AsyncTimer` - 提供可选的 Tokio deadline wait
 
 ### 组合优于继承
 
@@ -409,6 +469,7 @@ cargo test
 
 - **chrono**：日期和时间处理，支持序列化
 - **chrono-tz**：全面的时区数据库
+- **tokio**：启用 `tokio` feature 后为 `timer::AsyncTimer` 提供可选异步运行时支持
 
 ## 使用场景
 
@@ -430,16 +491,17 @@ log::info!("处理耗时: {}", meter.readable_duration());
 ### 超时控制
 
 ```rust
-use qubit_clock::{Clock, MonotonicClock};
+use qubit_clock::timer::{BlockingTimer, MonotonicTimer, SystemTimer};
 use std::time::Duration;
 
-let clock = MonotonicClock::new();
-let deadline = clock.millis() + 5000; // 从现在开始 5 秒
+let timer = SystemTimer::new();
+let deadline = timer.deadline_after(Duration::from_secs(5));
 
-while clock.millis() < deadline {
+while timer.duration_until(deadline).expect("deadline belongs to this timer").is_some() {
     if try_operation() {
         break;
     }
+    timer.wait_for(Duration::from_millis(10)).expect("self-created deadline should be valid");
 }
 ```
 

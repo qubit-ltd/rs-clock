@@ -2,21 +2,23 @@
 
 ## 版本信息
 
-- **文档版本**: 1.0
+- **文档版本**: 1.1
 - **创建日期**: 2025-10-19
+- **更新日期**: 2026-05-16
 - **作者**: 胡海星
 
 ## 1. 设计概述
 
-本文档描述了 `qubit-clock` crate 的架构设计。该设计提供了一套清晰、类型安全、灵活的时钟抽象，支持多种使用场景。
+本文档描述了 `qubit-clock` crate 的架构设计。该设计提供了一套清晰、类型安全、灵活的时钟与计时器抽象，支持多种使用场景。
 
 ### 1.1 设计目标
 
-1. **职责分离**：将时间获取、时区支持、高精度测量、时钟控制等功能分离到不同的 trait
+1. **职责分离**：将时间获取、时区支持、高精度测量、时钟控制、deadline wait 等功能分离到不同的 trait
 2. **类型安全**：通过类型系统在编译期保证功能支持（如是否支持时区、纳秒精度等）
 3. **零成本抽象**：不需要的功能不付出任何性能代价
 4. **易于测试**：提供可控制的模拟时钟，支持单元测试和集成测试
 5. **灵活组合**：通过包装器模式灵活组合不同的功能
+6. **Timer domain 隔离**：`TimerInstant` 只能在创建它的 timer domain 中比较和等待，避免不同 timer 的相对时间轴被误用
 
 ### 1.2 核心设计原则
 
@@ -34,12 +36,18 @@ Clock (基础时钟 trait)
 ├── NanoClock (高精度时钟 trait)
 ├── ZonedClock (带时区的时钟 trait)
 └── ControllableClock (可控制的时钟 trait)
+
+MonotonicTimer (timer-domain 单调计时器 trait)
+├── BlockingTimer (阻塞式 wait/sleep trait)
+└── AsyncTimer (Tokio 异步 wait/sleep trait，tokio feature)
 ```
 
 **说明**：
 - `Clock` 是基础 trait，提供 UTC 时间
 - `NanoClock`、`ZonedClock`、`ControllableClock` 都继承自 `Clock`
 - 这三个扩展 trait 是**正交的**，互不依赖
+- `MonotonicTimer` 系列不继承 `Clock`，因为它表达的是 timer domain 内的相对单调时间轴，不表达 UTC 当前时间
+- `AsyncTimer` 只在启用 `tokio` feature 时导出
 
 ### 2.2 实现类型
 
@@ -53,6 +61,10 @@ Clock trait 实现：
 
 包装器：
 └── Zoned<C: Clock> (为任何 Clock 添加时区支持)
+
+Timer trait 实现：
+├── SystemTimer (真实单调计时器)
+└── MockTimer (可手动控制的模拟计时器)
 ```
 
 ### 2.3 类型关系图
@@ -92,6 +104,36 @@ graph TD
     style NanoClock fill:#fff3e0
     style ZonedClock fill:#f3e5f5
     style ControllableClock fill:#e8f5e9
+```
+
+Timer 模块使用独立的类型关系，不把相对单调时间轴混入 UTC 时钟抽象：
+
+```mermaid
+graph TD
+    MonotonicTimer[MonotonicTimer trait<br/>timer domain]
+    BlockingTimer[BlockingTimer trait<br/>阻塞 wait/sleep]
+    AsyncTimer[AsyncTimer trait<br/>Tokio 异步 wait/sleep]
+    TimerInstant[TimerInstant<br/>domain-branded instant]
+    TimerDomainId[TimerDomainId<br/>timer domain]
+    SystemTimer[SystemTimer<br/>真实 timer]
+    MockTimer[MockTimer<br/>模拟 timer]
+
+    MonotonicTimer --> BlockingTimer
+    MonotonicTimer --> AsyncTimer
+    TimerInstant --> TimerDomainId
+
+    MonotonicTimer -.实现.-> SystemTimer
+    BlockingTimer -.实现.-> SystemTimer
+    AsyncTimer -.tokio feature.-> SystemTimer
+
+    MonotonicTimer -.实现.-> MockTimer
+    BlockingTimer -.实现.-> MockTimer
+    AsyncTimer -.tokio feature.-> MockTimer
+
+    style MonotonicTimer fill:#e1f5ff
+    style BlockingTimer fill:#fff3e0
+    style AsyncTimer fill:#f3e5f5
+    style TimerInstant fill:#e8f5e9
 ```
 
 ## 3. Trait 详细设计
@@ -239,6 +281,59 @@ pub trait ControllableClock: Clock {
 - 任何需要模拟时间的测试场景
 
 **文件位置**：`src/controllable_clock.rs`
+
+---
+
+### 3.5 Timer Trait - Timer Domain 计时器 Trait
+
+**职责**：提供相对单调时间轴上的 deadline、wait 和 sleep 能力。
+
+Timer API 位于 `src/timer` 模块下，不与 `Clock` 继承关系绑定。原因是
+`Clock` 关注 UTC 当前时间，而 timer 关注“从某个 timer 创建时刻开始”的单调
+elapsed time。不同 timer 拥有不同的 timer domain，它们的 `TimerInstant`
+不能相互比较或混用。
+
+**定义**：
+```rust
+pub trait MonotonicTimer: Send + Sync {
+    fn timer_domain(&self) -> TimerDomainId;
+    fn now(&self) -> TimerInstant;
+    fn deadline_after(&self, duration: Duration) -> TimerInstant;
+    fn duration_until(&self, deadline: TimerInstant) -> Result<Option<Duration>, TimerError>;
+}
+
+pub trait BlockingTimer: MonotonicTimer {
+    fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError>;
+    fn notify_waiters(&self);
+    fn wait_for(&self, duration: Duration) -> Result<TimerWaitOutcome, TimerError>;
+    fn sleep_until(&self, deadline: TimerInstant) -> Result<(), TimerError>;
+    fn sleep_for(&self, duration: Duration) -> Result<(), TimerError>;
+}
+```
+
+启用 `tokio` feature 后还会导出：
+
+```rust
+pub trait AsyncTimer: MonotonicTimer {
+    fn wait_until_async<'a>(&'a self, deadline: TimerInstant) -> Pin<Box<dyn Future<Output = Result<TimerWaitOutcome, TimerError>> + Send + 'a>>;
+    fn sleep_until_async<'a>(&'a self, deadline: TimerInstant) -> Pin<Box<dyn Future<Output = Result<(), TimerError>> + Send + 'a>>;
+    fn sleep_for_async<'a>(&'a self, duration: Duration) -> Pin<Box<dyn Future<Output = Result<(), TimerError>> + Send + 'a>>;
+}
+```
+
+**设计要点**：
+- `TimerInstant` 内部携带 `TimerDomainId` 和相对于该 domain 零点的 elapsed time
+- 所有接收外部 `TimerInstant` 的 API 都先校验 timer domain，不匹配时返回 `TimerError::TimerDomainMismatch`
+- `Duration` 参数（如 `sleep_for(duration)`）表示“相对于当前 timer instant 的一段时长”
+- `TimerWaitOutcome::Notified` 表示 wait 被显式通知提前唤醒，`sleep_*` 方法会忽略通知并继续等待 deadline
+- `AsyncTimer` 不引入 `async-trait` 依赖，而是返回 boxed `Future`，以保持依赖面可控
+
+**适用场景**：
+- 可测试的 timeout / retry / backoff 逻辑
+- 不想在测试中等待真实时间的 deadline 控制
+- 需要显式 notification 打断 wait 的后台任务
+
+**文件位置**：`src/timer/*.rs`
 
 ## 4. 实现类型详细设计
 
@@ -596,6 +691,71 @@ let local = clock.local_time();
 
 **文件位置**：`src/zoned.rs`
 
+---
+
+### 4.7 SystemTimer - 真实单调计时器
+
+**职责**：基于 `std::time::Instant` 提供真实单调 deadline、wait 和 sleep。
+
+**定义**：
+```rust
+pub struct SystemTimer {
+    domain: TimerDomainId,
+    origin: Instant,
+    wait_state: Arc<(Mutex<u64>, Condvar)>,
+    async_notifier: Arc<Notify>, // tokio feature
+}
+```
+
+**设计要点**：
+- 创建时生成独立 `TimerDomainId`，并把当前 `Instant` 作为 timer domain 零点
+- `now()` 返回相对于 `origin` 的 `TimerInstant`
+- clone 共享同一个 timer domain 和 notification 状态
+- `wait_until()` 使用 `Condvar::wait_timeout()` 等待真实剩余时间
+- `notify_waiters()` 增加 notification generation 并唤醒阻塞 wait；启用 `tokio` feature 时也唤醒异步 wait
+- `wait_until_async()` 使用 `tokio::time::sleep()` 与 `Notify`，只在 `tokio` feature 下编译
+
+**适用场景**：
+- 生产环境超时控制
+- 后台线程或异步任务的可中断等待
+- 与 `MockTimer` 共享同一套 timer trait 的实现代码
+
+**线程安全性**：完全线程安全，内部 notification 状态由 `Mutex` / `Condvar` 和 `Notify` 保护
+
+**文件位置**：`src/timer/system_timer.rs`
+
+---
+
+### 4.8 MockTimer - 可控制模拟计时器
+
+**职责**：提供测试可手动推进的单调 timer domain。
+
+**定义**：
+```rust
+pub struct MockTimer {
+    domain: TimerDomainId,
+    state: Arc<(Mutex<(Duration, u64)>, Condvar)>,
+    async_generation_sender: watch::Sender<u64>, // tokio feature
+}
+```
+
+**设计要点**：
+- elapsed time 从 `Duration::ZERO` 开始，不依赖真实时间流逝
+- `set_elapsed()` 直接设置当前 elapsed time，`advance()` 饱和推进 elapsed time，`reset()` 回到零点
+- 每次修改 elapsed time 或调用 `notify_waiters()` 都会推进 generation，并唤醒 waiters
+- `wait_until()` 在 mock time 达到 deadline 时返回 `DeadlineReached`，否则在 generation 改变后返回 `Notified`
+- 异步路径使用 `tokio::sync::watch` 保存 generation，避免 notification 在 subscribe 前后出现竞态时被静默丢失
+- 与 `SystemTimer` 一样，所有外部 deadline 都必须属于当前 timer domain
+
+**适用场景**：
+- timeout、retry、backoff 等时间相关逻辑的确定性测试
+- 需要手动控制“时间已经过去多少”的测试
+- 同时覆盖阻塞式和 Tokio 异步等待逻辑
+
+**线程安全性**：完全线程安全，clone 共享状态，所有状态读写由 `Mutex` 保护
+
+**文件位置**：`src/timer/mock_timer.rs`
+
 ## 5. 使用场景与示例
 
 ### 5.1 场景 1：简单日志（只需要 UTC 时间）
@@ -772,6 +932,44 @@ fn main() {
 - 适合微基准测试
 - 可以测量非常短的时间间隔
 
+---
+
+### 5.6 场景 6：可测试超时控制
+
+```rust
+use qubit_clock::timer::{BlockingTimer, MockTimer, MonotonicTimer};
+use std::time::Duration;
+
+fn wait_until_ready<T>(timer: &T) -> bool
+where
+    T: BlockingTimer,
+{
+    let deadline = timer.deadline_after(Duration::from_secs(5));
+    while timer.duration_until(deadline).expect("deadline belongs to this timer").is_some() {
+        if is_ready() {
+            return true;
+        }
+        timer.wait_for(Duration::from_millis(10)).expect("self-created deadline should be valid");
+    }
+    false
+}
+
+#[test]
+fn test_timeout_without_real_sleep() {
+    let timer = MockTimer::new();
+    let deadline = timer.deadline_after(Duration::from_secs(5));
+
+    timer.advance(Duration::from_secs(5));
+
+    assert_eq!(None, timer.duration_until(deadline).expect("deadline belongs to this timer"));
+}
+```
+
+**说明**：
+- `Duration` 参数表示相对于当前 timer instant 的一段时长
+- `TimerInstant` 只能回传给创建它的 timer domain
+- 测试中使用 `MockTimer::advance()` 可以瞬间推进 timeout，不需要真实等待
+
 ## 6. 文件组织结构
 
 ```
@@ -789,7 +987,8 @@ rs-clock/
 │   ├── mock_clock_progression.rs # MockClockProgression 定义
 │   ├── mock_nano_clock.rs        # MockNanoClock 实现
 │   ├── zoned.rs                  # Zoned<C> 包装器
-│   └── meter/                    # TimeMeter / NanoTimeMeter
+│   ├── meter/                    # TimeMeter / NanoTimeMeter
+│   └── timer/                    # Timer domain / SystemTimer / MockTimer
 ├── tests/
 │   ├── clock_tests.rs            # Clock trait 测试
 │   ├── *_clock_tests.rs          # 面向具体源文件的行为测试
@@ -799,6 +998,8 @@ rs-clock/
 │   ├── mock_tests.rs             # MockClock 测试
 │   ├── mock_nano_clock_tests.rs  # MockNanoClock 测试
 │   ├── meter/                    # 时间计量器测试
+│   ├── timer/                    # Timer 模块测试
+│   ├── timer_tests.rs            # Timer 测试入口
 │   └── zoned_tests.rs            # Zoned 测试
 ├── doc/
 │   └── clock_design.zh_CN.md     # 本设计文档
@@ -809,8 +1010,9 @@ rs-clock/
 **组织原则**：
 1. 每个 trait 单独一个文件
 2. 每个实现类型单独一个文件
-3. 测试代码与源代码分离
-4. 所有组件在同一个 crate 中
+3. `src/timer/xxx.rs` 对应 `tests/timer/xxx_tests.rs`
+4. 测试代码与源代码分离
+5. 所有组件在同一个 crate 中
 
 ## 7. 设计优势
 
@@ -820,6 +1022,8 @@ rs-clock/
 - **ZonedClock**：只添加时区支持
 - **NanoClock**：只添加纳秒精度
 - **ControllableClock**：只添加控制功能
+- **MonotonicTimer**：只表达 timer domain 内的单调 instant
+- **BlockingTimer / AsyncTimer**：只添加阻塞式或异步 wait/sleep
 
 每个 trait 职责单一，互不干扰。
 
@@ -869,6 +1073,16 @@ let clock = Zoned::new(mock, Shanghai);
 clock.set_time(time);       // ControllableClock
 clock.local_time();         // ZonedClock
 clock.millis();             // Clock
+```
+
+`MockTimer` 则让 deadline 相关测试不依赖真实时间：
+
+```rust
+let timer = MockTimer::new();
+let deadline = timer.deadline_after(Duration::from_secs(5));
+
+timer.advance(Duration::from_secs(5));
+assert_eq!(None, timer.duration_until(deadline).expect("deadline belongs to this timer"));
 ```
 
 ## 8. 设计权衡
