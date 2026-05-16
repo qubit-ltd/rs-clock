@@ -31,6 +31,19 @@ fn test_wait_for_reaches_real_deadline() {
 }
 
 #[test]
+fn test_wait_until_reaches_real_deadline() {
+    let timer = SystemTimer::new();
+    let deadline = timer.deadline_after(Duration::from_millis(1));
+
+    assert_eq!(
+        TimerWaitOutcome::DeadlineReached,
+        timer
+            .wait_until(deadline)
+            .expect("waiting on a self-created deadline should succeed"),
+    );
+}
+
+#[test]
 fn test_default_creates_system_timer() {
     let timer = SystemTimer::default();
 
