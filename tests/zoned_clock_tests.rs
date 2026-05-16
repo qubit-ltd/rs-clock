@@ -160,11 +160,15 @@ fn test_zoned_clock_trait_object() {
 #[test]
 fn test_zoned_clock_with_system_clock() {
     let clock = Zoned::new(SystemClock::new(), Shanghai);
-    let utc = clock.time();
-    let local = clock.local_time();
+    let before = clock.time().timestamp_millis();
+    let local = clock.local_time().timestamp_millis();
+    let after = clock.time().timestamp_millis();
 
-    // Both should represent the same instant in time
-    assert_eq!(utc.timestamp_millis(), local.timestamp_millis());
+    // The local time should represent the instant read by local_time().
+    assert!(
+        (before..=after).contains(&local),
+        "local timestamp should be between surrounding UTC reads: before={before}, local={local}, after={after}"
+    );
 
     // But the hour might be different due to timezone
     // (unless it happens to be the same by coincidence)
