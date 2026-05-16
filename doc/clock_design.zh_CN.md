@@ -702,7 +702,7 @@ let local = clock.local_time();
 pub struct SystemTimer {
     domain: TimerDomainId,
     origin: Instant,
-    wait_state: Arc<(Mutex<u64>, Condvar)>,
+    wait_generation: ArcMonitor<u64>,
     async_notifier: Arc<Notify>, // tokio feature
 }
 ```
@@ -711,7 +711,7 @@ pub struct SystemTimer {
 - 创建时生成独立 `TimerDomainId`，并把当前 `Instant` 作为 timer domain 零点
 - `now()` 返回相对于 `origin` 的 `TimerInstant`
 - clone 共享同一个 timer domain 和 notification 状态
-- `wait_until()` 使用 `Condvar::wait_timeout()` 等待真实剩余时间
+- `wait_until()` 使用 `ArcMonitor` 的 timed wait 等待真实剩余时间
 - `notify_waiters()` 增加 notification generation 并唤醒阻塞 wait；启用 `tokio` feature 时也唤醒异步 wait
 - `wait_until_async()` 使用 `tokio::time::sleep()` 与 `Notify`，只在 `tokio` feature 下编译
 
@@ -720,7 +720,7 @@ pub struct SystemTimer {
 - 后台线程或异步任务的可中断等待
 - 与 `MockTimer` 共享同一套 timer trait 的实现代码
 
-**线程安全性**：完全线程安全，内部 notification 状态由 `Mutex` / `Condvar` 和 `Notify` 保护
+**线程安全性**：完全线程安全，阻塞 notification 状态由 `ArcMonitor` 保护；启用 `tokio` feature 时异步 notification 状态由 `Notify` 保护
 
 **文件位置**：`src/timer/system_timer.rs`
 
