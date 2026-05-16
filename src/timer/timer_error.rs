@@ -10,17 +10,15 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::timer::TimerDomainId;
-
 /// Error returned when timer-domain operations cannot be completed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TimerError {
     /// The operation received an instant from another timer domain.
     TimerDomainMismatch {
         /// The timer domain ID required by the operation.
-        expected_domain_id: TimerDomainId,
+        expected_domain_id: u64,
         /// The timer domain ID carried by the provided instant.
-        actual_domain_id: TimerDomainId,
+        actual_domain_id: u64,
     },
 }
 
@@ -35,10 +33,7 @@ impl TimerError {
     /// # Returns
     ///
     /// A [`TimerError::TimerDomainMismatch`] value containing both domains.
-    pub(crate) fn timer_domain_mismatch(
-        expected_domain_id: TimerDomainId,
-        actual_domain_id: TimerDomainId,
-    ) -> Self {
+    pub(crate) fn timer_domain_mismatch(expected_domain_id: u64, actual_domain_id: u64) -> Self {
         Self::TimerDomainMismatch {
             expected_domain_id,
             actual_domain_id,

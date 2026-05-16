@@ -8,11 +8,8 @@
  *
  ******************************************************************************/
 #[cfg(feature = "tokio")]
-use std::future::Future;
-#[cfg(feature = "tokio")]
-use std::pin::Pin;
-#[cfg(feature = "tokio")]
 use std::sync::Arc;
+use std::thread;
 use std::time::Instant;
 
 use qubit_lock::{
@@ -23,14 +20,20 @@ use qubit_lock::{
 use tokio::sync::Notify;
 
 #[cfg(feature = "tokio")]
-use crate::timer::AsyncTimer;
 use crate::timer::{
-    BlockingTimer,
-    MonotonicTimer,
-    TimerDomainId,
-    TimerError,
+    AsyncSleeper,
+    AsyncTimerResult,
+    AsyncWaiter,
+};
+use crate::timer::{
+    BlockingSleeper,
+    BlockingWaiter,
+    TimerDomain,
     TimerInstant,
+    TimerResult,
     TimerWaitOutcome,
+    WaitNotifier,
+    next_timer_domain_id,
 };
 
 /// A real monotonic timer backed by [`std::time::Instant`].
@@ -39,9 +42,9 @@ use crate::timer::{
 /// measured relative to the instant at which the original timer was created.
 #[derive(Clone)]
 pub struct SystemTimer {
-    domain_id: TimerDomainId,
+    domain_id: u64,
     origin: Instant,
-    wait_generation: ArcMonitor<u64>,
+    notification_epoch: ArcMonitor<u64>,
     #[cfg(feature = "tokio")]
     async_notifier: Arc<Notify>,
 }
@@ -57,32 +60,32 @@ impl SystemTimer {
     /// A new [`SystemTimer`] backed by the system monotonic clock.
     pub fn new() -> Self {
         Self {
-            domain_id: TimerDomainId::new_unique(),
+            domain_id: next_timer_domain_id(),
             origin: Instant::now(),
-            wait_generation: ArcMonitor::new(0),
+            notification_epoch: ArcMonitor::new(0),
             #[cfg(feature = "tokio")]
             async_notifier: Arc::new(Notify::new()),
         }
     }
 
-    /// Advances the notification generation and wakes blocking waiters.
+    /// Advances the blocking notification epoch and wakes blocking waiters.
     ///
-    /// Waiters blocked in [`BlockingTimer::wait_until`] observe a generation change
+    /// Waiters blocked in [`BlockingWaiter::wait_until`] observe an epoch change
     /// and return [`TimerWaitOutcome::Notified`].
     fn wake_blocking_waiters(&self) {
-        self.wait_generation.write_notify_all(|generation| {
-            *generation = generation.wrapping_add(1);
+        self.notification_epoch.write_notify_all(|epoch| {
+            *epoch = epoch.wrapping_add(1);
         });
     }
 }
 
-impl MonotonicTimer for SystemTimer {
+impl TimerDomain for SystemTimer {
     /// Returns the timer domain ID owned by this system timer.
     ///
     /// # Returns
     ///
-    /// The [`TimerDomainId`] assigned when this timer was first created.
-    fn timer_domain_id(&self) -> TimerDomainId {
+    /// The numeric ID assigned when this timer was first created.
+    fn id(&self) -> u64 {
         self.domain_id
     }
 
@@ -97,7 +100,50 @@ impl MonotonicTimer for SystemTimer {
     }
 }
 
-impl BlockingTimer for SystemTimer {
+impl BlockingSleeper for SystemTimer {
+    /// Blocks the current thread until the deadline has been reached.
+    ///
+    /// This sleep uses the system scheduler directly and does not observe timer
+    /// notifications.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The target instant in this timer's domain.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` once the system timer has reached or passed `deadline`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimerError::TimerDomainMismatch`] when `deadline` belongs to
+    /// another timer domain.
+    fn sleep_until(&self, deadline: TimerInstant) -> TimerResult<()> {
+        deadline.ensure_domain_id(self.domain_id)?;
+        let deadline_elapsed = deadline.elapsed_since_timer_start();
+        loop {
+            let now_elapsed = self.origin.elapsed();
+            if now_elapsed >= deadline_elapsed {
+                return Ok(());
+            }
+            thread::sleep(deadline_elapsed - now_elapsed);
+        }
+    }
+}
+
+impl WaitNotifier for SystemTimer {
+    /// Wakes all current waiters without changing the timer's monotonic time.
+    ///
+    /// Blocking waiters and, when the `tokio` feature is enabled, asynchronous
+    /// waiters registered on this timer are notified. Sleepers are not notified.
+    fn notify_all_waiters(&self) {
+        self.wake_blocking_waiters();
+        #[cfg(feature = "tokio")]
+        self.async_notifier.notify_waiters();
+    }
+}
+
+impl BlockingWaiter for SystemTimer {
     /// Blocks until the deadline is reached or waiters are notified.
     ///
     /// # Arguments
@@ -106,13 +152,13 @@ impl BlockingTimer for SystemTimer {
     ///
     /// # Returns
     ///
-    /// The same outcomes as [`BlockingTimer::wait_until`].
+    /// The same outcomes as [`BlockingWaiter::wait_until`].
     ///
     /// # Errors
     ///
     /// Returns [`TimerError::TimerDomainMismatch`] when `deadline` belongs to
     /// another timer domain.
-    fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError> {
+    fn wait_until(&self, deadline: TimerInstant) -> TimerResult<TimerWaitOutcome> {
         deadline.ensure_domain_id(self.domain_id)?;
         let deadline_elapsed = deadline.elapsed_since_timer_start();
         let now_elapsed = self.origin.elapsed();
@@ -122,14 +168,14 @@ impl BlockingTimer for SystemTimer {
 
         let remaining = deadline_elapsed - now_elapsed;
         // Capture the baseline inside the monitor wait so notifications cannot
-        // be lost between a separate generation read and wait registration.
-        let mut observed_generation = None;
-        let result = self.wait_generation.wait_timeout_until(
+        // be lost between a separate epoch read and wait registration.
+        let mut observed_epoch = None;
+        let result = self.notification_epoch.wait_timeout_until(
             remaining,
-            |generation| match observed_generation {
-                Some(observed_generation) => *generation != observed_generation,
+            |epoch| match observed_epoch {
+                Some(observed_epoch) => *epoch != observed_epoch,
                 None => {
-                    observed_generation = Some(*generation);
+                    observed_epoch = Some(*epoch);
                     false
                 }
             },
@@ -140,20 +186,45 @@ impl BlockingTimer for SystemTimer {
             WaitTimeoutResult::TimedOut => Ok(TimerWaitOutcome::DeadlineReached),
         }
     }
+}
 
-    /// Wakes current waiters without changing the timer's monotonic time.
+#[cfg(feature = "tokio")]
+impl AsyncSleeper for SystemTimer {
+    /// Waits asynchronously until the deadline has been reached.
     ///
-    /// Blocking waiters and, when the `tokio` feature is enabled, asynchronous
-    /// waiters registered on this timer are notified.
-    fn notify_waiters(&self) {
-        self.wake_blocking_waiters();
-        #[cfg(feature = "tokio")]
-        self.async_notifier.notify_waiters();
+    /// This sleep uses Tokio's timer directly and does not observe timer
+    /// notifications.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The target instant in this timer's domain.
+    ///
+    /// # Returns
+    ///
+    /// A future that resolves to `Ok(())` once the system timer has reached or
+    /// passed `deadline`.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`TimerError::TimerDomainMismatch`] when `deadline`
+    /// belongs to another timer domain.
+    fn sleep_until_async<'a>(&'a self, deadline: TimerInstant) -> AsyncTimerResult<'a, ()> {
+        Box::pin(async move {
+            deadline.ensure_domain_id(self.domain_id)?;
+            let deadline_elapsed = deadline.elapsed_since_timer_start();
+            loop {
+                let now_elapsed = self.origin.elapsed();
+                if now_elapsed >= deadline_elapsed {
+                    return Ok(());
+                }
+                tokio::time::sleep(deadline_elapsed - now_elapsed).await;
+            }
+        })
     }
 }
 
 #[cfg(feature = "tokio")]
-impl AsyncTimer for SystemTimer {
+impl AsyncWaiter for SystemTimer {
     /// Waits asynchronously until the deadline is reached or waiters are
     /// notified.
     ///
@@ -163,7 +234,7 @@ impl AsyncTimer for SystemTimer {
     ///
     /// # Returns
     ///
-    /// A future with the same outcomes as [`AsyncTimer::wait_until_async`].
+    /// A future with the same outcomes as [`AsyncWaiter::wait_until_async`].
     ///
     /// # Errors
     ///
@@ -172,7 +243,7 @@ impl AsyncTimer for SystemTimer {
     fn wait_until_async<'a>(
         &'a self,
         deadline: TimerInstant,
-    ) -> Pin<Box<dyn Future<Output = Result<TimerWaitOutcome, TimerError>> + Send + 'a>> {
+    ) -> AsyncTimerResult<'a, TimerWaitOutcome> {
         Box::pin(async move {
             deadline.ensure_domain_id(self.domain_id)?;
             let deadline_elapsed = deadline.elapsed_since_timer_start();

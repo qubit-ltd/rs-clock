@@ -14,7 +14,7 @@ use std::time::Duration;
 use qubit_clock::timer::{
     BlockingTimer,
     MockTimer,
-    MonotonicTimer,
+    TimerDomain,
     TimerError,
     TimerWaitOutcome,
 };
