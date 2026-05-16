@@ -26,11 +26,21 @@ pub struct TimerDomainId(NonZeroU64);
 
 impl TimerDomainId {
     /// Returns the numeric identifier.
+    ///
+    /// # Returns
+    ///
+    /// The opaque non-zero ID assigned to this timer domain.
     pub fn get(self) -> u64 {
         self.0.get()
     }
 
     /// Creates a fresh timer domain identifier.
+    ///
+    /// Each call allocates a new ID from a process-wide counter.
+    ///
+    /// # Returns
+    ///
+    /// A previously unused [`TimerDomainId`].
     pub(crate) fn new_unique() -> Self {
         let value = NEXT_TIMER_DOMAIN_ID.fetch_add(1, Ordering::Relaxed);
         let value = NonZeroU64::new(value).expect("timer domain counter should never wrap to zero");
@@ -40,6 +50,14 @@ impl TimerDomainId {
 
 impl fmt::Display for TimerDomainId {
     /// Formats the numeric domain identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `formatter` - The destination formatter.
+    ///
+    /// # Returns
+    ///
+    /// The result of formatting the underlying numeric ID.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

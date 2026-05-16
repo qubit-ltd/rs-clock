@@ -26,6 +26,15 @@ pub enum TimerError {
 
 impl TimerError {
     /// Creates a timer-domain mismatch error.
+    ///
+    /// # Arguments
+    ///
+    /// * `expected` - The timer domain required by the operation.
+    /// * `actual` - The timer domain carried by the provided instant.
+    ///
+    /// # Returns
+    ///
+    /// A [`TimerError::TimerDomainMismatch`] value containing both domains.
     pub(crate) fn timer_domain_mismatch(expected: TimerDomainId, actual: TimerDomainId) -> Self {
         Self::TimerDomainMismatch { expected, actual }
     }
@@ -33,6 +42,14 @@ impl TimerError {
 
 impl fmt::Display for TimerError {
     /// Formats the error with enough domain context for diagnostics.
+    ///
+    /// # Arguments
+    ///
+    /// * `formatter` - The destination formatter.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or the formatter's error otherwise.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TimerDomainMismatch { expected, actual } => write!(
