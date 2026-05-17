@@ -9,9 +9,19 @@
  ******************************************************************************/
 //! Tests for MockNanoClock.
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{
+    DateTime,
+    Duration,
+    Utc,
+};
 use qubit_clock::meter::NanoTimeMeter;
-use qubit_clock::{Clock, ControllableClock, MockClockProgression, MockNanoClock, NanoClock};
+use qubit_clock::{
+    Clock,
+    ControllableClock,
+    MockClockProgression,
+    MockNanoClock,
+    NanoClock,
+};
 use std::thread;
 
 const NANOS_PER_SECOND: i128 = 1_000_000_000;

@@ -49,6 +49,10 @@ mod format;
 mod nano_time_meter;
 mod time_meter;
 
-pub use format::{format_duration_millis, format_duration_nanos, format_speed};
+pub use format::{
+    format_duration_millis,
+    format_duration_nanos,
+    format_speed,
+};
 pub use nano_time_meter::NanoTimeMeter;
 pub use time_meter::TimeMeter;

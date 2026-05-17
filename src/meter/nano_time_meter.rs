@@ -14,8 +14,14 @@
 //! use [`TimeMeter`](super::TimeMeter).
 //!
 
-use crate::meter::format::{format_duration_nanos, format_speed};
-use crate::{NanoClock, NanoMonotonicClock};
+use crate::meter::format::{
+    format_duration_nanos,
+    format_speed,
+};
+use crate::{
+    NanoClock,
+    NanoMonotonicClock,
+};
 use chrono::Duration;
 
 /// The number of nanoseconds in one millisecond.

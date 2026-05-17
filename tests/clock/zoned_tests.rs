@@ -9,14 +9,28 @@
  ******************************************************************************/
 //! Tests for Zoned wrapper.
 
-use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
+use chrono::{
+    DateTime,
+    Datelike,
+    Duration,
+    Timelike,
+    Utc,
+};
 use chrono_tz::America::New_York;
 use chrono_tz::Asia::Shanghai;
 use chrono_tz::Europe::London;
 use chrono_tz::Tz;
 use qubit_clock::{
-    Clock, ControllableClock, MockClock, MockClockProgression, MonotonicClock, NanoClock,
-    NanoMonotonicClock, SystemClock, Zoned, ZonedClock,
+    Clock,
+    ControllableClock,
+    MockClock,
+    MockClockProgression,
+    MonotonicClock,
+    NanoClock,
+    NanoMonotonicClock,
+    SystemClock,
+    Zoned,
+    ZonedClock,
 };
 
 const CLOCK_DRIFT_TOLERANCE_MS: i64 = 1_000;

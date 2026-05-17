@@ -7,9 +7,15 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-use std::time::{Duration, Instant};
+use std::time::{
+    Duration,
+    Instant,
+};
 
-use qubit_clock::sleep::{Sleeper, SystemSleeper};
+use qubit_clock::sleep::{
+    Sleeper,
+    SystemSleeper,
+};
 
 #[test]
 fn test_new_creates_system_sleeper() {

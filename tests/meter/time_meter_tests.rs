@@ -11,7 +11,11 @@
 
 use chrono::Duration;
 use qubit_clock::meter::TimeMeter;
-use qubit_clock::{Clock, MockClock, MonotonicClock};
+use qubit_clock::{
+    Clock,
+    MockClock,
+    MonotonicClock,
+};
 use std::thread;
 use std::time::Duration as StdDuration;
 

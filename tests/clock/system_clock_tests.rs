@@ -10,7 +10,10 @@
 //! Behavior-focused tests for the `SystemClock` type.
 
 use chrono::Utc;
-use qubit_clock::{Clock, SystemClock};
+use qubit_clock::{
+    Clock,
+    SystemClock,
+};
 
 #[test]
 fn test_system_clock_millis_matches_surrounding_utc_now() {

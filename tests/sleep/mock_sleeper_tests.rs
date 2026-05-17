@@ -11,7 +11,10 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use qubit_clock::sleep::{MockSleeper, Sleeper};
+use qubit_clock::sleep::{
+    MockSleeper,
+    Sleeper,
+};
 
 #[test]
 fn test_new_starts_at_zero_elapsed() {

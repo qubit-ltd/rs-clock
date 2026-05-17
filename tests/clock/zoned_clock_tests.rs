@@ -9,12 +9,24 @@
  ******************************************************************************/
 //! Tests for the ZonedClock trait.
 
-use chrono::{DateTime, Datelike, Timelike, Utc};
+use chrono::{
+    DateTime,
+    Datelike,
+    Timelike,
+    Utc,
+};
 use chrono_tz::America::New_York;
 use chrono_tz::Asia::Shanghai;
 use chrono_tz::Europe::London;
 use chrono_tz::Tz;
-use qubit_clock::{Clock, ControllableClock, MockClock, SystemClock, Zoned, ZonedClock};
+use qubit_clock::{
+    Clock,
+    ControllableClock,
+    MockClock,
+    SystemClock,
+    Zoned,
+    ZonedClock,
+};
 
 // A simple test implementation that uses the default local_time() implementation
 #[derive(Debug, Clone)]
