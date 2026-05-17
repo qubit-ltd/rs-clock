@@ -40,8 +40,10 @@ Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象�
 ### ⏲️ **Sleep 抽象**
 - **Sleeper**：阻塞式 relative sleep 抽象
 - **AsyncSleeper**：Tokio 异步 relative sleep 抽象
-- **SystemSleeper**：基于 `std::thread::sleep` 的真实 sleeper
-- **MockSleeper**：由测试手动控制 elapsed time 的确定性 sleeper
+- **SystemSleeper**：真实 elapsed time sleeper，实现 `Sleeper`，启用
+  `tokio` feature 后也实现 `AsyncSleeper`
+- **MockSleeper**：由测试手动控制 elapsed time 的确定性 sleeper，实现
+  `Sleeper`，启用 `tokio` feature 后也实现 `AsyncSleeper`
 
 ### 🔒 **线程安全**
 - 所有时钟实现都是 `Send + Sync`
@@ -162,20 +164,46 @@ meter.stop();
 println!("耗时: {}", meter.readable_duration());
 ```
 
-### 使用 MockSleeper 测试可控 sleep
+### 使用 MockClock 和 MockSleeper 测试时间逻辑
+
+`MockClock` 和 `MockSleeper` 解决的是两个不同测试问题：
+
+- `MockClock` 控制代码“读到的当前时间”，适合测试依赖 `Clock::time()`、
+  `Clock::millis()` 或 `TimeMeter` 的逻辑。
+- `MockSleeper` 控制代码“等待了多久”，适合测试 retry、backoff、轮询间隔等
+  会调用 `sleep_for` / `async_sleep_for` 的逻辑。
+- 推进 `MockClock` 不会自动完成 `MockSleeper` 的 sleep；推进 `MockSleeper`
+  也不会改变 `MockClock` 读到的当前时间。需要同时测试“当前时间”和“等待”
+  时，应分别注入并分别推进。
+
+```rust
+use qubit_clock::{Clock, ControllableClock, MockClock};
+
+let clock = MockClock::new();
+let start = clock.millis();
+
+clock.add_duration(chrono::Duration::seconds(30));
+assert_eq!(clock.millis(), start + 30_000);
+```
 
 ```rust
 use qubit_clock::sleep::{MockSleeper, Sleeper};
+use std::sync::mpsc;
 use std::time::Duration;
 
 let sleeper = MockSleeper::new();
 let worker = sleeper.clone();
+let (done_tx, done_rx) = mpsc::channel();
 
 std::thread::spawn(move || {
     worker.sleep_for(Duration::from_secs(5));
+    done_tx.send(()).expect("test should receive sleep result");
 });
 
 sleeper.advance(Duration::from_secs(5));
+done_rx
+    .recv_timeout(Duration::from_secs(1))
+    .expect("mock sleep should complete after elapsed time advances");
 ```
 
 ### 高精度时间计量器
@@ -282,18 +310,18 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 
 ### SystemSleeper
 
-- 使用 `std::thread::sleep` 执行阻塞式 relative sleep
-- 启用 `tokio` feature 后使用 `tokio::time::sleep`
+- 实现 `Sleeper`，使用 `std::thread::sleep` 执行阻塞式 relative sleep
+- 启用 `tokio` feature 后实现 `AsyncSleeper`，使用 `tokio::time::sleep`
 - 零大小类型（ZST），没有运行时状态
 - 适用于：生产代码中需要可注入 relative sleep 的场景
 
 ### MockSleeper
 
-- 面向确定性测试的手动控制 relative sleeper
+- 面向确定性测试的手动控制 relative sleeper，实现 `Sleeper`
 - elapsed time 从零开始
 - clone 共享同一个 elapsed time
 - 支持手动 `set_elapsed`、`advance` 和 `reset`
-- 启用 `tokio` feature 后支持异步 sleep
+- 启用 `tokio` feature 后实现 `AsyncSleeper`，支持异步 sleep
 - 适用于：不等待真实时间就测试 retry 和 backoff 逻辑
 
 ## 时间计量器
@@ -354,7 +382,8 @@ let elapsed = start.elapsed();
   `TimeMeter` 可以注入 `MockClock`，`NanoTimeMeter` 可以注入 `MockNanoClock`
   或其他实现 `NanoClock` 的测试时钟。
 - 当代码需要可注入 relative sleep 时，使用 `SystemSleeper` 或
-  `MockSleeper`。mock sleeper 允许测试瞬间推进 elapsed time，而不是等待
+  `MockSleeper`。它们实现阻塞式 `Sleeper`；启用 `tokio` feature 后也实现
+  `AsyncSleeper`。mock sleeper 允许测试瞬间推进 elapsed time，而不是等待
   真实 wall-clock 时间。
 - 当业务逻辑依赖“当前时间”且需要可测试时，使用 `Clock` 系列 trait，避免
   直接耦合到系统时钟或 `Instant::now()`。
@@ -401,8 +430,10 @@ Sleep API 位于 `qubit_clock::sleep` 下：
 
 - `Sleeper` - 提供阻塞式 relative sleep
 - `AsyncSleeper` - 提供 Tokio 异步 relative sleep
-- `SystemSleeper` - 使用真实 elapsed time
-- `MockSleeper` - 使用手动推进的 elapsed time 实现确定性测试
+- `SystemSleeper` - 使用真实 elapsed time 实现 `Sleeper`，启用 `tokio`
+  feature 后也实现 `AsyncSleeper`
+- `MockSleeper` - 使用手动推进的 elapsed time 实现确定性测试，实现
+  `Sleeper`，启用 `tokio` feature 后也实现 `AsyncSleeper`
 
 Sleep API 只表达 relative sleep。notification wait、condition wait 和
 timeout wait 属于 `qubit-lock` 的 monitor 原语。

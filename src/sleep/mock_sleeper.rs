@@ -25,7 +25,20 @@ use crate::sleep::{
     AsyncSleeper,
 };
 
-/// A manually controlled sleeper for deterministic tests.
+/// A manually controlled elapsed-time sleeper for deterministic tests.
+///
+/// This type implements [`Sleeper`] by waiting until manually controlled mock
+/// elapsed time reaches the requested target. When the `tokio` feature is
+/// enabled, it also implements `AsyncSleeper` with the same mock elapsed-time
+/// semantics.
+///
+/// # Testing guidance
+///
+/// Use this type when the code under test sleeps for retry, backoff, polling,
+/// or timeout intervals. `MockSleeper` controls elapsed sleep time only; it
+/// does not change the current time returned by [`crate::MockClock`]. If a
+/// component depends on both current-time reads and sleep completion, inject a
+/// `MockClock` and a `MockSleeper` separately and advance each one explicitly.
 #[derive(Clone, Debug)]
 pub struct MockSleeper {
     shared: Arc<MockSleeperShared>,
@@ -129,7 +142,7 @@ impl MockSleeper {
     ///
     /// # Returns
     ///
-    /// A snapshot of current elapsed time and update epoch.
+    /// A snapshot of current elapsed time.
     fn current_state(&self) -> MockSleeperSnapshot {
         let state = self.lock_state();
         Self::snapshot(&state)

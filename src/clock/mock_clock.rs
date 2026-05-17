@@ -37,6 +37,11 @@ use std::sync::{
 /// time-dependent code. Readings are frozen after construction by default.
 /// [`set_time()`](ControllableClock::set_time) reanchors the logical time
 /// without changing the current progression mode or auto-advance settings.
+/// Use this type when the code under test reads the current time through
+/// [`Clock`]. Use [`MockNanoClock`](crate::MockNanoClock) for code that needs
+/// [`NanoClock`](crate::NanoClock). For code that actually sleeps or waits for
+/// retry/backoff intervals, inject [`crate::sleep::MockSleeper`] separately;
+/// advancing a `MockClock` does not complete mock sleeps.
 ///
 /// # Features
 ///
@@ -45,6 +50,13 @@ use std::sync::{
 /// - Automatically advance time on each call
 /// - Switch between frozen and monotonic progression
 /// - Reset to the initial creation state
+///
+/// # Testing guidance
+///
+/// `MockClock` controls what "now" means to the code under test. It does not
+/// model blocking or asynchronous sleeping. If a component needs both a clock
+/// and a sleeper, tests should inject both `MockClock` and
+/// [`crate::sleep::MockSleeper`] and advance them independently.
 ///
 /// # Thread Safety
 ///
