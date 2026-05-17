@@ -11,13 +11,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use qubit_clock::timer::{
-    BlockingTimer,
-    MockTimer,
-    TimerDomain,
-    TimerError,
-    TimerWaitOutcome,
-};
+use qubit_clock::timer::{BlockingWaiter, MockTimer, TimerDomain, TimerError, TimerWaitOutcome};
 
 #[test]
 fn test_advance_updates_now_and_wakes_waiters() {

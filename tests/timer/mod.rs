@@ -19,3 +19,4 @@ mod timer_domain_tests;
 mod timer_error_tests;
 mod timer_instant_tests;
 mod timer_wait_outcome_tests;
+mod trait_import_tests;
