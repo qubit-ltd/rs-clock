@@ -69,7 +69,7 @@ Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象�
 
 ```toml
 [dependencies]
-qubit-clock = "0.6"
+qubit-clock = "0.7"
 ```
 
 ## 快速开始
@@ -171,7 +171,7 @@ println!("耗时: {}", meter.readable_duration());
 - `MockClock` 控制代码“读到的当前时间”，适合测试依赖 `Clock::time()`、
   `Clock::millis()` 或 `TimeMeter` 的逻辑。
 - `MockSleeper` 控制代码“等待了多久”，适合测试 retry、backoff、轮询间隔等
-  会调用 `sleep_for` / `async_sleep_for` 的逻辑。
+  会调用 `sleep_for` / `sleep_for_async` 的逻辑。
 - 推进 `MockClock` 不会自动完成 `MockSleeper` 的 sleep；推进 `MockSleeper`
   也不会改变 `MockClock` 读到的当前时间。需要同时测试“当前时间”和“等待”
   时，应分别注入并分别推进。

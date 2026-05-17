@@ -47,7 +47,7 @@ impl Sleeper for SystemSleeper {
 #[cfg(feature = "tokio")]
 impl AsyncSleeper for SystemSleeper {
     /// Returns a Tokio sleep future for the requested duration.
-    fn async_sleep_for<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a> {
+    fn sleep_for_async<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a> {
         Box::pin(tokio::time::sleep(duration))
     }
 }

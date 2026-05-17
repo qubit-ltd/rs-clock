@@ -293,14 +293,14 @@ pub trait Sleeper: Send + Sync {
 pub type AsyncSleepFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 
 pub trait AsyncSleeper: Send + Sync {
-    fn async_sleep_for<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a>;
+    fn sleep_for_async<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a>;
 }
 ```
 
 **设计要点**：
 - `Duration` 参数表示从方法调用时开始的一段相对时长
 - `Sleeper::sleep_for()` 阻塞当前线程，不返回错误
-- `AsyncSleeper::async_sleep_for()` 返回 boxed future，不引入 `async-trait` 依赖
+- `AsyncSleeper::sleep_for_async()` 返回 boxed future，不引入 `async-trait` 依赖
 - async sleep 的 duration 从方法调用时开始计算，而不是从首次 poll 开始计算
 - sleep 模块不承载 notification 或 condition wait 语义
 
@@ -680,7 +680,7 @@ pub struct SystemSleeper;
 
 **设计要点**：
 - `sleep_for()` 使用 `std::thread::sleep()`
-- 启用 `tokio` feature 后，`async_sleep_for()` 使用 `tokio::time::sleep()`
+- 启用 `tokio` feature 后，`sleep_for_async()` 使用 `tokio::time::sleep()`
 - 类型本身不保存状态，适合作为默认生产实现
 - 不响应 notification，不处理 condition wait
 

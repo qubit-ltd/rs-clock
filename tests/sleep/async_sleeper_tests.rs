@@ -19,19 +19,19 @@ use qubit_clock::sleep::{
 };
 
 #[tokio::test]
-async fn test_system_async_sleep_for_waits_real_duration() {
+async fn test_system_sleep_for_async_waits_real_duration() {
     let sleeper = SystemSleeper::new();
     let start = Instant::now();
 
-    sleeper.async_sleep_for(Duration::from_millis(2)).await;
+    sleeper.sleep_for_async(Duration::from_millis(2)).await;
 
     assert!(start.elapsed() >= Duration::from_millis(1));
 }
 
 #[tokio::test]
-async fn test_mock_async_sleep_for_completes_after_advance() {
+async fn test_mock_sleep_for_async_completes_after_advance() {
     let sleeper = MockSleeper::new();
-    let sleep = sleeper.async_sleep_for(Duration::from_millis(100));
+    let sleep = sleeper.sleep_for_async(Duration::from_millis(100));
 
     sleeper.advance(Duration::from_millis(100));
     tokio::time::timeout(Duration::from_millis(50), sleep)
@@ -40,10 +40,10 @@ async fn test_mock_async_sleep_for_completes_after_advance() {
 }
 
 #[tokio::test]
-async fn test_mock_async_sleep_for_uses_elapsed_at_call_time() {
+async fn test_mock_sleep_for_async_uses_elapsed_at_call_time() {
     let sleeper = MockSleeper::new();
     sleeper.advance(Duration::from_millis(10));
-    let sleep = sleeper.async_sleep_for(Duration::from_millis(100));
+    let sleep = sleeper.sleep_for_async(Duration::from_millis(100));
     tokio::pin!(sleep);
 
     sleeper.advance(Duration::from_millis(99));

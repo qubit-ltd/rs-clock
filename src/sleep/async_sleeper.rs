@@ -25,5 +25,5 @@ pub trait AsyncSleeper: Send + Sync {
     /// # Returns
     ///
     /// A future that resolves after the duration has elapsed.
-    fn async_sleep_for<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a>;
+    fn sleep_for_async<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a>;
 }
