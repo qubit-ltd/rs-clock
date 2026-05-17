@@ -7,32 +7,17 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-use std::sync::{
-    Arc,
-    Condvar,
-    Mutex,
-    MutexGuard,
-};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
 
 #[cfg(feature = "tokio")]
 use tokio::sync::watch;
 
 #[cfg(feature = "tokio")]
+use crate::timer::{AsyncSleeper, AsyncTimerResult, AsyncWaiter};
 use crate::timer::{
-    AsyncSleeper,
-    AsyncTimerResult,
-    AsyncWaiter,
-};
-use crate::timer::{
-    BlockingSleeper,
-    BlockingWaiter,
-    TimerDomain,
-    TimerInstant,
-    TimerResult,
-    TimerWaitOutcome,
-    WaitNotifier,
-    next_timer_domain_id,
+    BlockingSleeper, BlockingWaiter, TimerDomain, TimerInstant, TimerResult, TimerWaitOutcome,
+    WaitNotifier, next_timer_domain_id,
 };
 
 /// A manually controlled monotonic timer for deterministic tests.
@@ -422,16 +407,16 @@ impl AsyncWaiter for MockTimer {
         &'a self,
         deadline: TimerInstant,
     ) -> AsyncTimerResult<'a, TimerWaitOutcome> {
+        let snapshot = self.current_state();
+        let mut time_receiver = self.async_time_epoch_sender.subscribe();
+        let mut notification_receiver = self.async_notification_epoch_sender.subscribe();
         Box::pin(async move {
             deadline.ensure_domain_id(self.domain_id)?;
             let deadline_elapsed = deadline.elapsed_since_timer_start();
-            let snapshot = self.current_state();
             if snapshot.elapsed >= deadline_elapsed {
                 return Ok(TimerWaitOutcome::DeadlineReached);
             }
 
-            let mut time_receiver = self.async_time_epoch_sender.subscribe();
-            let mut notification_receiver = self.async_notification_epoch_sender.subscribe();
             if *notification_receiver.borrow() != snapshot.notification_epoch {
                 return Ok(self.outcome_after_async_notification(deadline_elapsed));
             }
