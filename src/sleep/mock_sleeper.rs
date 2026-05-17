@@ -7,7 +7,12 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{
+    Arc,
+    Condvar,
+    Mutex,
+    MutexGuard,
+};
 use std::time::Duration;
 
 #[cfg(feature = "tokio")]
@@ -15,7 +20,10 @@ use tokio::sync::watch;
 
 use crate::sleep::Sleeper;
 #[cfg(feature = "tokio")]
-use crate::sleep::{AsyncSleepFuture, AsyncSleeper};
+use crate::sleep::{
+    AsyncSleepFuture,
+    AsyncSleeper,
+};
 
 /// A manually controlled sleeper for deterministic tests.
 #[derive(Clone, Debug)]

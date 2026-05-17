@@ -7,9 +7,16 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-use std::time::{Duration, Instant};
+use std::time::{
+    Duration,
+    Instant,
+};
 
-use qubit_clock::sleep::{AsyncSleeper, MockSleeper, SystemSleeper};
+use qubit_clock::sleep::{
+    AsyncSleeper,
+    MockSleeper,
+    SystemSleeper,
+};
 
 #[tokio::test]
 async fn test_system_async_sleep_for_waits_real_duration() {

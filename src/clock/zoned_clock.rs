@@ -14,7 +14,10 @@
 //!
 
 use crate::Clock;
-use chrono::{DateTime, TimeZone};
+use chrono::{
+    DateTime,
+    TimeZone,
+};
 use chrono_tz::Tz;
 
 /// A trait representing a clock with timezone support.
