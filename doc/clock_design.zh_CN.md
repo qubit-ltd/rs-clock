@@ -9,16 +9,16 @@
 
 ## 1. 设计概述
 
-本文档描述了 `qubit-clock` crate 的架构设计。该设计提供了一套清晰、类型安全、灵活的时钟与计时器抽象，支持多种使用场景。
+本文档描述了 `qubit-clock` crate 的架构设计。该设计提供了一套清晰、类型安全、灵活的时钟与 sleep 抽象，支持多种使用场景。
 
 ### 1.1 设计目标
 
-1. **职责分离**：将时间获取、时区支持、高精度测量、时钟控制、deadline wait 等功能分离到不同的 trait
+1. **职责分离**：将时间获取、时区支持、高精度测量、时钟控制、relative sleep 等功能分离到不同的 trait
 2. **类型安全**：通过类型系统在编译期保证功能支持（如是否支持时区、纳秒精度等）
 3. **零成本抽象**：不需要的功能不付出任何性能代价
 4. **易于测试**：提供可控制的模拟时钟，支持单元测试和集成测试
 5. **灵活组合**：通过包装器模式灵活组合不同的功能
-6. **Timer domain 隔离**：`TimerInstant` 只能在创建它的 timer domain 中比较和等待，避免不同 timer 的相对时间轴被误用
+6. **Sleep 可注入**：生产代码使用真实 sleep，测试代码使用可手动推进的 mock sleep，避免真实等待
 
 ### 1.2 核心设计原则
 
@@ -37,19 +37,16 @@ Clock (基础时钟 trait)
 ├── ZonedClock (带时区的时钟 trait)
 └── ControllableClock (可控制的时钟 trait)
 
-TimerDomain (timer-domain 单调时间域 trait)
-├── BlockingSleeper / AsyncSleeper (只按 deadline 完成的 sleep trait)
-├── WaitNotifier (waiter 通知 trait)
-├── BlockingWaiter / AsyncWaiter (deadline 或 notification wait trait)
-└── BlockingTimer / AsyncTimer (组合 marker facade)
+Sleeper (阻塞式 relative sleep trait)
+└── AsyncSleeper (Tokio 异步 relative sleep trait)
 ```
 
 **说明**：
 - `Clock` 是基础 trait，提供 UTC 时间
 - `NanoClock`、`ZonedClock`、`ControllableClock` 都继承自 `Clock`
 - 这三个扩展 trait 是**正交的**，互不依赖
-- `TimerDomain` 系列不继承 `Clock`，因为它表达的是 timer domain 内的相对单调时间轴，不表达 UTC 当前时间
-- 异步 timer trait 只在启用 `tokio` feature 时导出
+- `Sleeper` 系列不继承 `Clock`，因为它只表达 relative sleep，不表达 UTC 当前时间
+- 异步 sleep trait 只在启用 `tokio` feature 时导出
 
 ### 2.2 实现类型
 
@@ -64,9 +61,9 @@ Clock trait 实现：
 包装器：
 └── Zoned<C: Clock> (为任何 Clock 添加时区支持)
 
-Timer trait 实现：
-├── SystemTimer (真实单调计时器)
-└── MockTimer (可手动控制的模拟计时器)
+Sleep trait 实现：
+├── SystemSleeper (真实 sleeper)
+└── MockSleeper (可手动控制 elapsed time 的模拟 sleeper)
 ```
 
 ### 2.3 类型关系图
@@ -108,52 +105,23 @@ graph TD
     style ControllableClock fill:#e8f5e9
 ```
 
-Timer 模块使用独立的类型关系，不把相对单调时间轴混入 UTC 时钟抽象：
+Sleep 模块使用独立的类型关系，不把 relative sleep 混入 UTC 时钟抽象：
 
 ```mermaid
 graph TD
-    TimerDomain[TimerDomain trait<br/>timer domain]
-    BlockingSleeper[BlockingSleeper trait<br/>阻塞 sleep]
-    BlockingWaiter[BlockingWaiter trait<br/>阻塞 wait]
-    BlockingTimer[BlockingTimer trait<br/>阻塞 marker facade]
-    AsyncSleeper[AsyncSleeper trait<br/>Tokio 异步 sleep]
-    AsyncWaiter[AsyncWaiter trait<br/>Tokio 异步 wait]
-    AsyncTimer[AsyncTimer trait<br/>Tokio 异步 marker facade]
-    WaitNotifier[WaitNotifier trait<br/>notify all waiters]
-    TimerInstant[TimerInstant<br/>domain-branded instant]
-    DomainId[u64<br/>timer domain id]
-    SystemTimer[SystemTimer<br/>真实 timer]
-    MockTimer[MockTimer<br/>模拟 timer]
+    Sleeper[Sleeper trait<br/>阻塞 relative sleep]
+    AsyncSleeper[AsyncSleeper trait<br/>Tokio 异步 relative sleep]
+    SystemSleeper[SystemSleeper<br/>真实 sleeper]
+    MockSleeper[MockSleeper<br/>模拟 sleeper]
 
-    TimerDomain --> BlockingSleeper
-    TimerDomain --> WaitNotifier
-    WaitNotifier --> BlockingWaiter
-    BlockingSleeper --> BlockingTimer
-    BlockingWaiter --> BlockingTimer
-    TimerDomain --> AsyncSleeper
-    WaitNotifier --> AsyncWaiter
-    AsyncSleeper --> AsyncTimer
-    AsyncWaiter --> AsyncTimer
-    TimerInstant --> DomainId
+    Sleeper -.实现.-> SystemSleeper
+    Sleeper -.实现.-> MockSleeper
+    AsyncSleeper -.tokio feature.-> SystemSleeper
+    AsyncSleeper -.tokio feature.-> MockSleeper
 
-    TimerDomain -.实现.-> SystemTimer
-    BlockingSleeper -.实现.-> SystemTimer
-    BlockingWaiter -.实现.-> SystemTimer
-    WaitNotifier -.实现.-> SystemTimer
-    AsyncSleeper -.tokio feature.-> SystemTimer
-    AsyncWaiter -.tokio feature.-> SystemTimer
-
-    TimerDomain -.实现.-> MockTimer
-    BlockingSleeper -.实现.-> MockTimer
-    BlockingWaiter -.实现.-> MockTimer
-    WaitNotifier -.实现.-> MockTimer
-    AsyncSleeper -.tokio feature.-> MockTimer
-    AsyncWaiter -.tokio feature.-> MockTimer
-
-    style TimerDomain fill:#e1f5ff
-    style BlockingTimer fill:#fff3e0
-    style AsyncTimer fill:#f3e5f5
-    style TimerInstant fill:#e8f5e9
+    style Sleeper fill:#e1f5ff
+    style AsyncSleeper fill:#f3e5f5
+    style MockSleeper fill:#e8f5e9
 ```
 
 ## 3. Trait 详细设计
@@ -304,75 +272,44 @@ pub trait ControllableClock: Clock {
 
 ---
 
-### 3.5 Timer Trait - Timer Domain 计时器 Trait
+### 3.5 Sleep Trait - Relative Sleep Trait
 
-**职责**：提供相对单调时间轴上的 deadline、wait 和 sleep 能力。
+**职责**：提供可注入的 relative sleep 能力。
 
-Timer API 位于 `src/timer` 模块下，不与 `Clock` 继承关系绑定。原因是
-`Clock` 关注 UTC 当前时间，而 timer 关注“从某个 timer 创建时刻开始”的单调
-elapsed time。不同 timer 拥有不同的 timer domain，它们的 `TimerInstant`
-不能相互比较或混用。
+Sleep API 位于 `src/sleep` 模块下，不与 `Clock` 继承关系绑定。原因是
+`Clock` 关注 UTC 当前时间，而 `Sleeper` 关注“暂停一段相对时长”。它不负责
+deadline、notification wait 或 condition wait，这些属于同步原语或调度器。
 
 **定义**：
 ```rust
-pub type TimerResult<T> = Result<T, TimerError>;
-
-pub trait TimerDomain: Send + Sync {
-    fn id(&self) -> u64;
-    fn now(&self) -> TimerInstant;
-    fn deadline_after(&self, duration: Duration) -> TimerInstant;
-    fn duration_until(&self, deadline: TimerInstant) -> TimerResult<Option<Duration>>;
+pub trait Sleeper: Send + Sync {
+    fn sleep_for(&self, duration: Duration);
 }
-
-pub trait BlockingSleeper: TimerDomain {
-    fn sleep_until(&self, deadline: TimerInstant) -> TimerResult<()>;
-    fn sleep_for(&self, duration: Duration) -> TimerResult<()>;
-}
-
-pub trait WaitNotifier: TimerDomain {
-    fn notify_all_waiters(&self);
-}
-
-pub trait BlockingWaiter: WaitNotifier {
-    fn wait_until(&self, deadline: TimerInstant) -> TimerResult<TimerWaitOutcome>;
-    fn wait_for(&self, duration: Duration) -> TimerResult<TimerWaitOutcome>;
-}
-
-pub trait BlockingTimer: BlockingSleeper + BlockingWaiter {}
 ```
 
 启用 `tokio` feature 后还会导出：
 
 ```rust
-pub type AsyncTimerResult<'a, T> = Pin<Box<dyn Future<Output = TimerResult<T>> + Send + 'a>>;
+pub type AsyncSleepFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 
-pub trait AsyncSleeper: TimerDomain {
-    fn sleep_until_async<'a>(&'a self, deadline: TimerInstant) -> AsyncTimerResult<'a, ()>;
-    fn sleep_for_async<'a>(&'a self, duration: Duration) -> AsyncTimerResult<'a, ()>;
+pub trait AsyncSleeper: Send + Sync {
+    fn async_sleep_for<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a>;
 }
-
-pub trait AsyncWaiter: WaitNotifier {
-    fn wait_until_async<'a>(&'a self, deadline: TimerInstant) -> AsyncTimerResult<'a, TimerWaitOutcome>;
-    fn wait_for_async<'a>(&'a self, duration: Duration) -> AsyncTimerResult<'a, TimerWaitOutcome>;
-}
-
-pub trait AsyncTimer: AsyncSleeper + AsyncWaiter {}
 ```
 
 **设计要点**：
-- `TimerInstant` 内部携带 `domain_id: u64` 和相对于该 domain 零点的 elapsed time
-- 所有接收外部 `TimerInstant` 的 API 都先校验 timer domain，不匹配时返回 `TimerError::TimerDomainMismatch`
-- `Duration` 参数（如 `sleep_for(duration)`）表示“相对于当前 timer instant 的一段时长”
-- `TimerWaitOutcome::Notified` 表示 wait 被显式通知提前唤醒，`sleep_*` 方法不把 notification 作为事件源或完成信号
-- `AsyncTimerResult<'a, T>` 是 boxed `Future` 的类型别名，`AsyncTimer` 不引入 `async-trait` 依赖
-- `BlockingTimer` 和 `AsyncTimer` 只作为组合 marker trait，不重复定义父 trait 已有方法，避免 glob import 时的方法歧义
+- `Duration` 参数表示从方法调用时开始的一段相对时长
+- `Sleeper::sleep_for()` 阻塞当前线程，不返回错误
+- `AsyncSleeper::async_sleep_for()` 返回 boxed future，不引入 `async-trait` 依赖
+- async sleep 的 duration 从方法调用时开始计算，而不是从首次 poll 开始计算
+- sleep 模块不承载 notification 或 condition wait 语义
 
 **适用场景**：
-- 可测试的 timeout / retry / backoff 逻辑
-- 不想在测试中等待真实时间的 deadline 控制
-- 需要显式 notification 打断 wait 的后台任务
+- 可测试的 retry / backoff 逻辑
+- 不想在测试中等待真实时间的 relative sleep
+- 需要在生产和测试中注入不同 sleep 实现的业务代码
 
-**文件位置**：`src/timer/*.rs`
+**文件位置**：`src/sleep/*.rs`
 
 ## 4. 实现类型详细设计
 
@@ -732,74 +669,60 @@ let local = clock.local_time();
 
 ---
 
-### 4.7 SystemTimer - 真实单调计时器
+### 4.7 SystemSleeper - 真实 sleeper
 
-**职责**：基于 `std::time::Instant` 提供真实单调 deadline、wait 和 sleep。
+**职责**：基于真实 elapsed time 提供 relative sleep。
 
 **定义**：
 ```rust
-pub struct SystemTimer {
-    domain_id: u64,
-    origin: Instant,
-    notification_epoch: ArcMonitor<u64>,
-    async_notification_epoch: Arc<AtomicU64>, // tokio feature
-    async_notifier: Arc<Notify>, // tokio feature
-}
+pub struct SystemSleeper;
 ```
 
 **设计要点**：
-- 创建时生成独立 `u64` domain ID，并把当前 `Instant` 作为 timer domain 零点
-- `now()` 返回相对于 `origin` 的 `TimerInstant`
-- clone 共享同一个 timer domain 和 notification 状态
-- `sleep_until()` 使用 `std::thread::sleep()` 按真实剩余时间睡眠，不响应 notification
-- `wait_until()` 使用 `ArcMonitor` 的 timed wait 等待真实剩余时间或 notification
-- `notify_all_waiters()` 推进 blocking 和 async notification epoch，并唤醒 wait；不唤醒 sleep
-- `sleep_until_async()` 使用 `tokio::time::sleep()`，不响应 notification
-- `wait_until_async()` 使用 async notification epoch、`Notify` 与 `tokio::time::sleep()`，避免 future 创建后到首次 poll 前的 notification 丢失
+- `sleep_for()` 使用 `std::thread::sleep()`
+- 启用 `tokio` feature 后，`async_sleep_for()` 使用 `tokio::time::sleep()`
+- 类型本身不保存状态，适合作为默认生产实现
+- 不响应 notification，不处理 condition wait
 
 **适用场景**：
-- 生产环境超时控制
-- 后台线程或异步任务的可中断等待
-- 与 `MockTimer` 共享同一套 timer trait 的实现代码
+- 生产环境中的相对 sleep
+- retry/backoff 等需要可注入 sleeper 的逻辑
+- 与 `MockSleeper` 共享同一套 sleep trait 的实现代码
 
-**线程安全性**：完全线程安全，阻塞 notification 状态由 `ArcMonitor` 保护；启用 `tokio` feature 时异步 notification 状态由 `AtomicU64` 和 `Notify` 共同保护
+**线程安全性**：零状态类型，天然线程安全
 
-**文件位置**：`src/timer/system_timer.rs`
+**文件位置**：`src/sleep/system_sleeper.rs`
 
 ---
 
-### 4.8 MockTimer - 可控制模拟计时器
+### 4.8 MockSleeper - 可控制模拟 sleeper
 
-**职责**：提供测试可手动推进的单调 timer domain。
+**职责**：提供测试可手动推进 elapsed time 的 relative sleep。
 
 **定义**：
 ```rust
-pub struct MockTimer {
-    domain_id: u64,
-    shared: Arc<MockTimerShared>,
-    async_time_epoch_sender: watch::Sender<u64>,         // tokio feature
-    async_notification_epoch_sender: watch::Sender<u64>, // tokio feature
+pub struct MockSleeper {
+    shared: Arc<MockSleeperShared>,
+    async_time_epoch_sender: watch::Sender<u64>, // tokio feature
 }
 ```
 
 **设计要点**：
 - elapsed time 从 `Duration::ZERO` 开始，不依赖真实时间流逝
 - `set_elapsed()` 直接设置当前 elapsed time，`advance()` 饱和推进 elapsed time，`reset()` 回到零点
-- 修改 elapsed time 会推进 time epoch，并唤醒 sleepers 和 waiters 重新检查 deadline
-- `notify_all_waiters()` 只推进 notification epoch，并只唤醒 waiters
-- `sleep_until()` 只等待 time epoch 变化，直到 mock time 到达 deadline
-- `wait_until()` 在 mock time 达到 deadline 时返回 `DeadlineReached`，在 notification epoch 改变且 deadline 未到时返回 `Notified`
-- 异步路径使用两个 `tokio::sync::watch` channel 分别保存 time epoch 和 notification epoch，避免 subscribe 前后出现竞态时静默丢失事件
-- 与 `SystemTimer` 一样，所有外部 deadline 都必须属于当前 timer domain
+- 修改 elapsed time 会推进 time epoch，并唤醒 sleepers 重新检查目标 elapsed time
+- `sleep_for(duration)` 在调用时以当前 elapsed time 加上 `duration` 得到目标 elapsed time
+- 异步路径使用 `tokio::sync::watch` 保存 time epoch，避免 future 创建后到首次 poll 前的时间推进被静默丢失
+- 不提供 notification 或 condition wait；这些能力由 `qubit-lock` 的 monitor API 承担
 
 **适用场景**：
-- timeout、retry、backoff 等时间相关逻辑的确定性测试
+- retry、backoff 等 relative sleep 逻辑的确定性测试
 - 需要手动控制“时间已经过去多少”的测试
-- 同时覆盖阻塞式和 Tokio 异步等待逻辑
+- 同时覆盖阻塞式和 Tokio 异步 sleep 逻辑
 
 **线程安全性**：完全线程安全，clone 共享状态，所有状态读写由 `Mutex` 保护
 
-**文件位置**：`src/timer/mock_timer.rs`
+**文件位置**：`src/sleep/mock_sleeper.rs`
 
 ## 5. 使用场景与示例
 
@@ -979,41 +902,38 @@ fn main() {
 
 ---
 
-### 5.6 场景 6：可测试超时控制
+### 5.6 场景 6：可测试 sleep 控制
 
 ```rust
-use qubit_clock::timer::{BlockingTimer, BlockingWaiter, MockTimer, TimerDomain};
+use qubit_clock::sleep::{MockSleeper, Sleeper};
 use std::time::Duration;
 
-fn wait_until_ready<T>(timer: &T) -> bool
+fn retry_after_delay<S>(sleeper: &S)
 where
-    T: BlockingTimer,
+    S: Sleeper,
 {
-    let deadline = timer.deadline_after(Duration::from_secs(5));
-    while timer.duration_until(deadline).expect("deadline belongs to this timer").is_some() {
-        if is_ready() {
-            return true;
-        }
-        timer.wait_for(Duration::from_millis(10)).expect("self-created deadline should be valid");
-    }
-    false
+    sleeper.sleep_for(Duration::from_millis(100));
+    retry_once();
 }
 
 #[test]
-fn test_timeout_without_real_sleep() {
-    let timer = MockTimer::new();
-    let deadline = timer.deadline_after(Duration::from_secs(5));
+fn test_sleep_without_real_time() {
+    let sleeper = MockSleeper::new();
+    let worker = sleeper.clone();
 
-    timer.advance(Duration::from_secs(5));
+    let handle = std::thread::spawn(move || {
+        retry_after_delay(&worker);
+    });
 
-    assert_eq!(None, timer.duration_until(deadline).expect("deadline belongs to this timer"));
+    sleeper.advance(Duration::from_millis(100));
+    handle.join().expect("retry should finish");
 }
 ```
 
 **说明**：
-- `Duration` 参数表示相对于当前 timer instant 的一段时长
-- `TimerInstant` 只能回传给创建它的 timer domain
-- 测试中使用 `MockTimer::advance()` 可以瞬间推进 timeout，不需要真实等待
+- `Duration` 参数表示从调用点开始的一段相对时长
+- 测试中使用 `MockSleeper::advance()` 可以瞬间推进 sleep，不需要真实等待
+- notification wait、condition wait 和 timeout wait 由 `qubit-lock` 的 monitor API 承担
 
 ## 6. 文件组织结构
 
@@ -1023,14 +943,14 @@ rs-clock/
 │   ├── lib.rs                    # 模块导出和文档
 │   ├── clock/                    # Clock trait 和实现
 │   ├── meter/                    # TimeMeter / NanoTimeMeter
-│   └── timer/                    # Timer domain / SystemTimer / MockTimer
+│   └── sleep/                    # Sleeper / SystemSleeper / MockSleeper
 ├── tests/
 │   ├── clock/                    # Clock trait 和实现测试
 │   ├── clock_tests.rs            # Clock 测试入口
 │   ├── meter/                    # 时间计量器测试
 │   ├── meter_tests.rs            # Meter 测试入口
-│   ├── timer/                    # Timer 模块测试
-│   ├── timer_tests.rs            # Timer 测试入口
+│   ├── sleep/                    # Sleep 模块测试
+│   ├── sleep_tests.rs            # Sleep 测试入口
 │   └── readme_api_tests.rs       # README API 回归测试
 ├── doc/
 │   └── clock_design.zh_CN.md     # 本设计文档
@@ -1042,7 +962,7 @@ rs-clock/
 1. 每个 trait 单独一个文件
 2. 每个实现类型单独一个文件
 3. `src/clock/xxx.rs` 对应 `tests/clock/xxx_tests.rs`
-4. `src/timer/xxx.rs` 对应 `tests/timer/xxx_tests.rs`
+4. `src/sleep/xxx.rs` 对应 `tests/sleep/xxx_tests.rs`
 5. 测试代码与源代码分离
 6. 所有组件在同一个 crate 中
 
@@ -1054,11 +974,7 @@ rs-clock/
 - **ZonedClock**：只添加时区支持
 - **NanoClock**：只添加纳秒精度
 - **ControllableClock**：只添加控制功能
-- **TimerDomain**：只表达 timer domain 内的单调 instant
-- **BlockingSleeper / AsyncSleeper**：只表达 deadline sleep
-- **BlockingWaiter / AsyncWaiter**：只表达 deadline-or-notification wait
-- **WaitNotifier**：只表达 waiter notification
-- **BlockingTimer / AsyncTimer**：只作为常用组合 marker facade
+- **Sleeper / AsyncSleeper**：只表达 relative sleep
 
 每个 trait 职责单一，互不干扰。
 
@@ -1110,14 +1026,17 @@ clock.local_time();         // ZonedClock
 clock.millis();             // Clock
 ```
 
-`MockTimer` 则让 deadline 相关测试不依赖真实时间：
+`MockSleeper` 则让 sleep 相关测试不依赖真实时间：
 
 ```rust
-let timer = MockTimer::new();
-let deadline = timer.deadline_after(Duration::from_secs(5));
+let sleeper = MockSleeper::new();
+let worker = sleeper.clone();
 
-timer.advance(Duration::from_secs(5));
-assert_eq!(None, timer.duration_until(deadline).expect("deadline belongs to this timer"));
+std::thread::spawn(move || {
+    worker.sleep_for(Duration::from_secs(5));
+});
+
+sleeper.advance(Duration::from_secs(5));
 ```
 
 ## 8. 设计权衡

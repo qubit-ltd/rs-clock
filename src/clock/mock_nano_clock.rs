@@ -13,23 +13,9 @@
 //! for tests that need deterministic nanosecond timestamps.
 //!
 
-use crate::{
-    Clock,
-    ControllableClock,
-    MockClockProgression,
-    NanoClock,
-    NanoMonotonicClock,
-};
-use chrono::{
-    DateTime,
-    Duration,
-    Utc,
-};
-use std::sync::{
-    Arc,
-    Mutex,
-    MutexGuard,
-};
+use crate::{Clock, ControllableClock, MockClockProgression, NanoClock, NanoMonotonicClock};
+use chrono::{DateTime, Duration, Utc};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 const NANOS_PER_MILLISECOND: i128 = 1_000_000;
 const NANOS_PER_SECOND: i128 = 1_000_000_000;

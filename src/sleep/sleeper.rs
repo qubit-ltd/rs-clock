@@ -7,7 +7,14 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-use crate::timer::TimerError;
+use std::time::Duration;
 
-/// Result type returned by timer operations.
-pub type TimerResult<T> = Result<T, TimerError>;
+/// Provides blocking relative sleep operations.
+pub trait Sleeper: Send + Sync {
+    /// Blocks the current thread for the specified duration.
+    ///
+    /// # Arguments
+    ///
+    /// * `duration` - The relative duration to sleep.
+    fn sleep_for(&self, duration: Duration);
+}

@@ -7,6 +7,9 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Integration tests for the timer module.
+//! Tests for the sleep module.
 
-mod timer;
+#[cfg(feature = "tokio")]
+mod async_sleeper_tests;
+mod mock_sleeper_tests;
+mod system_sleeper_tests;
