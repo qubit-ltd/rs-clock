@@ -51,8 +51,6 @@ struct MockSleeperState {
 #[derive(Clone, Copy, Debug)]
 struct MockSleeperSnapshot {
     elapsed: Duration,
-    #[cfg(feature = "tokio")]
-    time_epoch: u64,
 }
 
 impl MockSleeper {
@@ -149,8 +147,6 @@ impl MockSleeper {
     fn snapshot(state: &MockSleeperState) -> MockSleeperSnapshot {
         MockSleeperSnapshot {
             elapsed: state.elapsed,
-            #[cfg(feature = "tokio")]
-            time_epoch: state.time_epoch,
         }
     }
 
@@ -214,19 +210,15 @@ impl AsyncSleeper for MockSleeper {
             if self.current_state().elapsed >= target_elapsed {
                 return;
             }
-            if *time_receiver.borrow() != snapshot.time_epoch
-                && self.current_state().elapsed >= target_elapsed
-            {
-                return;
-            }
 
             loop {
                 if self.current_state().elapsed >= target_elapsed {
                     return;
                 }
-                if time_receiver.changed().await.is_err() {
-                    return;
-                }
+                time_receiver
+                    .changed()
+                    .await
+                    .expect("mock sleeper sender should live while the sleeper is borrowed");
             }
         })
     }
