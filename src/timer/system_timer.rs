@@ -9,31 +9,20 @@
  ******************************************************************************/
 #[cfg(feature = "tokio")]
 use std::sync::Arc;
+#[cfg(feature = "tokio")]
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Instant;
 
-use qubit_lock::{
-    ArcMonitor,
-    WaitTimeoutResult,
-};
+use qubit_lock::{ArcMonitor, WaitTimeoutResult};
 #[cfg(feature = "tokio")]
 use tokio::sync::Notify;
 
 #[cfg(feature = "tokio")]
+use crate::timer::{AsyncSleeper, AsyncTimerResult, AsyncWaiter};
 use crate::timer::{
-    AsyncSleeper,
-    AsyncTimerResult,
-    AsyncWaiter,
-};
-use crate::timer::{
-    BlockingSleeper,
-    BlockingWaiter,
-    TimerDomain,
-    TimerInstant,
-    TimerResult,
-    TimerWaitOutcome,
-    WaitNotifier,
-    next_timer_domain_id,
+    BlockingSleeper, BlockingWaiter, TimerDomain, TimerInstant, TimerResult, TimerWaitOutcome,
+    WaitNotifier, next_timer_domain_id,
 };
 
 /// A real monotonic timer backed by [`std::time::Instant`].
@@ -45,6 +34,8 @@ pub struct SystemTimer {
     domain_id: u64,
     origin: Instant,
     notification_epoch: ArcMonitor<u64>,
+    #[cfg(feature = "tokio")]
+    async_notification_epoch: Arc<AtomicU64>,
     #[cfg(feature = "tokio")]
     async_notifier: Arc<Notify>,
 }
@@ -63,6 +54,8 @@ impl SystemTimer {
             domain_id: next_timer_domain_id(),
             origin: Instant::now(),
             notification_epoch: ArcMonitor::new(0),
+            #[cfg(feature = "tokio")]
+            async_notification_epoch: Arc::new(AtomicU64::new(0)),
             #[cfg(feature = "tokio")]
             async_notifier: Arc::new(Notify::new()),
         }
@@ -138,6 +131,9 @@ impl WaitNotifier for SystemTimer {
     /// waiters registered on this timer are notified. Sleepers are not notified.
     fn notify_all_waiters(&self) {
         self.wake_blocking_waiters();
+        #[cfg(feature = "tokio")]
+        self.async_notification_epoch
+            .fetch_add(1, Ordering::Release);
         #[cfg(feature = "tokio")]
         self.async_notifier.notify_waiters();
     }
@@ -244,12 +240,20 @@ impl AsyncWaiter for SystemTimer {
         &'a self,
         deadline: TimerInstant,
     ) -> AsyncTimerResult<'a, TimerWaitOutcome> {
+        let observed_notification_epoch = self.async_notification_epoch.load(Ordering::Acquire);
         Box::pin(async move {
             deadline.ensure_domain_id(self.domain_id)?;
             let deadline_elapsed = deadline.elapsed_since_timer_start();
+            let notified = self.async_notifier.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
             let now_elapsed = self.origin.elapsed();
             if now_elapsed >= deadline_elapsed {
                 return Ok(TimerWaitOutcome::DeadlineReached);
+            }
+            if self.async_notification_epoch.load(Ordering::Acquire) != observed_notification_epoch
+            {
+                return Ok(TimerWaitOutcome::Notified);
             }
 
             let remaining = deadline_elapsed - now_elapsed;
@@ -257,8 +261,12 @@ impl AsyncWaiter for SystemTimer {
                 _ = tokio::time::sleep(remaining) => {
                     TimerWaitOutcome::DeadlineReached
                 }
-                _ = self.async_notifier.notified() => {
-                    TimerWaitOutcome::Notified
+                _ = &mut notified => {
+                    if self.origin.elapsed() >= deadline_elapsed {
+                        TimerWaitOutcome::DeadlineReached
+                    } else {
+                        TimerWaitOutcome::Notified
+                    }
                 }
             };
             Ok(outcome)

@@ -10,12 +10,8 @@
 use std::time::Duration;
 
 use qubit_clock::timer::{
-    AsyncTimer,
-    MockTimer,
-    SystemTimer,
-    TimerDomain,
-    TimerError,
-    TimerWaitOutcome,
+    AsyncSleeper, AsyncWaiter, MockTimer, SystemTimer, TimerDomain, TimerError, TimerWaitOutcome,
+    WaitNotifier,
 };
 
 #[tokio::test]
@@ -193,6 +189,22 @@ async fn test_system_timer_wait_until_async_can_be_notified_before_deadline() {
         .await
         .expect("notification should wake system async wait promptly")
         .expect("worker task should finish cleanly");
+
+    assert_eq!(TimerWaitOutcome::Notified, outcome);
+}
+
+#[tokio::test]
+async fn test_system_timer_wait_until_async_observes_notification_after_future_creation() {
+    let timer = SystemTimer::new();
+    let deadline = timer.deadline_after(Duration::from_secs(5));
+
+    let wait = timer.wait_until_async(deadline);
+    timer.notify_all_waiters();
+
+    let outcome = tokio::time::timeout(Duration::from_millis(50), wait)
+        .await
+        .expect("notification after future creation should not be lost")
+        .expect("deadline belongs to this timer");
 
     assert_eq!(TimerWaitOutcome::Notified, outcome);
 }
