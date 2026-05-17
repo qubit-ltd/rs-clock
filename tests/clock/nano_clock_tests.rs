@@ -9,15 +9,8 @@
  ******************************************************************************/
 //! Tests for the NanoClock trait.
 
-use chrono::{
-    DateTime,
-    Utc,
-};
-use qubit_clock::{
-    Clock,
-    NanoClock,
-    NanoMonotonicClock,
-};
+use chrono::{DateTime, Utc};
+use qubit_clock::{Clock, NanoClock, NanoMonotonicClock};
 use std::thread;
 use std::time::Duration;
 

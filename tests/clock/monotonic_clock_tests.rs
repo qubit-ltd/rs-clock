@@ -10,10 +10,7 @@
 //! Behavior-focused tests for the `MonotonicClock` type.
 
 use chrono::Utc;
-use qubit_clock::{
-    Clock,
-    MonotonicClock,
-};
+use qubit_clock::{Clock, MonotonicClock};
 use std::thread;
 use std::time::Duration;
 

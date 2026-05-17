@@ -14,14 +14,8 @@
 //! use [`NanoTimeMeter`](super::NanoTimeMeter).
 //!
 
-use crate::meter::format::{
-    format_duration_millis,
-    format_speed,
-};
-use crate::{
-    Clock,
-    MonotonicClock,
-};
+use crate::meter::format::{format_duration_millis, format_speed};
+use crate::{Clock, MonotonicClock};
 use chrono::Duration;
 
 /// A time meter for measuring elapsed time with millisecond precision.

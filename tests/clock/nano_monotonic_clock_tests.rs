@@ -9,11 +9,7 @@
  ******************************************************************************/
 //! Behavior-focused tests for the `NanoMonotonicClock` type.
 
-use qubit_clock::{
-    Clock,
-    NanoClock,
-    NanoMonotonicClock,
-};
+use qubit_clock::{Clock, NanoClock, NanoMonotonicClock};
 use std::thread;
 use std::time::Duration;
 

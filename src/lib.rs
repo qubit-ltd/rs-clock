@@ -149,28 +149,15 @@
 //!
 
 // Re-export chrono types for convenience
-pub use chrono::{
-    DateTime,
-    Duration,
-    Utc,
-};
+pub use chrono::{DateTime, Duration, Utc};
 pub use chrono_tz::Tz;
 
 // Clock traits and implementations
 pub mod clock;
 
 pub use clock::{
-    Clock,
-    ControllableClock,
-    MockClock,
-    MockClockProgression,
-    MockNanoClock,
-    MonotonicClock,
-    NanoClock,
-    NanoMonotonicClock,
-    SystemClock,
-    Zoned,
-    ZonedClock,
+    Clock, ControllableClock, MockClock, MockClockProgression, MockNanoClock, MonotonicClock,
+    NanoClock, NanoMonotonicClock, SystemClock, Zoned, ZonedClock,
 };
 
 // Time meters

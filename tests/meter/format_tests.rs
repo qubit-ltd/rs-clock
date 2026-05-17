@@ -9,11 +9,7 @@
  ******************************************************************************/
 //! Tests for duration and speed formatting utilities.
 
-use qubit_clock::meter::{
-    format_duration_millis,
-    format_duration_nanos,
-    format_speed,
-};
+use qubit_clock::meter::{format_duration_millis, format_duration_nanos, format_speed};
 
 #[test]
 fn test_format_duration_millis_negative() {

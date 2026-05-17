@@ -13,10 +13,7 @@
 //! clock abstraction. All clock implementations must implement this trait.
 //!
 
-use chrono::{
-    DateTime,
-    Utc,
-};
+use chrono::{DateTime, Utc};
 
 /// Clamps an out-of-range millisecond timestamp to chrono's nearest boundary.
 fn clamp_out_of_range_millis(millis: i64) -> DateTime<Utc> {

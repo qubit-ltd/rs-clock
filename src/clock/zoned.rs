@@ -13,18 +13,8 @@
 //! support to any clock implementation.
 //!
 
-use crate::{
-    Clock,
-    ControllableClock,
-    NanoClock,
-    ZonedClock,
-};
-use chrono::{
-    DateTime,
-    Duration,
-    TimeZone,
-    Utc,
-};
+use crate::{Clock, ControllableClock, NanoClock, ZonedClock};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use chrono_tz::Tz;
 use std::ops::Deref;
 

@@ -10,11 +10,7 @@
 //! Tests for NanoMonotonicClock.
 
 use chrono::Datelike;
-use qubit_clock::{
-    Clock,
-    NanoClock,
-    NanoMonotonicClock,
-};
+use qubit_clock::{Clock, NanoClock, NanoMonotonicClock};
 use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
