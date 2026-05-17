@@ -13,7 +13,10 @@ use std::sync::{
     Mutex,
     MutexGuard,
 };
-use std::time::Duration;
+use std::time::{
+    Duration,
+    Instant,
+};
 
 #[cfg(feature = "tokio")]
 use tokio::sync::watch;
@@ -51,6 +54,7 @@ pub struct MockSleeper {
 struct MockSleeperShared {
     state: Mutex<MockSleeperState>,
     time_changed: Condvar,
+    blocking_sleepers_changed: Condvar,
 }
 
 /// Mutable mock sleeper state guarded by [`MockSleeperShared::state`].
@@ -58,6 +62,7 @@ struct MockSleeperShared {
 struct MockSleeperState {
     elapsed: Duration,
     time_epoch: u64,
+    blocking_sleepers: usize,
 }
 
 /// Snapshot of mock sleeper state read under the internal lock.
@@ -81,8 +86,10 @@ impl MockSleeper {
                 state: Mutex::new(MockSleeperState {
                     elapsed: Duration::ZERO,
                     time_epoch: 0,
+                    blocking_sleepers: 0,
                 }),
                 time_changed: Condvar::new(),
+                blocking_sleepers_changed: Condvar::new(),
             }),
             #[cfg(feature = "tokio")]
             async_time_epoch_sender,
@@ -96,6 +103,42 @@ impl MockSleeper {
     /// The elapsed time observed by this mock sleeper.
     pub fn elapsed(&self) -> Duration {
         self.current_state().elapsed
+    }
+
+    /// Waits until at least `count` synchronous sleeps are blocked.
+    ///
+    /// This method is intended for deterministic tests that need to advance
+    /// mock time only after another thread has entered [`Sleeper::sleep_for`].
+    ///
+    /// # Arguments
+    ///
+    /// * `count` - The minimum number of blocked synchronous sleepers.
+    /// * `timeout` - The maximum real duration to wait.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the requested number of sleepers is observed before the
+    /// timeout expires; otherwise `false`.
+    pub fn wait_for_blocking_sleepers(&self, count: usize, timeout: Duration) -> bool {
+        let Some(deadline) = Instant::now().checked_add(timeout) else {
+            return false;
+        };
+        let mut state = self.lock_state();
+        while state.blocking_sleepers < count {
+            let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+                return false;
+            };
+            let (next_state, timeout_result) = self
+                .shared
+                .blocking_sleepers_changed
+                .wait_timeout(state, remaining)
+                .expect("mock sleeper state should not be poisoned");
+            state = next_state;
+            if timeout_result.timed_out() && state.blocking_sleepers < count {
+                return false;
+            }
+        }
+        true
     }
 
     /// Sets the current mock elapsed time.
@@ -202,6 +245,11 @@ impl Sleeper for MockSleeper {
     fn sleep_for(&self, duration: Duration) {
         let target_elapsed = self.current_state().elapsed.saturating_add(duration);
         let mut state = self.lock_state();
+        if state.elapsed >= target_elapsed {
+            return;
+        }
+        state.blocking_sleepers = state.blocking_sleepers.saturating_add(1);
+        self.shared.blocking_sleepers_changed.notify_all();
         while state.elapsed < target_elapsed {
             state = self
                 .shared
@@ -209,6 +257,8 @@ impl Sleeper for MockSleeper {
                 .wait(state)
                 .expect("mock sleeper state should not be poisoned");
         }
+        state.blocking_sleepers = state.blocking_sleepers.saturating_sub(1);
+        self.shared.blocking_sleepers_changed.notify_all();
     }
 }
 
