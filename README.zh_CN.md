@@ -574,7 +574,7 @@ println!("每次操作平均耗时: {} 纳秒", meter.nanos() / 10000);
 
 ## 许可证
 
-Copyright (c) 2025 - 2026. Haixing Hu, Qubit Co. Ltd. 保留所有权利。
+Copyright (c) 2025 - 2026. Haixing Hu.
 
 根据 Apache 许可证 2.0 版（"许可证"）授权；
 除非遵守许可证，否则您不得使用此文件。
@@ -592,10 +592,21 @@ Copyright (c) 2025 - 2026. Haixing Hu, Qubit Co. Ltd. 保留所有权利。
 
 欢迎贡献！请随时提交 Pull Request。
 
+### 开发指南
+
+- 遵循 Rust API 指南
+- 保持全面的测试覆盖
+- 为所有公共 API 编写文档和示例
+- 提交 PR 前确保所有测试通过
+
 ## 作者
 
 **胡海星** - *Qubit Co. Ltd.*
 
+## 相关项目
+
+Qubit 旗下的更多 Rust 库发布在 GitHub 组织 [qubit-ltd](https://github.com/qubit-ltd)。
+
 ---
 
-有关 Qubit 相关开源项目的更多信息，请访问我们的 [GitHub 主页](https://github.com/qubit-ltd)。
+仓库地址：[https://github.com/qubit-ltd/rs-clock](https://github.com/qubit-ltd/rs-clock)
