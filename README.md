@@ -7,11 +7,11 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-Thread-safe clock and timer abstractions for Rust with monotonic and mock implementations.
+Thread-safe clock and sleep abstractions for Rust with monotonic and mock implementations.
 
 ## Overview
 
-Qubit Clock provides a flexible and type-safe clock abstraction system for Rust applications. It offers robust, thread-safe clock implementations with support for basic time access, high-precision measurements, timezone handling, monotonic time, timer-domain deadlines, and testing support.
+Qubit Clock provides a flexible and type-safe clock abstraction system for Rust applications. It offers robust, thread-safe clock implementations with support for basic time access, high-precision measurements, timezone handling, monotonic time, mockable relative sleeps, and testing support.
 
 ## Features
 
@@ -37,14 +37,11 @@ Qubit Clock provides a flexible and type-safe clock abstraction system for Rust 
 - **Speed Calculation**: Calculate processing speed (items per second/minute)
 - **Test-Friendly**: Support injecting mock clocks for deterministic testing
 
-### ⏲️ **Timer Domains**
-- **TimerDomain**: Creates domain-branded monotonic instants and deadlines
-- **BlockingSleeper / AsyncSleeper**: Sleep until a deadline without treating notifications as completion
-- **BlockingWaiter / AsyncWaiter**: Wait until a deadline or explicit notification
-- **WaitNotifier**: Broadcasts notifications to waiters
-- **BlockingTimer / AsyncTimer**: Marker facades for types supporting both sleep and wait traits
-- **SystemTimer**: Real timer backed by `std::time::Instant`
-- **MockTimer**: Deterministic timer whose elapsed time is manually controlled by tests
+### ⏲️ **Sleep Abstractions**
+- **Sleeper**: Blocking relative sleep abstraction
+- **AsyncSleeper**: Tokio async relative sleep abstraction
+- **SystemSleeper**: Real sleeper backed by `std::thread::sleep`
+- **MockSleeper**: Deterministic sleeper whose elapsed time is manually controlled by tests
 
 ### 🔒 **Thread Safety**
 - All clock implementations are `Send + Sync`
@@ -59,7 +56,7 @@ Qubit Clock provides a flexible and type-safe clock abstraction system for Rust 
 
 ### 🧪 **Testing Support**
 - Mock clock with controllable time
-- Mock timer with controllable monotonic elapsed time
+- Mock sleeper with controllable monotonic elapsed time
 - Set time to specific points
 - Advance time programmatically
 - Auto-increment support
@@ -70,7 +67,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-qubit-clock = "0.5"
+qubit-clock = "0.6"
 ```
 
 ## Quick Start
@@ -165,17 +162,20 @@ meter.stop();
 println!("Elapsed: {}", meter.readable_duration());
 ```
 
-### Timer Domains for Mockable Timeouts
+### Mockable Relative Sleeps
 
 ```rust
-use qubit_clock::timer::{BlockingSleeper, MockTimer, TimerDomain};
+use qubit_clock::sleep::{MockSleeper, Sleeper};
 use std::time::Duration;
 
-let timer = MockTimer::new();
-let deadline = timer.deadline_after(Duration::from_secs(5));
+let sleeper = MockSleeper::new();
+let worker = sleeper.clone();
 
-timer.advance(Duration::from_secs(5));
-timer.sleep_until(deadline).expect("deadline belongs to this timer");
+std::thread::spawn(move || {
+    worker.sleep_for(Duration::from_secs(5));
+});
+
+sleeper.advance(Duration::from_secs(5));
 ```
 
 ### High-Precision Time Meter
@@ -224,11 +224,8 @@ The crate is built around several orthogonal traits:
 - **NanoClock**: Extension for nanosecond precision
 - **ZonedClock**: Extension for timezone support
 - **ControllableClock**: Extension for time control (testing)
-- **TimerDomain**: Base trait for timer-domain instants and deadlines
-- **BlockingSleeper / AsyncSleeper**: Sleep operations that complete only after the deadline
-- **WaitNotifier**: Notification broadcast for waiter operations
-- **BlockingWaiter / AsyncWaiter**: Wait operations that complete after the deadline or notification
-- **BlockingTimer / AsyncTimer**: Marker facades combining sleep and wait capabilities
+- **Sleeper**: Blocking relative sleep operations
+- **AsyncSleeper**: Tokio async relative sleep operations
 
 This design follows the **Interface Segregation Principle**, ensuring that implementations only need to provide the features they actually support.
 
@@ -281,24 +278,23 @@ This design follows the **Interface Segregation Principle**, ensuring that imple
 - Converts UTC time to local time in specified timezone
 - Use for: displaying local time, timezone conversions
 
-## Timer Implementations
+## Sleep Implementations
 
-### SystemTimer
+### SystemSleeper
 
-- Based on `std::time::Instant`
-- Creates `TimerInstant` values in its own timer domain
-- Supports blocking waits and explicit notifications
-- Supports asynchronous waits when the `tokio` feature is enabled
-- Use for: production deadlines, timeout control, interruptible sleeps
+- Uses `std::thread::sleep` for blocking relative sleeps
+- Uses `tokio::time::sleep` when the `tokio` feature is enabled
+- Zero-sized type (ZST) with no runtime state
+- Use for: production code that needs an injectable relative sleeper
 
-### MockTimer
+### MockSleeper
 
-- Manually controlled monotonic timer for deterministic tests
+- Manually controlled relative sleeper for deterministic tests
 - Starts at elapsed time zero
-- Clones share the same timer domain, elapsed time, and notification state
-- Supports manual `set_elapsed`, `advance`, `reset`, and `notify_all_waiters`
-- Supports asynchronous waits when the `tokio` feature is enabled
-- Use for: testing timeout and retry logic without waiting for real time
+- Clones share the same elapsed time
+- Supports manual `set_elapsed`, `advance`, and `reset`
+- Supports asynchronous sleeps when the `tokio` feature is enabled
+- Use for: testing retry and backoff logic without waiting for real time
 
 ## Time Meters
 
@@ -360,10 +356,9 @@ the problem:
   injectable clock source. They use monotonic clocks by default; `TimeMeter`
   can accept `MockClock`, while `NanoTimeMeter` can accept `MockNanoClock` or
   any other `NanoClock` implementation.
-- Use `SystemTimer` or `MockTimer` when code needs deadlines, sleeps, or
-  interruptible waits. `TimerInstant` values are branded with the timer domain
-  that produced them, so unrelated timers cannot accidentally compare or wait
-  on each other's deadlines.
+- Use `SystemSleeper` or `MockSleeper` when code needs injectable relative
+  sleeps. Mock sleepers let tests advance elapsed time instantly instead of
+  waiting for wall-clock time.
 - Use the `Clock` traits when business logic depends on "current time" and must
   be testable without coupling directly to the system clock or `Instant::now()`.
 
@@ -404,23 +399,17 @@ Extension trait for controllable clocks (testing):
 - `add_duration(duration)` - Advances the clock by a duration
 - `reset()` - Resets the clock to initial state
 
-### Timer Traits
+### Sleep Traits
 
-Timer-domain APIs are available under `qubit_clock::timer`:
+Sleep APIs are available under `qubit_clock::sleep`:
 
-- `TimerDomain` - Returns the current `TimerInstant`, creates deadlines, and computes remaining duration
-- `BlockingSleeper` / `AsyncSleeper` - Provide deadline sleeps that ignore notification as a completion signal
-- `WaitNotifier` - Provides `notify_all_waiters`
-- `BlockingWaiter` / `AsyncWaiter` - Provide notification-sensitive wait operations
-- `BlockingTimer` / `AsyncTimer` - Marker facades for common blocking or async timer bounds
-- `TimerInstant` - Represents an instant relative to the creating timer domain
-- `TimerError` - Reports timer-domain mismatches
+- `Sleeper` - Provides blocking relative sleeps
+- `AsyncSleeper` - Provides Tokio async relative sleeps
+- `SystemSleeper` - Uses real elapsed time
+- `MockSleeper` - Uses manually advanced elapsed time for deterministic tests
 
-Timer APIs intentionally separate wait and sleep semantics. Use `wait_until` or
-`wait_for` when a notification should wake the caller early and return
-`TimerWaitOutcome::Notified`. Use `sleep_until` or `sleep_for` when the operation
-must complete only after the deadline. Notifications target waiters, not
-sleepers.
+Sleep APIs intentionally model only relative sleeping. Notification waits,
+condition waits, and timeout waits belong to monitor primitives in `qubit-lock`.
 
 ## Design Principles
 
@@ -431,7 +420,7 @@ The crate follows the Interface Segregation Principle by providing separate trai
 - Not all clocks need nanosecond precision → `NanoClock` is separate
 - Not all clocks need timezone support → `ZonedClock` is separate
 - Only test clocks need controllability → `ControllableClock` is separate
-- Only timer users need deadlines and waits → timer traits live under `timer`
+- Only relative sleep users need sleep injection → sleep traits live under `sleep`
 
 This allows implementations to provide only the features they need, keeping the API clean and focused.
 
@@ -443,11 +432,8 @@ Each trait and type has one clear purpose:
 - `NanoClock` - Provide high-precision time
 - `ZonedClock` - Provide timezone conversion
 - `ControllableClock` - Provide time control for testing
-- `TimerDomain` - Provide domain-branded monotonic instants
-- `BlockingSleeper` / `AsyncSleeper` - Provide deadline sleeps
-- `BlockingWaiter` / `AsyncWaiter` - Provide notification-sensitive deadline waits
-- `WaitNotifier` - Provide waiter notification
-- `BlockingTimer` / `AsyncTimer` - Provide common marker facade traits
+- `Sleeper` - Provide blocking relative sleeps
+- `AsyncSleeper` - Provide Tokio async relative sleeps
 
 ### Composition over Inheritance
 
@@ -488,7 +474,7 @@ cargo test
 
 - **chrono**: Date and time handling with serialization support
 - **chrono-tz**: Comprehensive timezone database
-- **tokio**: Optional dependency for `timer::AsyncTimer` when the `tokio` feature is enabled
+- **tokio**: Optional dependency for `sleep::AsyncSleeper` when the `tokio` feature is enabled
 
 ## Use Cases
 
@@ -507,21 +493,22 @@ meter.stop();
 log::info!("Processing took: {}", meter.readable_duration());
 ```
 
-### Timeout Control
+### Mockable Sleep Control
 
 ```rust
-use qubit_clock::timer::{BlockingWaiter, TimerDomain, SystemTimer};
+use qubit_clock::sleep::{MockSleeper, Sleeper};
 use std::time::Duration;
 
-let timer = SystemTimer::new();
-let deadline = timer.deadline_after(Duration::from_secs(5));
-
-while timer.duration_until(deadline).expect("deadline belongs to this timer").is_some() {
-    if try_operation() {
-        break;
-    }
-    timer.wait_for(Duration::from_millis(10)).expect("self-created deadline should be valid");
+fn retry_once<S: Sleeper>(sleeper: &S) {
+    sleeper.sleep_for(Duration::from_millis(10));
 }
+
+let sleeper = MockSleeper::new();
+let worker = sleeper.clone();
+let handle = std::thread::spawn(move || retry_once(&worker));
+
+sleeper.advance(Duration::from_millis(10));
+handle.join().expect("retry should finish");
 ```
 
 ### Testing Time-Dependent Logic

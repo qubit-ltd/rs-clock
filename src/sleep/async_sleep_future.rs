@@ -10,7 +10,5 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use crate::timer::TimerResult;
-
-/// Boxed future returned by asynchronous timer operations.
-pub type AsyncTimerResult<'a, T> = Pin<Box<dyn Future<Output = TimerResult<T>> + Send + 'a>>;
+/// Future returned by asynchronous sleeper operations.
+pub type AsyncSleepFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;

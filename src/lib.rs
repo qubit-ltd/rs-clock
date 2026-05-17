@@ -17,7 +17,7 @@
 //! - **Timezone support**: Convert to local time in any timezone
 //! - **Monotonic time**: Time that never goes backwards
 //! - **Testing support**: Controllable mock clocks for tests
-//! - **Timer domains**: Monotonic deadlines and sleeps with mockable time
+//! - **Mockable sleeps**: Relative sleep abstractions with real and mock implementations
 //!
 //! # Architecture
 //!
@@ -27,7 +27,7 @@
 //! - [`NanoClock`]: Extension for nanosecond precision
 //! - [`ZonedClock`]: Extension for timezone support
 //! - [`ControllableClock`]: Extension for time control (testing)
-//! - [`timer::TimerDomain`]: Timer-domain based monotonic deadlines
+//! - [`sleep::Sleeper`]: Relative blocking sleep abstraction
 //!
 //! # Implementations
 //!
@@ -40,8 +40,8 @@
 //! - [`MockNanoClock`]: Nanosecond-precision controllable clock for testing
 //! - [`MockClockProgression`]: Frozen or monotonic mock-clock progression mode
 //! - [`Zoned<C>`](Zoned): Wrapper that adds timezone support to any clock
-//! - [`timer::SystemTimer`]: Real monotonic timer based on [`std::time::Instant`]
-//! - [`timer::MockTimer`]: Manually controlled monotonic timer for tests
+//! - [`sleep::SystemSleeper`]: Real relative sleeper
+//! - [`sleep::MockSleeper`]: Manually controlled relative sleeper for tests
 //!
 //! # Examples
 //!
@@ -145,32 +145,19 @@
 //!
 
 // Re-export chrono types for convenience
-pub use chrono::{
-    DateTime,
-    Duration,
-    Utc,
-};
+pub use chrono::{DateTime, Duration, Utc};
 pub use chrono_tz::Tz;
 
 // Clock traits and implementations
 pub mod clock;
 
 pub use clock::{
-    Clock,
-    ControllableClock,
-    MockClock,
-    MockClockProgression,
-    MockNanoClock,
-    MonotonicClock,
-    NanoClock,
-    NanoMonotonicClock,
-    SystemClock,
-    Zoned,
-    ZonedClock,
+    Clock, ControllableClock, MockClock, MockClockProgression, MockNanoClock, MonotonicClock,
+    NanoClock, NanoMonotonicClock, SystemClock, Zoned, ZonedClock,
 };
 
 // Time meters
 pub mod meter;
 
-// Timer-domain based deadlines and sleeps
-pub mod timer;
+// Relative sleep abstractions
+pub mod sleep;
