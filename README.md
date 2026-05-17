@@ -70,7 +70,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-qubit-clock = "0.6"
+qubit-clock = "0.7"
 ```
 
 ## Quick Start
