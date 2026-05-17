@@ -215,7 +215,7 @@ impl Sleeper for MockSleeper {
 #[cfg(feature = "tokio")]
 impl AsyncSleeper for MockSleeper {
     /// Returns a future that completes when mock elapsed time reaches the target.
-    fn async_sleep_for<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a> {
+    fn sleep_for_async<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a> {
         let snapshot = self.current_state();
         let target_elapsed = snapshot.elapsed.saturating_add(duration);
         let mut time_receiver = self.async_time_epoch_sender.subscribe();
