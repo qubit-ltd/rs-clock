@@ -63,48 +63,21 @@ fn test_reset_sets_elapsed_to_zero() {
 fn test_sleep_for_blocks_until_mock_time_advances() {
     let sleeper = MockSleeper::new();
     let worker_sleeper = sleeper.clone();
-    let (started_sender, started_receiver) = mpsc::channel::<Duration>();
     let (done_sender, done_receiver) = mpsc::channel();
-    let (ready_sender, ready_receiver) = mpsc::channel();
-    let (go_sender, go_receiver) = mpsc::channel();
 
     let worker = thread::spawn(move || {
-        ready_sender
-            .send(())
-            .expect("worker should report readiness");
-        go_receiver
-            .recv()
-            .expect("worker should wait for test synchronization");
-        let start_elapsed = worker_sleeper.elapsed();
-        started_sender
-            .send(start_elapsed)
-            .expect("worker should report when sleep starts");
         worker_sleeper.sleep_for(Duration::from_millis(100));
         done_sender
             .send(())
             .expect("worker should report when sleep completes");
     });
 
-    ready_receiver
-        .recv_timeout(Duration::from_secs(1))
-        .expect("worker should reach the test synchronization point");
-    go_sender
-        .send(())
-        .expect("test should start mock sleep after synchronization");
-    let start_elapsed = started_receiver
-        .recv_timeout(Duration::from_secs(1))
-        .expect("worker should start promptly");
-    let target_elapsed = start_elapsed.saturating_add(Duration::from_millis(100));
-    let first_target_elapsed = start_elapsed.saturating_add(Duration::from_millis(99));
-    let current_elapsed = sleeper.elapsed();
-    if first_target_elapsed > current_elapsed {
-        sleeper.advance(first_target_elapsed.saturating_sub(current_elapsed));
-    }
     assert!(
-        done_receiver.try_recv().is_err(),
-        "mock sleep should not complete before time advances",
+        sleeper.wait_for_blocking_sleepers(1, Duration::from_secs(1)),
+        "worker should block in mock sleep before time advances",
     );
 
+    sleeper.advance(Duration::from_millis(99));
     assert!(
         done_receiver
             .recv_timeout(Duration::from_millis(20))
@@ -112,10 +85,7 @@ fn test_sleep_for_blocks_until_mock_time_advances() {
         "mock sleep should not complete before target elapsed time",
     );
 
-    let current_elapsed = sleeper.elapsed();
-    if current_elapsed < target_elapsed {
-        sleeper.advance(target_elapsed.saturating_sub(current_elapsed));
-    }
+    sleeper.advance(Duration::from_millis(1));
     done_receiver
         .recv_timeout(Duration::from_secs(1))
         .expect("mock sleep should complete after target elapsed time");
@@ -127,43 +97,21 @@ fn test_sleep_for_uses_elapsed_at_call_time() {
     let sleeper = MockSleeper::new();
     sleeper.advance(Duration::from_millis(10));
     let worker_sleeper = sleeper.clone();
-    let (started_sender, started_receiver) = mpsc::channel::<Duration>();
     let (done_sender, done_receiver) = mpsc::channel();
-    let (ready_sender, ready_receiver) = mpsc::channel();
-    let (go_sender, go_receiver) = mpsc::channel();
 
     let worker = thread::spawn(move || {
-        ready_sender
-            .send(())
-            .expect("worker should report readiness");
-        go_receiver
-            .recv()
-            .expect("worker should wait for test synchronization");
-        let start_elapsed = worker_sleeper.elapsed();
-        started_sender
-            .send(start_elapsed)
-            .expect("worker should report when sleep starts");
         worker_sleeper.sleep_for(Duration::from_millis(100));
         done_sender
             .send(())
             .expect("worker should report when sleep completes");
     });
 
-    ready_receiver
-        .recv_timeout(Duration::from_secs(1))
-        .expect("worker should reach the test synchronization point");
-    go_sender
-        .send(())
-        .expect("test should start mock sleep after synchronization");
-    let start_elapsed = started_receiver
-        .recv_timeout(Duration::from_secs(1))
-        .expect("worker should start promptly");
-    let target_elapsed = start_elapsed.saturating_add(Duration::from_millis(100));
-    let first_target_elapsed = start_elapsed.saturating_add(Duration::from_millis(99));
-    let current_elapsed = sleeper.elapsed();
-    if first_target_elapsed > current_elapsed {
-        sleeper.advance(first_target_elapsed.saturating_sub(current_elapsed));
-    }
+    assert!(
+        sleeper.wait_for_blocking_sleepers(1, Duration::from_secs(1)),
+        "worker should block in mock sleep before time advances",
+    );
+
+    sleeper.advance(Duration::from_millis(99));
     assert!(
         done_receiver
             .recv_timeout(Duration::from_millis(20))
@@ -171,10 +119,7 @@ fn test_sleep_for_uses_elapsed_at_call_time() {
         "sleep should be relative to elapsed at call time",
     );
 
-    let current_elapsed = sleeper.elapsed();
-    if current_elapsed < target_elapsed {
-        sleeper.advance(target_elapsed.saturating_sub(current_elapsed));
-    }
+    sleeper.advance(Duration::from_millis(1));
     done_receiver
         .recv_timeout(Duration::from_secs(1))
         .expect("sleep should complete after the full relative duration");
