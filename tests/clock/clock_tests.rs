@@ -9,16 +9,8 @@
  ******************************************************************************/
 //! Tests for the Clock trait.
 
-use chrono::{
-    DateTime,
-    Utc,
-};
-use qubit_clock::{
-    Clock,
-    MockClock,
-    MonotonicClock,
-    SystemClock,
-};
+use chrono::{DateTime, Utc};
+use qubit_clock::{Clock, MockClock, MonotonicClock, SystemClock};
 use std::thread;
 use std::time::Duration;
 

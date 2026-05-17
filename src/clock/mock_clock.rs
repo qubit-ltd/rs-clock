@@ -13,23 +13,9 @@
 //! designed for testing scenarios where precise control over time is needed.
 //!
 
-use crate::{
-    Clock,
-    ControllableClock,
-    MockClockProgression,
-    MonotonicClock,
-    SystemClock,
-};
-use chrono::{
-    DateTime,
-    Duration,
-    Utc,
-};
-use std::sync::{
-    Arc,
-    Mutex,
-    MutexGuard,
-};
+use crate::{Clock, ControllableClock, MockClockProgression, MonotonicClock, SystemClock};
+use chrono::{DateTime, Duration, Utc};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 /// A controllable clock implementation for testing.
 ///

@@ -11,11 +11,7 @@
 
 use chrono::Duration;
 use qubit_clock::meter::NanoTimeMeter;
-use qubit_clock::{
-    Clock,
-    NanoClock,
-    NanoMonotonicClock,
-};
+use qubit_clock::{Clock, NanoClock, NanoMonotonicClock};
 use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::thread;

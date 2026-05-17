@@ -10,10 +10,7 @@
 //! Tests for MonotonicClock.
 
 use chrono::Datelike;
-use qubit_clock::{
-    Clock,
-    MonotonicClock,
-};
+use qubit_clock::{Clock, MonotonicClock};
 use std::thread;
 use std::time::Duration;
 

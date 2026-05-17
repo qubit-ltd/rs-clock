@@ -16,10 +16,7 @@
 
 use crate::Clock;
 use chrono::Utc;
-use std::time::{
-    Duration,
-    Instant,
-};
+use std::time::{Duration, Instant};
 
 /// A clock implementation that provides monotonically increasing time.
 ///
