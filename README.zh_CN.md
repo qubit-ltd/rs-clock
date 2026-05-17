@@ -42,7 +42,7 @@ Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象�
 - **BlockingSleeper / AsyncSleeper**：只按 deadline 完成的 sleep 能力
 - **BlockingWaiter / AsyncWaiter**：按 deadline 或显式通知完成的 wait 能力
 - **WaitNotifier**：向 waiters 广播通知
-- **BlockingTimer / AsyncTimer**：组合 sleep 和 wait 能力的便捷 facade
+- **BlockingTimer / AsyncTimer**：标记同时支持 sleep 和 wait 的组合 facade
 - **SystemTimer**：基于 `std::time::Instant` 的真实计时器
 - **MockTimer**：由测试手动控制 elapsed time 的确定性计时器
 
@@ -168,7 +168,7 @@ println!("耗时: {}", meter.readable_duration());
 ### 使用 Timer Domain 测试可控超时
 
 ```rust
-use qubit_clock::timer::{BlockingTimer, MockTimer, TimerDomain};
+use qubit_clock::timer::{BlockingSleeper, MockTimer, TimerDomain};
 use std::time::Duration;
 
 let timer = MockTimer::new();
@@ -228,7 +228,7 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 - **BlockingSleeper / AsyncSleeper**：只在 deadline 到达后完成的 sleep 能力
 - **WaitNotifier**：面向 wait 操作的通知广播能力
 - **BlockingWaiter / AsyncWaiter**：在 deadline 到达或收到通知后完成的 wait 能力
-- **BlockingTimer / AsyncTimer**：组合 sleep 和 wait 能力的便捷 facade
+- **BlockingTimer / AsyncTimer**：组合 sleep 和 wait 能力的 marker facade
 
 这种设计遵循**接口隔离原则**，确保实现只需要提供它们实际支持的功能。
 
@@ -407,7 +407,7 @@ Timer-domain API 位于 `qubit_clock::timer` 下：
 - `BlockingSleeper` / `AsyncSleeper` - 提供不把通知当作完成信号的 deadline sleep
 - `WaitNotifier` - 提供 `notify_all_waiters`
 - `BlockingWaiter` / `AsyncWaiter` - 提供对 notification 敏感的 wait 操作
-- `BlockingTimer` / `AsyncTimer` - 提供常用阻塞式或异步 timer facade
+- `BlockingTimer` / `AsyncTimer` - 提供常用阻塞式或异步 timer bound 的 marker facade
 - `TimerInstant` - 表示相对于创建它的 timer domain 的 instant
 - `TimerError` - 报告 timer-domain mismatch
 
@@ -441,7 +441,7 @@ Timer API 有意区分 wait 和 sleep 语义。需要通知提前唤醒调用方
 - `BlockingSleeper` / `AsyncSleeper` - 提供 deadline sleep
 - `BlockingWaiter` / `AsyncWaiter` - 提供对 notification 敏感的 deadline wait
 - `WaitNotifier` - 提供 waiter notification
-- `BlockingTimer` / `AsyncTimer` - 提供常用 facade trait
+- `BlockingTimer` / `AsyncTimer` - 提供常用 marker facade trait
 
 ### 组合优于继承
 
@@ -504,7 +504,7 @@ log::info!("处理耗时: {}", meter.readable_duration());
 ### 超时控制
 
 ```rust
-use qubit_clock::timer::{BlockingTimer, TimerDomain, SystemTimer};
+use qubit_clock::timer::{BlockingWaiter, TimerDomain, SystemTimer};
 use std::time::Duration;
 
 let timer = SystemTimer::new();

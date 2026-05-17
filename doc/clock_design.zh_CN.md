@@ -41,7 +41,7 @@ TimerDomain (timer-domain 单调时间域 trait)
 ├── BlockingSleeper / AsyncSleeper (只按 deadline 完成的 sleep trait)
 ├── WaitNotifier (waiter 通知 trait)
 ├── BlockingWaiter / AsyncWaiter (deadline 或 notification wait trait)
-└── BlockingTimer / AsyncTimer (便捷组合 facade)
+└── BlockingTimer / AsyncTimer (组合 marker facade)
 ```
 
 **说明**：
@@ -115,10 +115,10 @@ graph TD
     TimerDomain[TimerDomain trait<br/>timer domain]
     BlockingSleeper[BlockingSleeper trait<br/>阻塞 sleep]
     BlockingWaiter[BlockingWaiter trait<br/>阻塞 wait]
-    BlockingTimer[BlockingTimer trait<br/>阻塞 facade]
+    BlockingTimer[BlockingTimer trait<br/>阻塞 marker facade]
     AsyncSleeper[AsyncSleeper trait<br/>Tokio 异步 sleep]
     AsyncWaiter[AsyncWaiter trait<br/>Tokio 异步 wait]
-    AsyncTimer[AsyncTimer trait<br/>Tokio 异步 facade]
+    AsyncTimer[AsyncTimer trait<br/>Tokio 异步 marker facade]
     WaitNotifier[WaitNotifier trait<br/>notify all waiters]
     TimerInstant[TimerInstant<br/>domain-branded instant]
     DomainId[u64<br/>timer domain id]
@@ -315,16 +315,18 @@ elapsed time。不同 timer 拥有不同的 timer domain，它们的 `TimerInsta
 
 **定义**：
 ```rust
+pub type TimerResult<T> = Result<T, TimerError>;
+
 pub trait TimerDomain: Send + Sync {
     fn id(&self) -> u64;
     fn now(&self) -> TimerInstant;
     fn deadline_after(&self, duration: Duration) -> TimerInstant;
-    fn duration_until(&self, deadline: TimerInstant) -> Result<Option<Duration>, TimerError>;
+    fn duration_until(&self, deadline: TimerInstant) -> TimerResult<Option<Duration>>;
 }
 
 pub trait BlockingSleeper: TimerDomain {
-    fn sleep_until(&self, deadline: TimerInstant) -> Result<(), TimerError>;
-    fn sleep_for(&self, duration: Duration) -> Result<(), TimerError>;
+    fn sleep_until(&self, deadline: TimerInstant) -> TimerResult<()>;
+    fn sleep_for(&self, duration: Duration) -> TimerResult<()>;
 }
 
 pub trait WaitNotifier: TimerDomain {
@@ -332,8 +334,8 @@ pub trait WaitNotifier: TimerDomain {
 }
 
 pub trait BlockingWaiter: WaitNotifier {
-    fn wait_until(&self, deadline: TimerInstant) -> Result<TimerWaitOutcome, TimerError>;
-    fn wait_for(&self, duration: Duration) -> Result<TimerWaitOutcome, TimerError>;
+    fn wait_until(&self, deadline: TimerInstant) -> TimerResult<TimerWaitOutcome>;
+    fn wait_for(&self, duration: Duration) -> TimerResult<TimerWaitOutcome>;
 }
 
 pub trait BlockingTimer: BlockingSleeper + BlockingWaiter {}
@@ -342,14 +344,16 @@ pub trait BlockingTimer: BlockingSleeper + BlockingWaiter {}
 启用 `tokio` feature 后还会导出：
 
 ```rust
+pub type AsyncTimerResult<'a, T> = Pin<Box<dyn Future<Output = TimerResult<T>> + Send + 'a>>;
+
 pub trait AsyncSleeper: TimerDomain {
-    fn sleep_until_async<'a>(&'a self, deadline: TimerInstant) -> Pin<Box<dyn Future<Output = Result<(), TimerError>> + Send + 'a>>;
-    fn sleep_for_async<'a>(&'a self, duration: Duration) -> Pin<Box<dyn Future<Output = Result<(), TimerError>> + Send + 'a>>;
+    fn sleep_until_async<'a>(&'a self, deadline: TimerInstant) -> AsyncTimerResult<'a, ()>;
+    fn sleep_for_async<'a>(&'a self, duration: Duration) -> AsyncTimerResult<'a, ()>;
 }
 
 pub trait AsyncWaiter: WaitNotifier {
-    fn wait_until_async<'a>(&'a self, deadline: TimerInstant) -> Pin<Box<dyn Future<Output = Result<TimerWaitOutcome, TimerError>> + Send + 'a>>;
-    fn wait_for_async<'a>(&'a self, duration: Duration) -> Pin<Box<dyn Future<Output = Result<TimerWaitOutcome, TimerError>> + Send + 'a>>;
+    fn wait_until_async<'a>(&'a self, deadline: TimerInstant) -> AsyncTimerResult<'a, TimerWaitOutcome>;
+    fn wait_for_async<'a>(&'a self, duration: Duration) -> AsyncTimerResult<'a, TimerWaitOutcome>;
 }
 
 pub trait AsyncTimer: AsyncSleeper + AsyncWaiter {}
@@ -360,7 +364,8 @@ pub trait AsyncTimer: AsyncSleeper + AsyncWaiter {}
 - 所有接收外部 `TimerInstant` 的 API 都先校验 timer domain，不匹配时返回 `TimerError::TimerDomainMismatch`
 - `Duration` 参数（如 `sleep_for(duration)`）表示“相对于当前 timer instant 的一段时长”
 - `TimerWaitOutcome::Notified` 表示 wait 被显式通知提前唤醒，`sleep_*` 方法不把 notification 作为事件源或完成信号
-- `AsyncTimer` 不引入 `async-trait` 依赖，而是返回 boxed `Future`，以保持依赖面可控
+- `AsyncTimerResult<'a, T>` 是 boxed `Future` 的类型别名，`AsyncTimer` 不引入 `async-trait` 依赖
+- `BlockingTimer` 和 `AsyncTimer` 只作为组合 marker trait，不重复定义父 trait 已有方法，避免 glob import 时的方法歧义
 
 **适用场景**：
 - 可测试的 timeout / retry / backoff 逻辑
@@ -737,6 +742,7 @@ pub struct SystemTimer {
     domain_id: u64,
     origin: Instant,
     notification_epoch: ArcMonitor<u64>,
+    async_notification_epoch: Arc<AtomicU64>, // tokio feature
     async_notifier: Arc<Notify>, // tokio feature
 }
 ```
@@ -747,16 +753,16 @@ pub struct SystemTimer {
 - clone 共享同一个 timer domain 和 notification 状态
 - `sleep_until()` 使用 `std::thread::sleep()` 按真实剩余时间睡眠，不响应 notification
 - `wait_until()` 使用 `ArcMonitor` 的 timed wait 等待真实剩余时间或 notification
-- `notify_all_waiters()` 推进 notification epoch 并唤醒阻塞 wait；启用 `tokio` feature 时也唤醒异步 wait，不唤醒 sleep
+- `notify_all_waiters()` 推进 blocking 和 async notification epoch，并唤醒 wait；不唤醒 sleep
 - `sleep_until_async()` 使用 `tokio::time::sleep()`，不响应 notification
-- `wait_until_async()` 使用 `tokio::time::sleep()` 与 `Notify`，只在 `tokio` feature 下编译
+- `wait_until_async()` 使用 async notification epoch、`Notify` 与 `tokio::time::sleep()`，避免 future 创建后到首次 poll 前的 notification 丢失
 
 **适用场景**：
 - 生产环境超时控制
 - 后台线程或异步任务的可中断等待
 - 与 `MockTimer` 共享同一套 timer trait 的实现代码
 
-**线程安全性**：完全线程安全，阻塞 notification 状态由 `ArcMonitor` 保护；启用 `tokio` feature 时异步 notification 状态由 `Notify` 保护
+**线程安全性**：完全线程安全，阻塞 notification 状态由 `ArcMonitor` 保护；启用 `tokio` feature 时异步 notification 状态由 `AtomicU64` 和 `Notify` 共同保护
 
 **文件位置**：`src/timer/system_timer.rs`
 
@@ -976,7 +982,7 @@ fn main() {
 ### 5.6 场景 6：可测试超时控制
 
 ```rust
-use qubit_clock::timer::{BlockingTimer, MockTimer, TimerDomain};
+use qubit_clock::timer::{BlockingTimer, BlockingWaiter, MockTimer, TimerDomain};
 use std::time::Duration;
 
 fn wait_until_ready<T>(timer: &T) -> bool
@@ -1052,7 +1058,7 @@ rs-clock/
 - **BlockingSleeper / AsyncSleeper**：只表达 deadline sleep
 - **BlockingWaiter / AsyncWaiter**：只表达 deadline-or-notification wait
 - **WaitNotifier**：只表达 waiter notification
-- **BlockingTimer / AsyncTimer**：只作为常用组合 facade
+- **BlockingTimer / AsyncTimer**：只作为常用组合 marker facade
 
 每个 trait 职责单一，互不干扰。
 
