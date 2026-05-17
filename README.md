@@ -42,7 +42,7 @@ Qubit Clock provides a flexible and type-safe clock abstraction system for Rust 
 - **BlockingSleeper / AsyncSleeper**: Sleep until a deadline without treating notifications as completion
 - **BlockingWaiter / AsyncWaiter**: Wait until a deadline or explicit notification
 - **WaitNotifier**: Broadcasts notifications to waiters
-- **BlockingTimer / AsyncTimer**: Convenience facades over the sleep and wait traits
+- **BlockingTimer / AsyncTimer**: Marker facades for types supporting both sleep and wait traits
 - **SystemTimer**: Real timer backed by `std::time::Instant`
 - **MockTimer**: Deterministic timer whose elapsed time is manually controlled by tests
 
@@ -168,7 +168,7 @@ println!("Elapsed: {}", meter.readable_duration());
 ### Timer Domains for Mockable Timeouts
 
 ```rust
-use qubit_clock::timer::{BlockingTimer, MockTimer, TimerDomain};
+use qubit_clock::timer::{BlockingSleeper, MockTimer, TimerDomain};
 use std::time::Duration;
 
 let timer = MockTimer::new();
@@ -228,7 +228,7 @@ The crate is built around several orthogonal traits:
 - **BlockingSleeper / AsyncSleeper**: Sleep operations that complete only after the deadline
 - **WaitNotifier**: Notification broadcast for waiter operations
 - **BlockingWaiter / AsyncWaiter**: Wait operations that complete after the deadline or notification
-- **BlockingTimer / AsyncTimer**: Convenience facades combining sleep and wait capabilities
+- **BlockingTimer / AsyncTimer**: Marker facades combining sleep and wait capabilities
 
 This design follows the **Interface Segregation Principle**, ensuring that implementations only need to provide the features they actually support.
 
@@ -412,7 +412,7 @@ Timer-domain APIs are available under `qubit_clock::timer`:
 - `BlockingSleeper` / `AsyncSleeper` - Provide deadline sleeps that ignore notification as a completion signal
 - `WaitNotifier` - Provides `notify_all_waiters`
 - `BlockingWaiter` / `AsyncWaiter` - Provide notification-sensitive wait operations
-- `BlockingTimer` / `AsyncTimer` - Provide facade APIs for common blocking or async timer usage
+- `BlockingTimer` / `AsyncTimer` - Marker facades for common blocking or async timer bounds
 - `TimerInstant` - Represents an instant relative to the creating timer domain
 - `TimerError` - Reports timer-domain mismatches
 
@@ -447,7 +447,7 @@ Each trait and type has one clear purpose:
 - `BlockingSleeper` / `AsyncSleeper` - Provide deadline sleeps
 - `BlockingWaiter` / `AsyncWaiter` - Provide notification-sensitive deadline waits
 - `WaitNotifier` - Provide waiter notification
-- `BlockingTimer` / `AsyncTimer` - Provide common facade traits
+- `BlockingTimer` / `AsyncTimer` - Provide common marker facade traits
 
 ### Composition over Inheritance
 
@@ -510,7 +510,7 @@ log::info!("Processing took: {}", meter.readable_duration());
 ### Timeout Control
 
 ```rust
-use qubit_clock::timer::{BlockingTimer, TimerDomain, SystemTimer};
+use qubit_clock::timer::{BlockingWaiter, TimerDomain, SystemTimer};
 use std::time::Duration;
 
 let timer = SystemTimer::new();
