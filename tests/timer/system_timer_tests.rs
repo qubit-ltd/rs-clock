@@ -12,10 +12,7 @@ use std::thread;
 use std::time::Duration;
 
 use qubit_clock::timer::{
-    BlockingTimer,
-    SystemTimer,
-    TimerDomain,
-    TimerWaitOutcome,
+    BlockingWaiter, SystemTimer, TimerDomain, TimerWaitOutcome, WaitNotifier,
 };
 
 #[test]
