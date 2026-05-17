@@ -24,6 +24,13 @@ fn test_new_starts_at_zero_elapsed() {
 }
 
 #[test]
+fn test_default_starts_at_zero_elapsed() {
+    let sleeper = MockSleeper::default();
+
+    assert_eq!(Duration::ZERO, sleeper.elapsed());
+}
+
+#[test]
 fn test_advance_updates_elapsed() {
     let sleeper = MockSleeper::new();
 
