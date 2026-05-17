@@ -28,6 +28,8 @@
 //! - [`ZonedClock`]: Extension for timezone support
 //! - [`ControllableClock`]: Extension for time control (testing)
 //! - [`sleep::Sleeper`]: Relative blocking sleep abstraction
+//! - `sleep::AsyncSleeper`: Tokio async relative sleep abstraction enabled by
+//!   the `tokio` feature
 //!
 //! # Implementations
 //!
@@ -40,8 +42,10 @@
 //! - [`MockNanoClock`]: Nanosecond-precision controllable clock for testing
 //! - [`MockClockProgression`]: Frozen or monotonic mock-clock progression mode
 //! - [`Zoned<C>`](Zoned): Wrapper that adds timezone support to any clock
-//! - [`sleep::SystemSleeper`]: Real relative sleeper
-//! - [`sleep::MockSleeper`]: Manually controlled relative sleeper for tests
+//! - [`sleep::SystemSleeper`]: Real relative sleeper, with async support when
+//!   the `tokio` feature is enabled
+//! - [`sleep::MockSleeper`]: Manually controlled relative sleeper for tests,
+//!   with async support when the `tokio` feature is enabled
 //!
 //! # Examples
 //!

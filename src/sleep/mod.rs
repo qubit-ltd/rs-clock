@@ -12,6 +12,8 @@
 //! The sleep module intentionally models only relative sleeps. It does not
 //! expose deadlines, notifications, or condition waits; those belong to
 //! synchronization primitives such as monitors.
+//! [`SystemSleeper`] and [`MockSleeper`] implement [`Sleeper`], and also
+//! implement `AsyncSleeper` when the `tokio` feature is enabled.
 
 #[cfg(feature = "tokio")]
 mod async_sleep_future;

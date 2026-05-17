@@ -40,8 +40,11 @@ Qubit Clock provides a flexible and type-safe clock abstraction system for Rust 
 ### ⏲️ **Sleep Abstractions**
 - **Sleeper**: Blocking relative sleep abstraction
 - **AsyncSleeper**: Tokio async relative sleep abstraction
-- **SystemSleeper**: Real sleeper backed by `std::thread::sleep`
-- **MockSleeper**: Deterministic sleeper whose elapsed time is manually controlled by tests
+- **SystemSleeper**: Real elapsed-time sleeper that implements `Sleeper`, and
+  also implements `AsyncSleeper` when the `tokio` feature is enabled
+- **MockSleeper**: Deterministic elapsed-time sleeper that implements
+  `Sleeper`, and also implements `AsyncSleeper` when the `tokio` feature is
+  enabled
 
 ### 🔒 **Thread Safety**
 - All clock implementations are `Send + Sync`
@@ -282,18 +285,21 @@ This design follows the **Interface Segregation Principle**, ensuring that imple
 
 ### SystemSleeper
 
-- Uses `std::thread::sleep` for blocking relative sleeps
-- Uses `tokio::time::sleep` when the `tokio` feature is enabled
+- Implements `Sleeper` using `std::thread::sleep` for blocking relative sleeps
+- Implements `AsyncSleeper` using `tokio::time::sleep` when the `tokio` feature
+  is enabled
 - Zero-sized type (ZST) with no runtime state
 - Use for: production code that needs an injectable relative sleeper
 
 ### MockSleeper
 
-- Manually controlled relative sleeper for deterministic tests
+- Manually controlled relative sleeper for deterministic tests that implements
+  `Sleeper`
 - Starts at elapsed time zero
 - Clones share the same elapsed time
 - Supports manual `set_elapsed`, `advance`, and `reset`
-- Supports asynchronous sleeps when the `tokio` feature is enabled
+- Implements `AsyncSleeper` for asynchronous sleeps when the `tokio` feature is
+  enabled
 - Use for: testing retry and backoff logic without waiting for real time
 
 ## Time Meters
@@ -357,8 +363,9 @@ the problem:
   can accept `MockClock`, while `NanoTimeMeter` can accept `MockNanoClock` or
   any other `NanoClock` implementation.
 - Use `SystemSleeper` or `MockSleeper` when code needs injectable relative
-  sleeps. Mock sleepers let tests advance elapsed time instantly instead of
-  waiting for wall-clock time.
+  sleeps. They implement the blocking `Sleeper` trait, and also implement
+  `AsyncSleeper` when the `tokio` feature is enabled. Mock sleepers let tests
+  advance elapsed time instantly instead of waiting for wall-clock time.
 - Use the `Clock` traits when business logic depends on "current time" and must
   be testable without coupling directly to the system clock or `Instant::now()`.
 
@@ -405,8 +412,11 @@ Sleep APIs are available under `qubit_clock::sleep`:
 
 - `Sleeper` - Provides blocking relative sleeps
 - `AsyncSleeper` - Provides Tokio async relative sleeps
-- `SystemSleeper` - Uses real elapsed time
-- `MockSleeper` - Uses manually advanced elapsed time for deterministic tests
+- `SystemSleeper` - Uses real elapsed time, implements `Sleeper`, and also
+  implements `AsyncSleeper` when the `tokio` feature is enabled
+- `MockSleeper` - Uses manually advanced elapsed time for deterministic tests,
+  implements `Sleeper`, and also implements `AsyncSleeper` when the `tokio`
+  feature is enabled
 
 Sleep APIs intentionally model only relative sleeping. Notification waits,
 condition waits, and timeout waits belong to monitor primitives in `qubit-lock`.

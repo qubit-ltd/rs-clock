@@ -17,7 +17,11 @@ use crate::sleep::{
     AsyncSleeper,
 };
 
-/// A real sleeper backed by the system thread and Tokio timers.
+/// A real elapsed-time sleeper.
+///
+/// This type implements [`Sleeper`] using [`std::thread::sleep`]. When the
+/// `tokio` feature is enabled, it also implements `AsyncSleeper` using
+/// Tokio timers.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemSleeper;
 
