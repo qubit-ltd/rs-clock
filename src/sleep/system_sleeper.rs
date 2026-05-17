@@ -12,7 +12,10 @@ use std::time::Duration;
 
 use crate::sleep::Sleeper;
 #[cfg(feature = "tokio")]
-use crate::sleep::{AsyncSleepFuture, AsyncSleeper};
+use crate::sleep::{
+    AsyncSleepFuture,
+    AsyncSleeper,
+};
 
 /// A real elapsed-time sleeper.
 ///

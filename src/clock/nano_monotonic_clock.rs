@@ -13,9 +13,15 @@
 //! provides nanosecond-precision monotonic time measurements.
 //!
 
-use crate::{Clock, NanoClock};
+use crate::{
+    Clock,
+    NanoClock,
+};
 use chrono::Utc;
-use std::time::{Duration, Instant};
+use std::time::{
+    Duration,
+    Instant,
+};
 
 /// A clock implementation that provides nanosecond-precision monotonic time.
 ///
