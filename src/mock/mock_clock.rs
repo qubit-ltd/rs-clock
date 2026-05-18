@@ -9,11 +9,6 @@
  ******************************************************************************/
 //! Clock view backed by a shared mock timeline.
 
-use std::sync::{
-    Arc,
-    Mutex,
-    MutexGuard,
-};
 use std::time::Duration as StdDuration;
 
 use chrono::{
@@ -21,6 +16,11 @@ use chrono::{
     Duration,
     Utc,
 };
+use parking_lot::{
+    Mutex,
+    MutexGuard,
+};
+use std::sync::Arc;
 
 use crate::{
     Clock,
@@ -144,14 +144,12 @@ impl MockClock {
             .saturating_add(timeline_elapsed_i128(&self.timeline))
     }
 
-    /// Locks the wall-clock anchor and recovers from poisoning.
+    /// Locks the wall-clock anchor.
     ///
     /// # Returns
     /// A guard for anchor state.
     fn lock_anchor(&self) -> MutexGuard<'_, MockClockAnchor> {
-        self.anchor
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.anchor.lock()
     }
 }
 
