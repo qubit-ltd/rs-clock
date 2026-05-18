@@ -58,11 +58,9 @@ use chrono::{
 pub trait ControllableClock: Clock {
     /// Sets or aligns the clock to a specific time.
     ///
-    /// The exact progression semantics depend on the implementation. For
-    /// [`MockClock`](crate::MockClock) and
-    /// [`MockNanoClock`](crate::MockNanoClock), this reanchors the current
-    /// logical reading to `instant` while preserving the current progression
-    /// and auto-advance settings.
+    /// The exact semantics depend on the implementation. For
+    /// [`MockClock`](crate::MockClock), this reanchors the current timeline
+    /// instant to read as `instant` without changing elapsed mock time.
     ///
     /// # Arguments
     ///
@@ -85,6 +83,10 @@ pub trait ControllableClock: Clock {
     fn set_time(&self, instant: DateTime<Utc>);
 
     /// Advances the clock by the specified duration.
+    ///
+    /// Implementations may reject durations they cannot represent. For
+    /// [`MockClock`](crate::MockClock), negative durations panic because mock
+    /// timeline time is monotonic.
     ///
     /// # Arguments
     ///
@@ -109,9 +111,8 @@ pub trait ControllableClock: Clock {
     /// Resets the clock to its initial state.
     ///
     /// The exact behavior of this method depends on the implementation. For
-    /// [`MockClock`](crate::MockClock) and
-    /// [`MockNanoClock`](crate::MockNanoClock), it resets to the logical
-    /// reading and progression mode captured when the clock was created.
+    /// [`MockClock`](crate::MockClock), it resets the shared mock timeline and
+    /// wall-clock anchor captured when the clock was created.
     ///
     /// # Examples
     ///

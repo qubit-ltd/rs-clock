@@ -12,9 +12,6 @@
 
 mod clock;
 mod controllable_clock;
-mod mock_clock;
-mod mock_clock_progression;
-mod mock_nano_clock;
 mod monotonic_clock;
 mod nano_clock;
 mod nano_monotonic_clock;
@@ -24,9 +21,6 @@ mod zoned_clock;
 
 pub use clock::Clock;
 pub use controllable_clock::ControllableClock;
-pub use mock_clock::MockClock;
-pub use mock_clock_progression::MockClockProgression;
-pub use mock_nano_clock::MockNanoClock;
 pub use monotonic_clock::MonotonicClock;
 pub use nano_clock::NanoClock;
 pub use nano_monotonic_clock::NanoMonotonicClock;

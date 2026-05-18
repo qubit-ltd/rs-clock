@@ -110,7 +110,7 @@ fn test_millis_with_mock_clock() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(1000, false);
+    clock.advance(StdDuration::from_millis(1000));
     meter.stop();
 
     assert_eq!(meter.millis(), 1000);
@@ -128,12 +128,12 @@ fn test_millis_running() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(500, false);
+    clock.advance(StdDuration::from_millis(500));
 
     // Should return current elapsed time even without stop
     assert_eq!(meter.millis(), 500);
 
-    clock.add_millis(500, false);
+    clock.advance(StdDuration::from_millis(500));
     assert_eq!(meter.millis(), 1000);
 }
 
@@ -143,13 +143,13 @@ fn test_millis_stopped() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(1000, false);
+    clock.advance(StdDuration::from_millis(1000));
     meter.stop();
 
     // After stop, should return fixed duration
     assert_eq!(meter.millis(), 1000);
 
-    clock.add_millis(1000, false);
+    clock.advance(StdDuration::from_millis(1000));
     assert_eq!(meter.millis(), 1000); // Still 1000
 }
 
@@ -159,7 +159,7 @@ fn test_seconds() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(5500, false);
+    clock.advance(StdDuration::from_millis(5500));
     meter.stop();
 
     assert_eq!(meter.seconds(), 5);
@@ -171,7 +171,7 @@ fn test_minutes() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(125000, false); // 2 minutes 5 seconds
+    clock.advance(StdDuration::from_millis(125000)); // 2 minutes 5 seconds
     meter.stop();
 
     assert_eq!(meter.minutes(), 2);
@@ -183,7 +183,7 @@ fn test_duration() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(1500, false);
+    clock.advance(StdDuration::from_millis(1500));
     meter.stop();
 
     let duration = meter.duration();
@@ -196,7 +196,7 @@ fn test_readable_duration() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(1500, false);
+    clock.advance(StdDuration::from_millis(1500));
     meter.stop();
 
     let readable = meter.readable_duration();
@@ -215,7 +215,7 @@ fn test_speed_per_second() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(2000, false); // 2 seconds
+    clock.advance(StdDuration::from_millis(2000)); // 2 seconds
     meter.stop();
 
     let speed = meter.speed_per_second(1000);
@@ -234,7 +234,7 @@ fn test_speed_per_minute() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(2000, false); // 2 seconds
+    clock.advance(StdDuration::from_millis(2000)); // 2 seconds
     meter.stop();
 
     let speed = meter.speed_per_minute(1000);
@@ -253,7 +253,7 @@ fn test_formatted_speed_per_second() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(2000, false);
+    clock.advance(StdDuration::from_millis(2000));
     meter.stop();
 
     let formatted = meter.formatted_speed_per_second(1000);
@@ -272,7 +272,7 @@ fn test_formatted_speed_per_minute() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(2000, false);
+    clock.advance(StdDuration::from_millis(2000));
     meter.stop();
 
     let formatted = meter.formatted_speed_per_minute(1000);
@@ -369,11 +369,11 @@ fn test_multiple_start_calls() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(1000, false);
+    clock.advance(StdDuration::from_millis(1000));
 
     // Start again should reset the start time
     meter.start();
-    clock.add_millis(500, false);
+    clock.advance(StdDuration::from_millis(500));
     meter.stop();
 
     // Should only measure from second start
@@ -419,7 +419,7 @@ fn test_speed_calculation_with_fractional_seconds() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(500, false); // 0.5 seconds
+    clock.advance(StdDuration::from_millis(500)); // 0.5 seconds
     meter.stop();
 
     // seconds() is still integer-truncated.
@@ -430,7 +430,7 @@ fn test_speed_calculation_with_fractional_seconds() {
 
     // For non-integer seconds, speed should also use precise duration.
     meter.restart();
-    clock.add_millis(1500, false); // 1.5 seconds
+    clock.advance(StdDuration::from_millis(1500)); // 1.5 seconds
     meter.stop();
 
     let speed = meter
@@ -445,7 +445,7 @@ fn test_edge_case_zero_count() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(1000, false);
+    clock.advance(StdDuration::from_millis(1000));
     meter.stop();
 
     assert_eq!(meter.speed_per_second(0), Some(0.0));
@@ -458,7 +458,7 @@ fn test_edge_case_large_count() {
     let mut meter = TimeMeter::with_clock(clock.clone());
 
     meter.start();
-    clock.add_millis(1000, false);
+    clock.advance(StdDuration::from_millis(1000));
     meter.stop();
 
     let large_count = 1_000_000_000;
@@ -500,14 +500,14 @@ fn test_millis_uses_current_time_when_running() {
 
     // Start the meter
     meter.start();
-    clock.add_millis(100, false);
+    clock.advance(StdDuration::from_millis(100));
 
     // First call - should use self.clock.millis() because end_time is None
     let elapsed1 = meter.millis();
     assert_eq!(elapsed1, 100);
 
     // Advance time more
-    clock.add_millis(50, false);
+    clock.advance(StdDuration::from_millis(50));
 
     // Second call - should again use self.clock.millis() because end_time is still None
     let elapsed2 = meter.millis();
@@ -517,7 +517,7 @@ fn test_millis_uses_current_time_when_running() {
     meter.stop();
 
     // After stop, should use end_time instead of self.clock.millis()
-    clock.add_millis(100, false);
+    clock.advance(StdDuration::from_millis(100));
     let elapsed3 = meter.millis();
     assert_eq!(elapsed3, 150); // Should still be 150, not 250
 }

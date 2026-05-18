@@ -24,7 +24,6 @@ use qubit_clock::{
     Clock,
     ControllableClock,
     MockClock,
-    MockClockProgression,
     MonotonicClock,
     NanoClock,
     NanoMonotonicClock,
@@ -32,6 +31,7 @@ use qubit_clock::{
     Zoned,
     ZonedClock,
 };
+use std::time::Duration as StdDuration;
 
 const CLOCK_DRIFT_TOLERANCE_MS: i64 = 1_000;
 
@@ -124,10 +124,9 @@ fn test_zoned_deref_to_inner_clock() {
     let clock = Zoned::new(mock, Shanghai);
 
     // Can call MockClock-specific methods directly via Deref.
-    assert_eq!(clock.progression(), MockClockProgression::Frozen);
-    clock.set_monotonic_progression_enabled(true);
-    assert_eq!(clock.progression(), MockClockProgression::Monotonic);
-    clock.set_progression(MockClockProgression::Frozen);
+    assert_eq!(clock.timeline().elapsed(), StdDuration::ZERO);
+    clock.advance(StdDuration::from_millis(10));
+    assert_eq!(clock.timeline().elapsed(), StdDuration::from_millis(10));
 
     // Can call controllable methods directly as well.
     let fixed_time = DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")

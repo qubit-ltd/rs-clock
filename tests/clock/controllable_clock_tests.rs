@@ -69,14 +69,11 @@ fn test_controllable_clock_add_duration_positive() {
 }
 
 #[test]
-fn test_controllable_clock_add_duration_negative() {
+#[should_panic(expected = "mock time can only be advanced by a non-negative duration")]
+fn test_controllable_clock_add_duration_negative_panics() {
     let clock = MockClock::new();
 
-    let initial = clock.time();
     clock.add_duration(Duration::hours(-1));
-
-    let after = clock.time();
-    assert_eq!(after - initial, Duration::hours(-1));
 }
 
 #[test]
@@ -164,13 +161,10 @@ fn test_controllable_clock_complex_scenario() {
         start_time + Duration::days(1) + Duration::hours(12)
     );
 
-    // Go back 6 hours
-    clock.add_duration(Duration::hours(-6));
-    let after_back = clock.time();
-    assert_eq!(
-        after_back,
-        start_time + Duration::days(1) + Duration::hours(6)
-    );
+    // Reanchor wall time without rewinding the shared monotonic timeline.
+    let reanchored = start_time + Duration::hours(6);
+    clock.set_time(reanchored);
+    assert_eq!(clock.time(), reanchored);
 }
 
 #[test]
