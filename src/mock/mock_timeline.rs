@@ -9,12 +9,12 @@
  ******************************************************************************/
 //! Shared monotonic timeline for mock time components.
 
-use std::sync::{
-    Arc,
+use parking_lot::{
     Condvar,
     Mutex,
     MutexGuard,
 };
+use std::sync::Arc;
 use std::time::{
     Duration,
     Instant,
@@ -229,11 +229,7 @@ impl MockTimeline {
     pub fn wait_for_event_after(&self, observed_epoch: u64) {
         let mut state = self.lock_state();
         while state.event_epoch == observed_epoch {
-            state = self
-                .shared
-                .event_changed
-                .wait(state)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            self.shared.event_changed.wait(&mut state);
         }
     }
 
@@ -261,13 +257,8 @@ impl MockTimeline {
             let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
                 return false;
             };
-            let wait_result = self.shared.waiters_changed.wait_timeout(state, remaining);
-            let (next_state, timeout_result) = match wait_result {
-                Ok(result) => result,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-            state = next_state;
-            if timeout_result.timed_out() && Self::waiter_count(&state, kind) < count {
+            let wait_result = self.shared.waiters_changed.wait_for(&mut state, remaining);
+            if wait_result.timed_out() && Self::waiter_count(&state, kind) < count {
                 return false;
             }
         }
@@ -287,11 +278,7 @@ impl MockTimeline {
         Self::increment_waiter(&mut state, kind);
         self.shared.waiters_changed.notify_all();
         while state.elapsed_nanos < deadline.nanos_since_origin() {
-            state = self
-                .shared
-                .event_changed
-                .wait(state)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            self.shared.event_changed.wait(&mut state);
         }
         Self::decrement_waiter(&mut state, kind);
         self.shared.waiters_changed.notify_all();
@@ -330,15 +317,12 @@ impl MockTimeline {
         })
     }
 
-    /// Locks timeline state and recovers from poisoning.
+    /// Locks timeline state.
     ///
     /// # Returns
     /// A guard for timeline state.
     fn lock_state(&self) -> MutexGuard<'_, MockTimelineState> {
-        self.shared
-            .state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.shared.state.lock()
     }
 
     /// Wakes blocking and async waiters after an event-epoch change.
