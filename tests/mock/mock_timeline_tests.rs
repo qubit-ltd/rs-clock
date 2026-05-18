@@ -30,6 +30,20 @@ fn test_default_starts_at_zero_elapsed() {
     assert_eq!(Duration::ZERO, timeline.elapsed());
 }
 
+/// Verifies independently created timelines receive unique ids.
+///
+/// # Errors
+/// The test fails if timeline ids are reused.
+#[test]
+fn test_new_assigns_unique_timeline_ids() {
+    let first = MockTimeline::new();
+    let second = MockTimeline::new();
+    let first_clone = first.clone();
+
+    assert_ne!(first.id(), second.id());
+    assert_eq!(first.id(), first_clone.id());
+}
+
 /// Verifies elapsed conversion saturates when internal nanoseconds exceed `Duration`.
 ///
 /// # Errors
@@ -124,9 +138,46 @@ fn test_wait_until_returns_immediately_for_reached_deadline() {
     let timeline = MockTimeline::new();
     let deadline = timeline.now();
 
-    timeline.wait_until(deadline);
+    timeline
+        .wait_until(deadline)
+        .expect("deadline should belong to its timeline");
 
     assert_eq!(Duration::ZERO, timeline.elapsed());
+}
+
+/// Verifies deadline waits reject instants from another timeline.
+///
+/// # Errors
+/// The test fails if a foreign instant is accepted as a local deadline.
+#[test]
+fn test_wait_until_rejects_foreign_timeline_deadline() {
+    let timeline = MockTimeline::new();
+    let foreign_timeline = MockTimeline::new();
+    let foreign_deadline = foreign_timeline.now();
+
+    assert_eq!(
+        Err(MockTimeError::MismatchedTimeline {
+            expected: timeline.id(),
+            actual: foreign_timeline.id(),
+        }),
+        timeline.wait_until(foreign_deadline),
+    );
+}
+
+/// Verifies instant ordering is defined only within the same timeline.
+///
+/// # Errors
+/// The test fails if foreign instants are ordered as if they shared a timeline.
+#[test]
+fn test_mock_instant_partial_order_requires_same_timeline() {
+    let timeline = MockTimeline::new();
+    let first = timeline.now();
+    timeline.advance(Duration::from_nanos(1));
+    let second = timeline.now();
+    let foreign = MockTimeline::new().now();
+
+    assert!(first < second);
+    assert_eq!(None, first.partial_cmp(&foreign));
 }
 
 /// Verifies waiter observation returns false when the real timeout is elapsed.

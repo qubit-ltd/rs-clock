@@ -24,6 +24,23 @@ fn test_active_waiters_display_message() {
     assert_eq!("mock timeline has active waiters", error.to_string());
 }
 
+/// Verifies mismatched-timeline errors expose both timeline ids.
+///
+/// # Errors
+/// The test fails if the display text no longer identifies the mismatched ids.
+#[test]
+fn test_mismatched_timeline_display_message() {
+    let error = MockTimeError::MismatchedTimeline {
+        expected: 7,
+        actual: 9,
+    };
+
+    assert_eq!(
+        "mock instant belongs to timeline 9, but timeline 7 was expected",
+        error.to_string(),
+    );
+}
+
 /// Verifies mock time errors implement the standard error trait.
 ///
 /// # Errors
