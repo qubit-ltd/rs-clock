@@ -189,23 +189,22 @@ assert_eq!(clock.millis(), start + 30_000);
 ```rust
 use qubit_clock::MockTime;
 use qubit_clock::sleep::Sleeper;
-use std::sync::mpsc;
 use std::time::Duration;
 
 let mock = MockTime::unix_epoch();
 let sleeper = mock.sleeper();
 let worker = sleeper.clone();
-let (done_tx, done_rx) = mpsc::channel();
-
-std::thread::spawn(move || {
+let handle = std::thread::spawn(move || {
     worker.sleep_for(Duration::from_secs(5));
-    done_tx.send(()).expect("test should receive sleep result");
 });
 
+assert!(mock.timeline().wait_for_blocked_waiters(
+    qubit_clock::MockWaiterKind::Sleep,
+    1,
+    Duration::from_secs(1),
+));
 mock.advance(Duration::from_secs(5));
-done_rx
-    .recv_timeout(Duration::from_secs(1))
-    .expect("mock sleep should complete after elapsed time advances");
+handle.join().expect("mock sleep should finish");
 ```
 
 ### 高精度时间计量器
@@ -299,6 +298,7 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 - 驱动 `MockClock`、`MockSleeper` 以及后续 timeout-aware 测试原语
 - 支持瞬间推进时间和外部事件通知
 - 跟踪 active waiter，避免在仍有等待者时 unsafe reset timeline
+- 为每个 timeline 分配唯一 id，防止 `MockInstant` deadline 被用于错误的 timeline
 - 拒绝来自其他 mock timeline 的 deadline
 - 适用于：需要 clock 和 sleep 遵循同一套 mock 时间源的确定性测试
 
@@ -441,6 +441,7 @@ let elapsed = start.elapsed();
 Mock time API 位于 crate root：
 
 - `MockTimeline` - 共享的单调 mock 时间源
+- `MockInstant` - 绑定 timeline 的单调 instant，用于 deadline
 - `MockClock` - timeline-backed 的 `Clock`、`NanoClock` 和
   `ControllableClock` 实现
 - `MockTime` - 便捷 facade，返回共享同一 timeline 的 clock 和 sleeper
@@ -525,6 +526,7 @@ cargo test
 
 - **chrono**：日期和时间处理，支持序列化
 - **chrono-tz**：全面的时区数据库
+- **parking_lot**：mock time runtime 使用的非 poisoning 同步原语
 - **tokio**：启用 `tokio` feature 后为 `sleep::AsyncSleeper` 提供可选异步运行时支持
 
 ## 使用场景
@@ -560,6 +562,11 @@ let sleeper = mock.sleeper();
 let worker = sleeper.clone();
 let handle = std::thread::spawn(move || retry_once(&worker));
 
+assert!(mock.timeline().wait_for_blocked_waiters(
+    qubit_clock::MockWaiterKind::Sleep,
+    1,
+    Duration::from_secs(1),
+));
 mock.advance(Duration::from_millis(10));
 handle.join().expect("retry should finish");
 ```
