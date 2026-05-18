@@ -45,3 +45,13 @@ fn test_readmes_do_not_reference_removed_mock_time_api() {
         assert!(readme.contains("MockTime"));
     }
 }
+
+#[test]
+fn test_readmes_describe_current_mock_timeline_api() {
+    for readme in readmes() {
+        assert!(readme.contains("MockInstant"));
+        assert!(readme.contains("MockTimeError"));
+        assert!(readme.contains("wait_for_blocked_waiters"));
+        assert!(readme.contains("parking_lot"));
+    }
+}
