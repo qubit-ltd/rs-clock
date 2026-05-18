@@ -176,12 +176,17 @@ let mock = MockTime::unix_epoch();
 let clock = mock.clock();
 let sleeper = mock.sleeper();
 let worker = sleeper.clone();
-
-std::thread::spawn(move || {
+let handle = std::thread::spawn(move || {
     worker.sleep_for(Duration::from_secs(5));
 });
 
+assert!(mock.timeline().wait_for_blocked_waiters(
+    qubit_clock::MockWaiterKind::Sleep,
+    1,
+    Duration::from_secs(1),
+));
 mock.advance(Duration::from_secs(5));
+handle.join().expect("mock sleep should finish");
 assert_eq!(clock.millis(), 5_000);
 ```
 
@@ -276,6 +281,8 @@ This design follows the **Interface Segregation Principle**, ensuring that imple
 - Drives `MockClock`, `MockSleeper`, and future timeout-aware test primitives
 - Supports instant time advancement and external event notifications
 - Tracks active waiters so reset can reject unsafe timeline rewinds
+- Assigns a unique id to each timeline so `MockInstant` deadlines cannot be
+  used with the wrong timeline
 - Rejects deadlines created by a different mock timeline
 - Use for: deterministic tests that need clocks and sleeps to follow one time source
 
@@ -425,6 +432,7 @@ Extension trait for controllable clocks (testing):
 Mock time APIs are available at the crate root:
 
 - `MockTimeline` - Shared monotonic mock time source
+- `MockInstant` - Timeline-bound monotonic instant used for deadlines
 - `MockClock` - Timeline-backed implementation of `Clock`, `NanoClock`, and
   `ControllableClock`
 - `MockTime` - Convenience facade that returns one shared clock and sleeper
@@ -510,6 +518,8 @@ cargo test
 
 - **chrono**: Date and time handling with serialization support
 - **chrono-tz**: Comprehensive timezone database
+- **parking_lot**: Non-poisoning synchronization primitives used by the mock
+  time runtime
 - **tokio**: Optional dependency for `sleep::AsyncSleeper` when the `tokio` feature is enabled
 
 ## Use Cases
@@ -545,6 +555,11 @@ let sleeper = mock.sleeper();
 let worker = sleeper.clone();
 let handle = std::thread::spawn(move || retry_once(&worker));
 
+assert!(mock.timeline().wait_for_blocked_waiters(
+    qubit_clock::MockWaiterKind::Sleep,
+    1,
+    Duration::from_secs(1),
+));
 mock.advance(Duration::from_millis(10));
 handle.join().expect("retry should finish");
 ```
