@@ -287,7 +287,7 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 
 - 可控制的 UTC 与纳秒测试时钟
 - 由 `MockTimeline` 驱动
-- 使用 `Arc<Mutex<>>` 实现线程安全
+- 使用非 poisoning 同步原语保护共享状态
 - 实现 `Clock`、`NanoClock` 和 `ControllableClock`
 - 支持设置墙钟锚点，并推进共享 mock 时间
 - 在关联 timeline 被测试推进前保持冻结
@@ -299,6 +299,7 @@ println!("速度: {}", meter.formatted_speed_per_second(1000));
 - 驱动 `MockClock`、`MockSleeper` 以及后续 timeout-aware 测试原语
 - 支持瞬间推进时间和外部事件通知
 - 跟踪 active waiter，避免在仍有等待者时 unsafe reset timeline
+- 拒绝来自其他 mock timeline 的 deadline
 - 适用于：需要 clock 和 sleep 遵循同一套 mock 时间源的确定性测试
 
 ### MockTime
@@ -444,7 +445,8 @@ Mock time API 位于 crate root：
   `ControllableClock` 实现
 - `MockTime` - 便捷 facade，返回共享同一 timeline 的 clock 和 sleeper
 - `MockWaiterKind` - 用于测试观测的 waiter 分类
-- `MockTimeError` - active waiter 导致 reset 被拒绝时返回的错误
+- `MockTimeError` - active waiter 导致 reset 被拒绝，或 deadline 属于其他
+  mock timeline 时返回的错误
 
 ### Sleep Trait
 
