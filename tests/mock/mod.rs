@@ -7,16 +7,9 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for the clock module.
+//! Tests for the mock time module.
 
-mod clock_tests;
-mod controllable_clock_tests;
-mod monotonic_clock_tests;
-mod monotonic_tests;
-mod nano_clock_tests;
-mod nano_monotonic_clock_tests;
-mod nano_monotonic_tests;
-mod system_clock_tests;
-mod system_tests;
-mod zoned_clock_tests;
-mod zoned_tests;
+mod mock_clock_tests;
+mod mock_time_error_tests;
+mod mock_time_tests;
+mod mock_timeline_tests;

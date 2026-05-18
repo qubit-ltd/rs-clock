@@ -7,61 +7,48 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
+//! Tests for timeline-backed mock sleepers.
+
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
+use qubit_clock::MockWaiterKind;
 use qubit_clock::sleep::{
     MockSleeper,
     Sleeper,
 };
 
+/// Verifies new sleepers start with a zero-elapsed timeline.
+///
+/// # Errors
+/// The test fails if the sleeper timeline starts advanced.
 #[test]
-fn test_new_starts_at_zero_elapsed() {
+fn test_new_starts_with_zero_timeline_elapsed() {
     let sleeper = MockSleeper::new();
 
-    assert_eq!(Duration::ZERO, sleeper.elapsed());
+    assert_eq!(Duration::ZERO, sleeper.timeline().elapsed());
 }
 
+/// Verifies default sleepers start with a zero-elapsed timeline.
+///
+/// # Errors
+/// The test fails if the default timeline starts advanced.
 #[test]
-fn test_default_starts_at_zero_elapsed() {
+fn test_default_starts_with_zero_timeline_elapsed() {
     let sleeper = MockSleeper::default();
 
-    assert_eq!(Duration::ZERO, sleeper.elapsed());
+    assert_eq!(Duration::ZERO, sleeper.timeline().elapsed());
 }
 
+/// Verifies sleep completion is driven by the backing timeline.
+///
+/// # Errors
+/// The test fails if advancing the timeline does not unblock the sleeper.
 #[test]
-fn test_advance_updates_elapsed() {
+fn test_sleep_for_blocks_until_timeline_advances() {
     let sleeper = MockSleeper::new();
-
-    sleeper.advance(Duration::from_millis(40));
-
-    assert_eq!(Duration::from_millis(40), sleeper.elapsed());
-}
-
-#[test]
-fn test_set_elapsed_replaces_elapsed() {
-    let sleeper = MockSleeper::new();
-
-    sleeper.advance(Duration::from_millis(40));
-    sleeper.set_elapsed(Duration::from_millis(7));
-
-    assert_eq!(Duration::from_millis(7), sleeper.elapsed());
-}
-
-#[test]
-fn test_reset_sets_elapsed_to_zero() {
-    let sleeper = MockSleeper::new();
-
-    sleeper.advance(Duration::from_millis(40));
-    sleeper.reset();
-
-    assert_eq!(Duration::ZERO, sleeper.elapsed());
-}
-
-#[test]
-fn test_sleep_for_blocks_until_mock_time_advances() {
-    let sleeper = MockSleeper::new();
+    let timeline = sleeper.timeline();
     let worker_sleeper = sleeper.clone();
     let (done_sender, done_receiver) = mpsc::channel();
 
@@ -73,11 +60,11 @@ fn test_sleep_for_blocks_until_mock_time_advances() {
     });
 
     assert!(
-        sleeper.wait_for_blocking_sleepers(1, Duration::from_secs(1)),
+        timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::from_secs(1)),
         "worker should block in mock sleep before time advances",
     );
 
-    sleeper.advance(Duration::from_millis(99));
+    timeline.advance(Duration::from_millis(99));
     assert!(
         done_receiver
             .recv_timeout(Duration::from_millis(20))
@@ -85,17 +72,22 @@ fn test_sleep_for_blocks_until_mock_time_advances() {
         "mock sleep should not complete before target elapsed time",
     );
 
-    sleeper.advance(Duration::from_millis(1));
+    timeline.advance(Duration::from_millis(1));
     done_receiver
         .recv_timeout(Duration::from_secs(1))
         .expect("mock sleep should complete after target elapsed time");
     worker.join().expect("worker should finish cleanly");
 }
 
+/// Verifies sleep deadlines are relative to the call-time timeline instant.
+///
+/// # Errors
+/// The test fails if the sleeper ignores elapsed time at call start.
 #[test]
-fn test_sleep_for_uses_elapsed_at_call_time() {
+fn test_sleep_for_uses_timeline_elapsed_at_call_time() {
     let sleeper = MockSleeper::new();
-    sleeper.advance(Duration::from_millis(10));
+    let timeline = sleeper.timeline();
+    timeline.advance(Duration::from_millis(10));
     let worker_sleeper = sleeper.clone();
     let (done_sender, done_receiver) = mpsc::channel();
 
@@ -107,11 +99,11 @@ fn test_sleep_for_uses_elapsed_at_call_time() {
     });
 
     assert!(
-        sleeper.wait_for_blocking_sleepers(1, Duration::from_secs(1)),
+        timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::from_secs(1)),
         "worker should block in mock sleep before time advances",
     );
 
-    sleeper.advance(Duration::from_millis(99));
+    timeline.advance(Duration::from_millis(99));
     assert!(
         done_receiver
             .recv_timeout(Duration::from_millis(20))
@@ -119,7 +111,7 @@ fn test_sleep_for_uses_elapsed_at_call_time() {
         "sleep should be relative to elapsed at call time",
     );
 
-    sleeper.advance(Duration::from_millis(1));
+    timeline.advance(Duration::from_millis(1));
     done_receiver
         .recv_timeout(Duration::from_secs(1))
         .expect("sleep should complete after the full relative duration");

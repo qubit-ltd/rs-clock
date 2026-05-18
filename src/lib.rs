@@ -16,7 +16,7 @@
 //! - **High precision**: Nanosecond-level time measurements
 //! - **Timezone support**: Convert to local time in any timezone
 //! - **Monotonic time**: Time that never goes backwards
-//! - **Testing support**: Controllable mock clocks for tests
+//! - **Testing support**: Shared mock timelines for clocks and sleepers
 //! - **Mockable sleeps**: Relative sleep abstractions with real and mock implementations
 //!
 //! # Architecture
@@ -30,6 +30,7 @@
 //! - [`sleep::Sleeper`]: Relative blocking sleep abstraction
 //! - `sleep::AsyncSleeper`: Tokio async relative sleep abstraction enabled by
 //!   the `tokio` feature
+//! - [`MockTimeline`]: Shared monotonic mock time source for deterministic tests
 //!
 //! # Implementations
 //!
@@ -38,13 +39,12 @@
 //! - [`SystemClock`]: Uses system wall clock time
 //! - [`MonotonicClock`]: Monotonic time (unaffected by system time changes)
 //! - [`NanoMonotonicClock`]: Monotonic time with nanosecond precision
-//! - [`MockClock`]: Controllable clock for testing
-//! - [`MockNanoClock`]: Nanosecond-precision controllable clock for testing
-//! - [`MockClockProgression`]: Frozen or monotonic mock-clock progression mode
+//! - [`MockClock`]: UTC and nanosecond clock backed by a mock timeline
+//! - [`MockTime`]: Convenience facade bundling one timeline, clock, and sleeper
 //! - [`Zoned<C>`](Zoned): Wrapper that adds timezone support to any clock
 //! - [`sleep::SystemSleeper`]: Real relative sleeper, with async support when
 //!   the `tokio` feature is enabled
-//! - [`sleep::MockSleeper`]: Manually controlled relative sleeper for tests,
+//! - [`sleep::MockSleeper`]: Timeline-backed relative sleeper for tests,
 //!   with async support when the `tokio` feature is enabled
 //!
 //! # Examples
@@ -162,15 +162,24 @@ pub mod clock;
 pub use clock::{
     Clock,
     ControllableClock,
-    MockClock,
-    MockClockProgression,
-    MockNanoClock,
     MonotonicClock,
     NanoClock,
     NanoMonotonicClock,
     SystemClock,
     Zoned,
     ZonedClock,
+};
+
+// Unified mock time runtime
+pub mod mock;
+
+pub use mock::{
+    MockClock,
+    MockInstant,
+    MockTime,
+    MockTimeError,
+    MockTimeline,
+    MockWaiterKind,
 };
 
 // Time meters

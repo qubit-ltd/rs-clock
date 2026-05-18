@@ -33,3 +33,15 @@ fn test_readmes_use_existing_time_api_names() {
         assert!(readme.contains("local_time()"));
     }
 }
+
+#[test]
+fn test_readmes_do_not_reference_removed_mock_time_api() {
+    for readme in readmes() {
+        assert!(!readme.contains("MockNanoClock"));
+        assert!(!readme.contains("MockClockProgression"));
+        assert!(!readme.contains("MockSleeper::advance"));
+        assert!(!readme.contains("sleeper.advance("));
+        assert!(readme.contains("MockTimeline"));
+        assert!(readme.contains("MockTime"));
+    }
+}

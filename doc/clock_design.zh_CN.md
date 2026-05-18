@@ -2,9 +2,9 @@
 
 ## 版本信息
 
-- **文档版本**: 1.1
+- **文档版本**: 1.2
 - **创建日期**: 2025-10-19
-- **更新日期**: 2026-05-16
+- **更新日期**: 2026-05-18
 - **作者**: 胡海星
 
 ## 1. 设计概述
@@ -16,9 +16,9 @@
 1. **职责分离**：将时间获取、时区支持、高精度测量、时钟控制、relative sleep 等功能分离到不同的 trait
 2. **类型安全**：通过类型系统在编译期保证功能支持（如是否支持时区、纳秒精度等）
 3. **零成本抽象**：不需要的功能不付出任何性能代价
-4. **易于测试**：提供可控制的模拟时钟，支持单元测试和集成测试
+4. **易于测试**：提供共享 mock timeline 的模拟时钟和模拟 sleeper，支持单元测试和集成测试
 5. **灵活组合**：通过包装器模式灵活组合不同的功能
-6. **Sleep 可注入**：生产代码使用真实 sleep，测试代码使用可手动推进的 mock sleep，避免真实等待
+6. **Sleep 可注入**：生产代码使用真实 sleep，测试代码通过共享 mock timeline 推进 sleep，避免真实等待
 
 ### 1.2 核心设计原则
 
@@ -55,15 +55,19 @@ Clock trait 实现：
 ├── SystemClock (系统时钟)
 ├── MonotonicClock (单调时钟)
 ├── NanoMonotonicClock (高精度单调时钟)
-├── MockClock (模拟时钟)
-└── MockNanoClock (高精度模拟时钟)
+└── MockClock (timeline-backed 模拟时钟)
 
 包装器：
 └── Zoned<C: Clock> (为任何 Clock 添加时区支持)
 
 Sleep trait 实现：
 ├── SystemSleeper (真实 sleeper)
-└── MockSleeper (可手动控制 elapsed time 的模拟 sleeper)
+└── MockSleeper (timeline-backed 模拟 sleeper)
+
+Mock time runtime：
+├── MockTimeline (共享单调 mock 时间源)
+├── MockInstant (timeline 上的单调 instant)
+└── MockTime (组合 timeline、clock 和 sleeper 的便捷入口)
 ```
 
 ### 2.3 类型关系图
@@ -78,8 +82,7 @@ graph TD
     SystemClock[SystemClock<br/>系统时钟]
     MonotonicClock[MonotonicClock<br/>单调时钟]
     NanoMonotonicClock[NanoMonotonicClock<br/>高精度单调时钟]
-    MockClock[MockClock<br/>模拟时钟]
-    MockNanoClock[MockNanoClock<br/>高精度模拟时钟]
+    MockClock[MockClock<br/>timeline-backed 模拟时钟]
     Zoned[Zoned&lt;C&gt;<br/>时区包装器]
 
     Clock --> NanoClock
@@ -90,14 +93,12 @@ graph TD
     Clock -.实现.-> MonotonicClock
     Clock -.实现.-> NanoMonotonicClock
     Clock -.实现.-> MockClock
-    Clock -.实现.-> MockNanoClock
     Clock -.实现.-> Zoned
 
     NanoClock -.实现.-> NanoMonotonicClock
-    NanoClock -.实现.-> MockNanoClock
+    NanoClock -.实现.-> MockClock
     ZonedClock -.实现.-> Zoned
     ControllableClock -.实现.-> MockClock
-    ControllableClock -.实现.-> MockNanoClock
 
     style Clock fill:#e1f5ff
     style NanoClock fill:#fff3e0
@@ -112,16 +113,25 @@ graph TD
     Sleeper[Sleeper trait<br/>阻塞 relative sleep]
     AsyncSleeper[AsyncSleeper trait<br/>Tokio 异步 relative sleep]
     SystemSleeper[SystemSleeper<br/>真实 sleeper]
-    MockSleeper[MockSleeper<br/>模拟 sleeper]
+    MockSleeper[MockSleeper<br/>timeline-backed 模拟 sleeper]
+    MockTimeline[MockTimeline<br/>共享 mock 时间源]
+    MockClock[MockClock<br/>timeline-backed clock]
+    MockTime[MockTime<br/>测试 facade]
 
     Sleeper -.实现.-> SystemSleeper
     Sleeper -.实现.-> MockSleeper
     AsyncSleeper -.tokio feature.-> SystemSleeper
     AsyncSleeper -.tokio feature.-> MockSleeper
+    MockTimeline -.驱动.-> MockSleeper
+    MockTimeline -.驱动.-> MockClock
+    MockTime -.组合.-> MockTimeline
+    MockTime -.提供.-> MockSleeper
+    MockTime -.提供.-> MockClock
 
     style Sleeper fill:#e1f5ff
     style AsyncSleeper fill:#f3e5f5
     style MockSleeper fill:#e8f5e9
+    style MockTimeline fill:#fff3e0
 ```
 
 ## 3. Trait 详细设计
@@ -458,126 +468,148 @@ println!("耗时: {} ns", elapsed);
 
 ### 4.4 MockClock - 模拟时钟
 
-**职责**：提供可控制的时钟实现，用于测试
+**职责**：提供由共享 `MockTimeline` 驱动的可控制 UTC 时钟和纳秒时钟，用于测试。
 
 **定义**：
 ```rust
 pub struct MockClock {
-    inner: Arc<Mutex<MockClockInner>>,
+    timeline: MockTimeline,
+    anchor: Arc<Mutex<MockClockAnchor>>,
 }
 
-struct MockClockInner {
-    initial_time: i64,
-    initial_progression: MockClockProgression,
-    epoch: i64,
-    monotonic_clock: MonotonicClock,
-    monotonic_base_millis: i64,
-    progression: MockClockProgression,
-    millis_to_add: i64,
-    millis_to_add_each_time: i64,
-    add_every_time: bool,
+struct MockClockAnchor {
+    initial_wall_origin_nanos: i128,
+    wall_origin_nanos: i128,
 }
 
 impl Clock for MockClock { /* ... */ }
+impl NanoClock for MockClock { /* ... */ }
 impl ControllableClock for MockClock { /* ... */ }
 ```
 
 **设计要点**：
-- 实现 `Clock` 和 `ControllableClock`
-- 创建时捕获系统时间作为初始冻结读数
-- 使用 `Arc<Mutex<>>` 保证线程安全和可共享
-- 支持设置逻辑当前时间、增加时间、自动递增等功能
-- 默认使用冻结模式，保证测试可重复
-- 通过 `MockClockProgression` 可切换到基于内部 `MonotonicClock` 的自然推进模式
-- 切换冻结/单调推进时会先把当前逻辑读数重新锚定，避免开关造成时间跳变
-- `set_time()` 设置当前逻辑读数，并保留当前 progression 与自动递增设置；后续是否自然推进由当前 progression 模式决定
-- `reset()` 会恢复到创建时捕获的读数和初始 progression，并清除附加偏移和自动递增
+- 同时实现 `Clock`、`NanoClock` 和 `ControllableClock`
+- 由 `MockTimeline` 提供单调 elapsed time；测试不推进 timeline 时，读数保持冻结
+- `MockClock::new()` 使用当前 UTC 时间作为初始墙钟锚点，`MockClock::at()` 可指定锚点
+- `MockClock::with_timeline()` 允许多个 mock 组件共享同一套时间推进逻辑
+- `set_time()` 在当前 timeline instant 上重新锚定墙钟读数，不改变 timeline elapsed time
+- `add_duration()` 只接受非负 `chrono::Duration`，内部转换为 `std::time::Duration` 后推进 timeline
+- `reset()` / `try_reset()` 会在没有 active waiter 时将 timeline 和墙钟锚点恢复到初始状态
 
 **核心功能**：
-1. **设置时间**：`set_time(instant)` - 将当前逻辑时间重新锚定到指定时间点，并保留推进策略
-2. **增加时间**：`add_duration(duration)` - 前进指定时间
-3. **自动递增**：`add_millis(millis, true)` - 每次调用自动增加
-4. **推进模式**：`set_progression(mode)` / `set_monotonic_progression_enabled(enabled)` - 在冻结和单调自然推进之间切换
-5. **重置**：`reset()` - 恢复到创建时的读数和 progression，并清除附加偏移
+1. **设置时间**：`set_time(instant)` - 将当前 timeline instant 对应的 UTC 读数设为指定时间
+2. **推进时间**：`advance(duration)` / `add_duration(duration)` - 推进共享 mock timeline
+3. **纳秒读数**：`nanos()` - 返回 Unix 纳秒时间戳
+4. **共享 timeline**：`timeline()` - 暴露底层 `MockTimeline`，用于与 sleeper 或 monitor 共享
+5. **重置**：`try_reset()` / `reset()` - 在没有 active waiter 时恢复初始状态
 
 **适用场景**：
 - 单元测试
 - 集成测试
-- 需要精确控制时间的测试场景
+- 需要同时控制墙钟时间、纳秒时间和 relative sleep 的测试场景
 
 **使用示例**：
 ```rust
 #[test]
 fn test_with_fixed_time() {
-    let mock = MockClock::new();
-    mock.set_time(DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap());
+    let mock = MockTime::at(
+        DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+    );
+    let clock = mock.clock();
 
-    let service = TimeService::new(Arc::new(mock));
+    mock.advance(std::time::Duration::from_secs(60));
+    assert_eq!(clock.millis(), 1_704_067_260_000);
     // 测试逻辑...
 }
 ```
 
 **线程安全性**：完全线程安全，使用 `Mutex` 保护内部状态
 
-**文件位置**：`src/clock/mock_clock.rs`
+**文件位置**：`src/mock/mock_clock.rs`
 
 ---
 
-### 4.5 MockNanoClock - 高精度模拟时钟
+### 4.5 MockTimeline - 共享 mock 时间源
 
-**职责**：提供纳秒精度、可控制、冻结语义的测试时钟
+**职责**：为 mock clock、mock sleeper 和 timeout-aware 测试工具提供同一套单调时间推进逻辑。
 
 **定义**：
 ```rust
-pub struct MockNanoClock {
-    inner: Arc<Mutex<MockNanoClockInner>>,
+pub struct MockTimeline {
+    shared: Arc<MockTimelineShared>,
+    async_event_sender: watch::Sender<u64>, // tokio feature
 }
 
-struct MockNanoClockInner {
-    initial_nanos: i128,
-    initial_progression: MockClockProgression,
-    epoch_nanos: i128,
-    monotonic_clock: NanoMonotonicClock,
-    monotonic_base_nanos: i128,
-    progression: MockClockProgression,
-    nanos_to_add: i128,
-    nanos_to_add_each_time: i128,
-    add_every_time: bool,
+struct MockTimelineState {
+    elapsed_nanos: u128,
+    time_epoch: u64,
+    event_epoch: u64,
+    sleep_waiters: usize,
+    deadline_waiters: usize,
 }
-
-impl Clock for MockNanoClock { /* ... */ }
-impl NanoClock for MockNanoClock { /* ... */ }
-impl ControllableClock for MockNanoClock { /* ... */ }
 ```
 
 **设计要点**：
-- 同时实现 `Clock`、`NanoClock` 和 `ControllableClock`
-- 创建时用 `Utc::now()` 捕获纳秒级初始冻结读数
-- 使用 `i128` 表示 Unix 纳秒时间戳，避免常见区间内的溢出问题
-- `Clock::millis()` 由纳秒读数转换而来，超出 `i64` 范围时饱和到边界
-- 默认使用冻结模式，保证测试可重复
-- 通过 `MockClockProgression` 可切换到基于内部 `NanoMonotonicClock` 的自然推进模式
-- 切换冻结/单调推进时会先把当前逻辑读数重新锚定，避免开关造成时间跳变
-- `set_time()` 设置当前逻辑读数，并保留当前 progression 与自动递增设置；后续是否自然推进由当前 progression 模式决定
+- `elapsed_nanos` 是唯一的单调时间状态，所有组件都从这里读取 elapsed time
+- `time_epoch` 用于表示时间推进事件，`event_epoch` 同时覆盖时间推进和外部状态通知
+- `advance(duration)` 推进 elapsed time，并唤醒阻塞和异步 waiter
+- `notify_external_change()` 不推进时间，只用于 monitor/condition 这类状态变化通知
+- `wait_until()` / `wait_for()` 可作为通用 deadline wait 原语
+- `wait_for_blocked_waiters()` 用真实超时辅助测试确认某类 waiter 已经进入等待状态
+- `reset()` 在存在 active waiter 时返回 `MockTimeError::ActiveWaiters`，避免等待者观察到不一致的 timeline 回退
 
 **核心功能**：
-1. **设置时间**：`set_time(instant)` - 将纳秒级当前逻辑时间重新锚定到指定时间点，并保留推进策略
-2. **增加时间**：`add_duration(duration)` - 按 chrono duration 前进，尽量保留纳秒精度
-3. **纳秒推进**：`advance_nanos(nanos)` / `add_nanos(nanos, false)` - 一次性推进纳秒数
-4. **自动递增**：`set_auto_advance_nanos(nanos)` / `add_nanos(nanos, true)` - 每次读取后推进下一次读数
-5. **推进模式**：`set_progression(mode)` / `set_monotonic_progression_enabled(enabled)` - 在冻结和单调自然推进之间切换
-6. **重置**：`reset()` - 恢复到创建时的读数和 progression，并清除附加偏移
+1. **当前 instant**：`now()` - 返回 `MockInstant`
+2. **推进时间**：`advance(duration)` - 推进 mock elapsed time
+3. **外部通知**：`notify_external_change()` - 唤醒 event waiter，不改变 elapsed time
+4. **deadline 等待**：`wait_until(deadline)` / `wait_for(duration)`
+5. **等待者观测**：`wait_for_blocked_waiters(kind, count, real_timeout)`
+6. **重置**：`reset()` - 无 active waiter 时回到 elapsed zero
 
 **适用场景**：
-- `NanoClock` 相关逻辑的确定性测试
-- `NanoTimeMeter` 的可控测试
-- 需要保留纳秒级 DateTime 精度的测试场景
+- retry/backoff 与 clock 读数要共享同一套时间推进的测试
+- future `qubit-lock` mock monitor 的 timeout/notification 测试
+- 需要测试“时间推进”和“状态通知”交织的同步逻辑
 
-**文件位置**：`src/clock/mock_nano_clock.rs`
+**线程安全性**：完全线程安全，clone 共享状态，阻塞路径使用 `Condvar`，异步路径使用 `tokio::sync::watch`
+
+**文件位置**：`src/mock/mock_timeline.rs`
 
 ---
 
-### 4.6 Zoned<C> - 时区包装器
+### 4.6 MockTime - mock runtime facade
+
+**职责**：以一个入口构造共享同一 `MockTimeline` 的 `MockClock` 和 `MockSleeper`。
+
+**定义**：
+```rust
+pub struct MockTime {
+    timeline: MockTimeline,
+    clock: MockClock,
+    sleeper: MockSleeper,
+}
+```
+
+**设计要点**：
+- `MockTime::at(start)` 创建指定 UTC 锚点的 runtime
+- `MockTime::unix_epoch()` 创建以 Unix epoch 为墙钟锚点的 runtime
+- `clock()` 返回 cloneable `MockClock`
+- `sleeper()` 返回 cloneable `MockSleeper`
+- `advance(duration)` 统一推进 clock 和 sleeper 共享的 timeline
+- `set_time(instant)` 只重新锚定 clock，不改变已有 sleep deadline
+
+**适用场景**：
+- 同一个测试需要同时注入 clock 和 sleeper
+- 需要确保 retry、timeout、meter、业务过期判断都按照同一套 mock 时间前进
+- 后续与 `MockMonitor` 组合时，作为测试里的统一时间控制入口
+
+**文件位置**：`src/mock/mock_time.rs`
+
+---
+
+### 4.7 Zoned<C> - 时区包装器
 
 **职责**：为任何 `Clock` 添加时区支持
 
@@ -669,7 +701,7 @@ let local = clock.local_time();
 
 ---
 
-### 4.7 SystemSleeper - 真实 sleeper
+### 4.8 SystemSleeper - 真实 sleeper
 
 **职责**：基于真实 elapsed time 提供 relative sleep。
 
@@ -695,29 +727,29 @@ pub struct SystemSleeper;
 
 ---
 
-### 4.8 MockSleeper - 可控制模拟 sleeper
+### 4.9 MockSleeper - 可控制模拟 sleeper
 
-**职责**：提供测试可手动推进 elapsed time 的 relative sleep。
+**职责**：提供由 `MockTimeline` 驱动的 relative sleep。
 
 **定义**：
 ```rust
 pub struct MockSleeper {
-    shared: Arc<MockSleeperShared>,
-    async_time_epoch_sender: watch::Sender<u64>, // tokio feature
+    timeline: MockTimeline,
 }
 ```
 
 **设计要点**：
-- elapsed time 从 `Duration::ZERO` 开始，不依赖真实时间流逝
-- `set_elapsed()` 直接设置当前 elapsed time，`advance()` 饱和推进 elapsed time，`reset()` 回到零点
-- 修改 elapsed time 会推进 time epoch，并唤醒 sleepers 重新检查目标 elapsed time
+- `MockSleeper::new()` 创建独立 timeline，`MockSleeper::with_timeline()` 共享已有 timeline
+- elapsed time 来自底层 `MockTimeline`，不依赖真实时间流逝
+- 测试通过 `timeline.advance()` 或 `MockTime::advance()` 推进 elapsed time
 - `sleep_for(duration)` 在调用时以当前 elapsed time 加上 `duration` 得到目标 elapsed time
-- 异步路径使用 `tokio::sync::watch` 保存 time epoch，避免 future 创建后到首次 poll 前的时间推进被静默丢失
+- 阻塞路径注册 `MockWaiterKind::Sleep`，便于测试确认线程已经进入 sleep 等待
+- 异步路径同样在 future 创建时注册 waiter，避免 future 创建后到首次 poll 前的时间推进被静默丢失
 - 不提供 notification 或 condition wait；这些能力由 `qubit-lock` 的 monitor API 承担
 
 **适用场景**：
 - retry、backoff 等 relative sleep 逻辑的确定性测试
-- 需要手动控制“时间已经过去多少”的测试
+- 需要让 sleeper 与 clock 共用同一套 mock elapsed time 的测试
 - 同时覆盖阻塞式和 Tokio 异步 sleep 逻辑
 
 **线程安全性**：完全线程安全，clone 共享状态，所有状态读写由 `Mutex` 保护
@@ -905,7 +937,8 @@ fn main() {
 ### 5.6 场景 6：可测试 sleep 控制
 
 ```rust
-use qubit_clock::sleep::{MockSleeper, Sleeper};
+use qubit_clock::MockTime;
+use qubit_clock::sleep::Sleeper;
 use std::time::Duration;
 
 fn retry_after_delay<S>(sleeper: &S)
@@ -918,21 +951,22 @@ where
 
 #[test]
 fn test_sleep_without_real_time() {
-    let sleeper = MockSleeper::new();
+    let mock = MockTime::unix_epoch();
+    let sleeper = mock.sleeper();
     let worker = sleeper.clone();
 
     let handle = std::thread::spawn(move || {
         retry_after_delay(&worker);
     });
 
-    sleeper.advance(Duration::from_millis(100));
+    mock.advance(Duration::from_millis(100));
     handle.join().expect("retry should finish");
 }
 ```
 
 **说明**：
 - `Duration` 参数表示从调用点开始的一段相对时长
-- 测试中使用 `MockSleeper::advance()` 可以瞬间推进 sleep，不需要真实等待
+- 测试中使用 `MockTime::advance()` 或 `MockTimeline::advance()` 可以瞬间推进 sleep，不需要真实等待
 - notification wait、condition wait 和 timeout wait 由 `qubit-lock` 的 monitor API 承担
 
 ## 6. 文件组织结构
@@ -1029,14 +1063,15 @@ clock.millis();             // Clock
 `MockSleeper` 则让 sleep 相关测试不依赖真实时间：
 
 ```rust
-let sleeper = MockSleeper::new();
+let mock = MockTime::unix_epoch();
+let sleeper = mock.sleeper();
 let worker = sleeper.clone();
 
 std::thread::spawn(move || {
     worker.sleep_for(Duration::from_secs(5));
 });
 
-sleeper.advance(Duration::from_secs(5));
+mock.advance(Duration::from_secs(5));
 ```
 
 ## 8. 设计权衡
@@ -1084,11 +1119,11 @@ sleeper.advance(Duration::from_secs(5));
 2. **TickClock**：按固定间隔跳动的时钟
 3. **SystemClockWithOffset**：系统时钟 + 偏移量
 
-### 9.2 兼容性考虑
+### 9.2 演进边界
 
-- 保持向后兼容
-- 新功能通过新 trait 添加
-- 不破坏现有 API
+- mock time 语义以共享 `MockTimeline` 为核心，旧的彼此独立 mock clock / mock sleeper 模型不再保留
+- 新增 timeout-aware primitive 时应优先复用 `MockTimeline`，避免各组件各自维护一套 mock 时间
+- 破坏性 API 变更需要同步 README、设计文档和测试示例，避免文档继续暴露旧模型
 
 ## 10. 参考资料
 
@@ -1112,6 +1147,6 @@ sleeper.advance(Duration::from_secs(5));
 2. **类型安全**：编译期保证功能支持
 3. **零成本抽象**：不需要的功能不付出代价
 4. **灵活组合**：通过 `Zoned<C>` 包装器灵活组合功能
-5. **测试友好**：`MockClock` / `MockNanoClock` + `Zoned` 支持确定性测试
+5. **测试友好**：`MockClock`、`MockSleeper` 和 `MockTime` 支持共享 timeline 的确定性测试
 
 这个设计在简洁性、灵活性、类型安全之间取得了良好的平衡，适合各种使用场景。
