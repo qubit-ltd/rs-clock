@@ -25,6 +25,41 @@ use crate::{
 };
 
 /// A complete mock time runtime sharing one timeline across clocks and sleepers.
+///
+/// `MockTime` is the recommended entry point for tests that need both "what
+/// time is it?" and "how long should this operation sleep?" to use the same
+/// deterministic time source. It constructs one [`MockTimeline`], then creates
+/// a [`MockClock`] and [`MockSleeper`](crate::sleep::MockSleeper) over that
+/// timeline.
+///
+/// Advancing the runtime through [`advance`](Self::advance) advances every
+/// component derived from it. This avoids a common testing bug where a mock
+/// clock reports one logical time while a mock sleeper or monitor waits on a
+/// different logical time source.
+///
+/// Wall-clock anchoring is separate from elapsed mock time. Calling
+/// [`set_time`](Self::set_time) changes the UTC value read at the current
+/// timeline instant, but it does not advance or rewind the timeline. Calling
+/// [`reset`](Self::reset) restores both the elapsed timeline and the clock
+/// anchor, and fails if any timeline waiter is active.
+///
+/// # Example
+///
+/// ```
+/// use std::time::Duration;
+///
+/// use qubit_clock::{Clock, MockTime};
+///
+/// let mock = MockTime::unix_epoch();
+/// let clock = mock.clock();
+///
+/// assert_eq!(0, clock.millis());
+///
+/// mock.advance(Duration::from_millis(250));
+///
+/// assert_eq!(250, clock.millis());
+/// assert_eq!(Duration::from_millis(250), mock.elapsed());
+/// ```
 #[derive(Debug, Clone)]
 pub struct MockTime {
     timeline: MockTimeline,

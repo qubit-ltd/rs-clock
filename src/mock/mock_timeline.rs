@@ -15,6 +15,10 @@ use parking_lot::{
     MutexGuard,
 };
 use std::sync::Arc;
+use std::sync::atomic::{
+    AtomicU64,
+    Ordering,
+};
 use std::time::{
     Duration,
     Instant,
@@ -31,9 +35,42 @@ use crate::{
     MockWaiterKind,
 };
 
+/// Next globally unique mock timeline id.
+static NEXT_MOCK_TIMELINE_ID: AtomicU64 = AtomicU64::new(1);
+
 /// Shared monotonic time source for deterministic tests.
+///
+/// `MockTimeline` is the single authority for elapsed mock time. Cloned
+/// timelines share the same internal state, so a clock, sleeper, and future
+/// timeout-aware primitive can all observe the same logical time progression.
+/// The timeline starts at elapsed zero and advances only when a test calls
+/// [`advance`](Self::advance). It never follows wall-clock time by itself.
+///
+/// The timeline maintains two related notions of progress:
+///
+/// - **elapsed time** is the monotonic duration since the timeline origin.
+///   [`MockClock`](crate::MockClock) and
+///   [`crate::sleep::MockSleeper`] derive their behavior from this value.
+/// - **event epoch** is a notification counter incremented when time advances
+///   or when [`notify_external_change`](Self::notify_external_change) is
+///   called. It lets monitor-like primitives wait for either a state change or
+///   a later deadline without inventing a second mock clock.
+///
+/// Blocking waiters use condition variables, and async waiters use a Tokio
+/// watch channel when the `tokio` feature is enabled. Waiter counts are tracked
+/// by [`MockWaiterKind`] so tests can wait until a thread or future has really
+/// entered a mock wait before advancing time. Reset is rejected while waiters
+/// are active, because rewinding a timeline under a blocked waiter would make
+/// deadline semantics ambiguous. Deadlines also carry the id of the timeline
+/// that created them. Passing a deadline from one timeline into another
+/// timeline is rejected with [`MockTimeError::MismatchedTimeline`].
+///
+/// `MockTimeline` uses non-poisoning synchronization primitives internally.
+/// A panic in one test thread does not permanently poison the timeline for the
+/// rest of the test process.
 #[derive(Clone, Debug)]
 pub struct MockTimeline {
+    id: u64,
     shared: Arc<MockTimelineShared>,
     #[cfg(feature = "tokio")]
     async_event_sender: watch::Sender<u64>,
@@ -104,6 +141,7 @@ impl MockTimeline {
         #[cfg(feature = "tokio")]
         let (async_event_sender, _) = watch::channel(0);
         Self {
+            id: next_mock_timeline_id(),
             shared: Arc::new(MockTimelineShared {
                 state: Mutex::new(MockTimelineState {
                     elapsed_nanos: 0,
@@ -118,6 +156,19 @@ impl MockTimeline {
             #[cfg(feature = "tokio")]
             async_event_sender,
         }
+    }
+
+    /// Returns the globally unique id of this timeline.
+    ///
+    /// Clones of the same timeline return the same id. Independently created
+    /// timelines receive different ids, which lets deadline APIs reject
+    /// [`MockInstant`] values from the wrong timeline.
+    ///
+    /// # Returns
+    /// The timeline id.
+    #[inline]
+    pub const fn id(&self) -> u64 {
+        self.id
     }
 
     /// Returns elapsed mock time as a standard duration.
@@ -144,7 +195,7 @@ impl MockTimeline {
     /// Current instant on this timeline.
     #[inline]
     pub fn now(&self) -> MockInstant {
-        MockInstant::from_nanos_since_origin(self.elapsed_nanos())
+        MockInstant::from_nanos_since_origin(self.id, self.elapsed_nanos())
     }
 
     /// Returns the current event epoch.
@@ -210,16 +261,26 @@ impl MockTimeline {
     ///
     /// # Parameters
     /// - `deadline`: Mock instant at which the wait should complete.
-    pub fn wait_until(&self, deadline: MockInstant) {
-        self.wait_until_with_kind(deadline, MockWaiterKind::Deadline);
+    ///
+    /// # Returns
+    /// `Ok(())` when the wait completes.
+    ///
+    /// # Errors
+    /// Returns [`MockTimeError::MismatchedTimeline`] if `deadline` was created
+    /// by a different timeline.
+    #[inline]
+    pub fn wait_until(&self, deadline: MockInstant) -> Result<(), MockTimeError> {
+        self.wait_until_with_kind(deadline, MockWaiterKind::Deadline)
     }
 
     /// Blocks until `duration` has elapsed on the mock timeline.
     ///
     /// # Parameters
     /// - `duration`: Relative mock duration to wait.
+    #[inline]
     pub fn wait_for(&self, duration: Duration) {
-        self.wait_until(self.now().saturating_add(duration));
+        self.wait_until(self.now().saturating_add(duration))
+            .expect("relative waits should create deadlines on the same timeline");
     }
 
     /// Blocks until the event epoch changes after `observed_epoch`.
@@ -270,10 +331,15 @@ impl MockTimeline {
     /// # Parameters
     /// - `deadline`: Mock instant at which the wait should complete.
     /// - `kind`: Waiter group used for test observability.
-    pub(crate) fn wait_until_with_kind(&self, deadline: MockInstant, kind: MockWaiterKind) {
+    pub(crate) fn wait_until_with_kind(
+        &self,
+        deadline: MockInstant,
+        kind: MockWaiterKind,
+    ) -> Result<(), MockTimeError> {
+        self.ensure_own_instant(deadline)?;
         let mut state = self.lock_state();
         if state.elapsed_nanos >= deadline.nanos_since_origin() {
-            return;
+            return Ok(());
         }
         Self::increment_waiter(&mut state, kind);
         self.shared.waiters_changed.notify_all();
@@ -282,6 +348,7 @@ impl MockTimeline {
         }
         Self::decrement_waiter(&mut state, kind);
         self.shared.waiters_changed.notify_all();
+        Ok(())
     }
 
     /// Returns a future that completes once the deadline is reached.
@@ -297,13 +364,14 @@ impl MockTimeline {
         &'a self,
         deadline: MockInstant,
         kind: MockWaiterKind,
-    ) -> AsyncSleepFuture<'a> {
+    ) -> Result<AsyncSleepFuture<'a>, MockTimeError> {
+        self.ensure_own_instant(deadline)?;
         if self.elapsed_nanos() >= deadline.nanos_since_origin() {
-            return Box::pin(async {});
+            return Ok(Box::pin(async {}));
         }
         let registration = MockTimelineWaiterRegistration::new(self.clone(), kind);
         let mut event_receiver = self.async_event_sender.subscribe();
-        Box::pin(async move {
+        Ok(Box::pin(async move {
             let _registration = registration;
             loop {
                 if self.elapsed_nanos() >= deadline.nanos_since_origin() {
@@ -314,13 +382,36 @@ impl MockTimeline {
                     .await
                     .expect("mock timeline sender should live while timeline is borrowed");
             }
-        })
+        }))
+    }
+
+    /// Ensures an instant belongs to this timeline.
+    ///
+    /// # Parameters
+    /// - `instant`: Instant to validate.
+    ///
+    /// # Returns
+    /// `Ok(())` when the instant belongs to this timeline.
+    ///
+    /// # Errors
+    /// Returns [`MockTimeError::MismatchedTimeline`] when the instant belongs
+    /// to a different timeline.
+    fn ensure_own_instant(&self, instant: MockInstant) -> Result<(), MockTimeError> {
+        if instant.timeline_id() == self.id {
+            Ok(())
+        } else {
+            Err(MockTimeError::MismatchedTimeline {
+                expected: self.id,
+                actual: instant.timeline_id(),
+            })
+        }
     }
 
     /// Locks timeline state.
     ///
     /// # Returns
     /// A guard for timeline state.
+    #[inline]
     fn lock_state(&self) -> MutexGuard<'_, MockTimelineState> {
         self.shared.state.lock()
     }
@@ -340,6 +431,7 @@ impl MockTimeline {
     /// # Parameters
     /// - `event_epoch`: New event epoch.
     #[cfg(feature = "tokio")]
+    #[inline]
     fn notify_async_waiters(&self, event_epoch: u64) {
         let _ = self.async_event_sender.send(event_epoch);
     }
@@ -349,6 +441,7 @@ impl MockTimeline {
     /// # Parameters
     /// - `_event_epoch`: New event epoch.
     #[cfg(not(feature = "tokio"))]
+    #[inline]
     fn notify_async_waiters(&self, _event_epoch: u64) {}
 
     /// Increments a waiter count.
@@ -391,6 +484,7 @@ impl MockTimeline {
     ///
     /// # Returns
     /// Number of registered waiters in the group.
+    #[inline]
     fn waiter_count(state: &MockTimelineState, kind: MockWaiterKind) -> usize {
         match kind {
             MockWaiterKind::Sleep => state.sleep_waiters,
@@ -401,6 +495,7 @@ impl MockTimeline {
 
 impl Default for MockTimeline {
     /// Creates a zero-elapsed mock timeline.
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -421,4 +516,24 @@ fn duration_from_nanos_saturating(nanos: u128) -> Duration {
         Err(_) => return Duration::MAX,
     };
     Duration::new(secs, sub_nanos)
+}
+
+/// Allocates a new globally unique mock timeline id.
+///
+/// # Returns
+/// A non-zero timeline id.
+///
+/// # Panics
+/// Panics if all `u64` timeline ids have been exhausted.
+fn next_mock_timeline_id() -> u64 {
+    loop {
+        let current = NEXT_MOCK_TIMELINE_ID.load(Ordering::Relaxed);
+        assert_ne!(current, u64::MAX, "mock timeline id space exhausted");
+        if NEXT_MOCK_TIMELINE_ID
+            .compare_exchange_weak(current, current + 1, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            return current;
+        }
+    }
 }

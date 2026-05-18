@@ -36,6 +36,27 @@ const NANOS_PER_MILLISECOND: i128 = 1_000_000;
 const NANOS_PER_SECOND: i128 = 1_000_000_000;
 
 /// Clock implementation whose readings are derived from a shared mock timeline.
+///
+/// `MockClock` is a controllable UTC clock for tests. It combines a monotonic
+/// [`MockTimeline`] with a wall-clock anchor. The current UTC reading is:
+///
+/// `wall_origin + timeline.elapsed()`
+///
+/// Creating a clock with [`at`](Self::at) or
+/// [`with_timeline`](Self::with_timeline) establishes the wall-clock value for
+/// the timeline's current elapsed instant. Later calls to
+/// [`set_time`](ControllableClock::set_time) move only that wall-clock anchor;
+/// they do not change elapsed mock time. Calls to [`advance`](Self::advance)
+/// or [`add_duration`](ControllableClock::add_duration) advance the underlying
+/// monotonic timeline and therefore wake timeline waiters such as mock sleeps.
+///
+/// This clock implements [`Clock`], [`NanoClock`], and [`ControllableClock`].
+/// It is frozen until its timeline advances, which makes elapsed-time tests
+/// deterministic and independent of wall-clock scheduling noise.
+///
+/// A cloned `MockClock` shares both the timeline and the wall-clock anchor with
+/// the original clock. A clock created with `MockClock::with_timeline` shares
+/// only the provided timeline; it owns its own wall-clock anchor.
 #[derive(Debug, Clone)]
 pub struct MockClock {
     timeline: MockTimeline,
