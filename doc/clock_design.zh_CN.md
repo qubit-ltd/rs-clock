@@ -474,7 +474,7 @@ println!("耗时: {} ns", elapsed);
 ```rust
 pub struct MockClock {
     timeline: MockTimeline,
-    anchor: Arc<Mutex<MockClockAnchor>>,
+    anchor: Arc<parking_lot::Mutex<MockClockAnchor>>,
 }
 
 struct MockClockAnchor {
@@ -525,7 +525,7 @@ fn test_with_fixed_time() {
 }
 ```
 
-**线程安全性**：完全线程安全，使用 `Mutex` 保护内部状态
+**线程安全性**：完全线程安全，使用 `parking_lot::Mutex` 保护内部状态
 
 **文件位置**：`src/mock/mock_clock.rs`
 
@@ -538,6 +538,7 @@ fn test_with_fixed_time() {
 **定义**：
 ```rust
 pub struct MockTimeline {
+    id: u64,
     shared: Arc<MockTimelineShared>,
     async_event_sender: watch::Sender<u64>, // tokio feature
 }
@@ -552,13 +553,15 @@ struct MockTimelineState {
 ```
 
 **设计要点**：
+- `id` 是创建时自动分配的全局唯一 timeline id，clone 保持相同 id
 - `elapsed_nanos` 是唯一的单调时间状态，所有组件都从这里读取 elapsed time
 - `time_epoch` 用于表示时间推进事件，`event_epoch` 同时覆盖时间推进和外部状态通知
 - `advance(duration)` 推进 elapsed time，并唤醒阻塞和异步 waiter
 - `notify_external_change()` 不推进时间，只用于 monitor/condition 这类状态变化通知
-- `wait_until()` / `wait_for()` 可作为通用 deadline wait 原语
+- `wait_until()` / `wait_for()` 可作为通用 deadline wait 原语；`wait_until()` 会拒绝来自其他 timeline 的 `MockInstant`
 - `wait_for_blocked_waiters()` 用真实超时辅助测试确认某类 waiter 已经进入等待状态
 - `reset()` 在存在 active waiter 时返回 `MockTimeError::ActiveWaiters`，避免等待者观察到不一致的 timeline 回退
+- foreign instant 会返回 `MockTimeError::MismatchedTimeline { expected, actual }`，避免不同 mock runtime 的 deadline 被误用
 
 **核心功能**：
 1. **当前 instant**：`now()` - 返回 `MockInstant`
@@ -568,12 +571,17 @@ struct MockTimelineState {
 5. **等待者观测**：`wait_for_blocked_waiters(kind, count, real_timeout)`
 6. **重置**：`reset()` - 无 active waiter 时回到 elapsed zero
 
+**MockInstant 语义**：
+- `MockInstant` 同时包含 source timeline id 和 elapsed offset
+- 同一 timeline 的 instant 可以比较和作为 deadline 使用
+- 不同 timeline 的 instant 不能作为彼此的 deadline；`partial_cmp()` 返回 `None`
+
 **适用场景**：
 - retry/backoff 与 clock 读数要共享同一套时间推进的测试
 - future `qubit-lock` mock monitor 的 timeout/notification 测试
 - 需要测试“时间推进”和“状态通知”交织的同步逻辑
 
-**线程安全性**：完全线程安全，clone 共享状态，阻塞路径使用 `Condvar`，异步路径使用 `tokio::sync::watch`
+**线程安全性**：完全线程安全，clone 共享状态，阻塞路径使用 `parking_lot::Condvar`，异步路径使用 `tokio::sync::watch`
 
 **文件位置**：`src/mock/mock_timeline.rs`
 
@@ -752,7 +760,7 @@ pub struct MockSleeper {
 - 需要让 sleeper 与 clock 共用同一套 mock elapsed time 的测试
 - 同时覆盖阻塞式和 Tokio 异步 sleep 逻辑
 
-**线程安全性**：完全线程安全，clone 共享状态，所有状态读写由 `Mutex` 保护
+**线程安全性**：完全线程安全，clone 共享状态，底层状态由 `MockTimeline` 的 `parking_lot::Mutex` 保护
 
 **文件位置**：`src/sleep/mock_sleeper.rs`
 

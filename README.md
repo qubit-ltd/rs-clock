@@ -264,7 +264,7 @@ This design follows the **Interface Segregation Principle**, ensuring that imple
 
 - Controllable UTC and nanosecond clock for testing
 - Backed by a `MockTimeline`
-- Thread-safe with `Arc<Mutex<>>`
+- Thread-safe with shared state guarded by non-poisoning synchronization
 - Implements `Clock`, `NanoClock`, and `ControllableClock`
 - Supports setting the wall-clock anchor and advancing shared mock time
 - Frozen until the associated timeline is advanced by the test
@@ -276,6 +276,7 @@ This design follows the **Interface Segregation Principle**, ensuring that imple
 - Drives `MockClock`, `MockSleeper`, and future timeout-aware test primitives
 - Supports instant time advancement and external event notifications
 - Tracks active waiters so reset can reject unsafe timeline rewinds
+- Rejects deadlines created by a different mock timeline
 - Use for: deterministic tests that need clocks and sleeps to follow one time source
 
 ### MockTime
@@ -429,6 +430,7 @@ Mock time APIs are available at the crate root:
 - `MockTime` - Convenience facade that returns one shared clock and sleeper
 - `MockWaiterKind` - Waiter category used for test observability
 - `MockTimeError` - Error returned when reset is rejected with active waiters
+  or a deadline belongs to a different mock timeline
 
 ### Sleep Traits
 
