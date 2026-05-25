@@ -47,12 +47,9 @@ async fn test_mock_sleep_for_async_completes_after_advance() {
 async fn test_mock_sleep_for_async_zero_duration_completes_immediately() {
     let sleeper = MockSleeper::new();
 
-    tokio::time::timeout(
-        Duration::from_millis(50),
-        sleeper.sleep_for_async(Duration::ZERO),
-    )
-    .await
-    .expect("zero-duration mock async sleep should complete immediately");
+    tokio::time::timeout(Duration::from_millis(50), sleeper.sleep_for_async(Duration::ZERO))
+        .await
+        .expect("zero-duration mock async sleep should complete immediately");
     sleeper
         .timeline()
         .reset()

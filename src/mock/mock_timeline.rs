@@ -304,12 +304,7 @@ impl MockTimeline {
     ///
     /// # Returns
     /// `true` when enough waiters are observed before the real timeout.
-    pub fn wait_for_blocked_waiters(
-        &self,
-        kind: MockWaiterKind,
-        count: usize,
-        real_timeout: Duration,
-    ) -> bool {
+    pub fn wait_for_blocked_waiters(&self, kind: MockWaiterKind, count: usize, real_timeout: Duration) -> bool {
         let Some(deadline) = Instant::now().checked_add(real_timeout) else {
             return false;
         };

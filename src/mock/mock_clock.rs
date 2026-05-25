@@ -103,8 +103,7 @@ impl MockClock {
     /// A mock clock view over the provided timeline.
     #[must_use]
     pub fn with_timeline(start: DateTime<Utc>, timeline: MockTimeline) -> Self {
-        let wall_origin_nanos =
-            datetime_to_nanos(start).saturating_sub(timeline_elapsed_i128(&timeline));
+        let wall_origin_nanos = datetime_to_nanos(start).saturating_sub(timeline_elapsed_i128(&timeline));
         Self {
             timeline,
             anchor: Arc::new(Mutex::new(MockClockAnchor {
@@ -204,8 +203,7 @@ impl ControllableClock for MockClock {
     /// Reanchors this clock so the current timeline instant reads as `instant`.
     fn set_time(&self, instant: DateTime<Utc>) {
         let mut anchor = self.lock_anchor();
-        anchor.wall_origin_nanos =
-            datetime_to_nanos(instant).saturating_sub(timeline_elapsed_i128(&self.timeline));
+        anchor.wall_origin_nanos = datetime_to_nanos(instant).saturating_sub(timeline_elapsed_i128(&self.timeline));
     }
 
     /// Advances the shared mock timeline by a non-negative duration.

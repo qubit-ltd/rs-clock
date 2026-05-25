@@ -36,8 +36,8 @@ fn test_monotonic_clock_elapsed_matches_monotonic_millis() {
 
     thread::sleep(Duration::from_millis(25));
 
-    let elapsed_millis = i64::try_from(clock.elapsed().as_millis())
-        .expect("short test elapsed duration should fit in i64");
+    let elapsed_millis =
+        i64::try_from(clock.elapsed().as_millis()).expect("short test elapsed duration should fit in i64");
     let monotonic_millis = clock.monotonic_millis();
 
     assert!(

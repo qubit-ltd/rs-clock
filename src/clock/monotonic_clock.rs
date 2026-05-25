@@ -163,7 +163,6 @@ impl Default for MonotonicClock {
 impl Clock for MonotonicClock {
     #[inline]
     fn millis(&self) -> i64 {
-        self.system_time_base_millis
-            .saturating_add(self.monotonic_millis())
+        self.system_time_base_millis.saturating_add(self.monotonic_millis())
     }
 }

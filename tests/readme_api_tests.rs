@@ -10,10 +10,7 @@
 //! Regression tests for public API names documented in README files.
 
 fn readmes() -> [&'static str; 2] {
-    [
-        include_str!("../README.md"),
-        include_str!("../README.zh_CN.md"),
-    ]
+    [include_str!("../README.md"), include_str!("../README.zh_CN.md")]
 }
 
 #[test]

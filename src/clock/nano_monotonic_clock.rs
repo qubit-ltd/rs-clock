@@ -169,8 +169,8 @@ impl NanoClock for NanoMonotonicClock {
     #[inline]
     fn nanos(&self) -> i128 {
         let elapsed_nanos = self.monotonic_nanos();
-        let base_nanos = (self.system_time_base_seconds as i128) * 1_000_000_000
-            + (self.system_time_base_nanos as i128);
+        let base_nanos =
+            (self.system_time_base_seconds as i128) * 1_000_000_000 + (self.system_time_base_nanos as i128);
         base_nanos.saturating_add(elapsed_nanos)
     }
 }

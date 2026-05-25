@@ -59,8 +59,7 @@ fn duration_from_nanos(nanos: i128) -> Duration {
 
     let seconds = nanos.div_euclid(NANOS_PER_SECOND);
     let sub_nanos = nanos.rem_euclid(NANOS_PER_SECOND) as u32;
-    Duration::new(seconds as i64, sub_nanos)
-        .expect("nanos within chrono bounds should construct Duration")
+    Duration::new(seconds as i64, sub_nanos).expect("nanos within chrono bounds should construct Duration")
 }
 
 /// A time meter for measuring elapsed time with nanosecond precision.

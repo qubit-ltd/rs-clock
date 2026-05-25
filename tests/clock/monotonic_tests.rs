@@ -21,10 +21,7 @@ use std::time::Duration;
 fn test_monotonic_clock_new() {
     let clock = MonotonicClock::new();
     let millis = clock.millis();
-    assert!(
-        millis > 0,
-        "MonotonicClock should return positive milliseconds"
-    );
+    assert!(millis > 0, "MonotonicClock should return positive milliseconds");
 }
 
 #[test]
@@ -53,10 +50,7 @@ fn test_monotonic_clock_time() {
     let time = clock.time();
 
     // Should be a reasonable year
-    assert!(
-        time.year() >= 2020,
-        "MonotonicClock should return a reasonable year"
-    );
+    assert!(time.year() >= 2020, "MonotonicClock should return a reasonable year");
 }
 
 #[test]
@@ -67,10 +61,7 @@ fn test_monotonic_clock_monotonicity() {
     for _ in 0..100 {
         thread::sleep(Duration::from_millis(1));
         let curr = clock.millis();
-        assert!(
-            curr >= prev,
-            "MonotonicClock time should never go backwards"
-        );
+        assert!(curr >= prev, "MonotonicClock time should never go backwards");
         prev = curr;
     }
 }
@@ -84,11 +75,7 @@ fn test_monotonic_clock_elapsed_time() {
 
     let elapsed = clock.millis() - start;
 
-    assert!(
-        elapsed >= 100,
-        "At least 100ms should have elapsed, got: {}",
-        elapsed
-    );
+    assert!(elapsed >= 100, "At least 100ms should have elapsed, got: {}", elapsed);
 }
 
 #[test]
@@ -115,11 +102,7 @@ fn test_monotonic_clock_consistency() {
 
     // They should be very close
     let diff = (millis - time.timestamp_millis()).abs();
-    assert!(
-        diff < 10,
-        "millis() and time() should be consistent, diff: {}",
-        diff
-    );
+    assert!(diff < 10, "millis() and time() should be consistent, diff: {}", diff);
 }
 
 #[test]
@@ -152,10 +135,7 @@ fn test_monotonic_clock_clone() {
 
     // Cloned clocks share the same base, so they should return the same time
     let diff = (time1 - time2).abs();
-    assert!(
-        diff < 10,
-        "Cloned MonotonicClocks should return the same time"
-    );
+    assert!(diff < 10, "Cloned MonotonicClocks should return the same time");
 }
 
 #[test]
@@ -249,9 +229,5 @@ fn test_monotonic_clock_multiple_threads() {
     // The difference should be at least 50ms (since threads sleep for
     // different durations)
     let diff = max - min;
-    assert!(
-        diff >= 50,
-        "Time should progress across threads, diff: {}",
-        diff
-    );
+    assert!(diff >= 50, "Time should progress across threads, diff: {}", diff);
 }

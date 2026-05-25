@@ -37,9 +37,7 @@ const CLOCK_DRIFT_TOLERANCE_MS: i64 = 1_000;
 
 /// Asserts that a clock reading is close to the expected logical time.
 fn assert_close_to_expected_time(actual: DateTime<Utc>, expected: DateTime<Utc>) {
-    let diff_ms = actual
-        .timestamp_millis()
-        .saturating_sub(expected.timestamp_millis());
+    let diff_ms = actual.timestamp_millis().saturating_sub(expected.timestamp_millis());
     assert!(
         (0..CLOCK_DRIFT_TOLERANCE_MS).contains(&diff_ms),
         "time should be within {}ms after expected time, diff_ms: {}",
@@ -222,10 +220,7 @@ fn test_zoned_clone() {
 fn test_zoned_debug() {
     let clock = Zoned::new(SystemClock::new(), Shanghai);
     let debug_str = format!("{:?}", clock);
-    assert!(
-        debug_str.contains("Zoned"),
-        "Debug output should contain 'Zoned'"
-    );
+    assert!(debug_str.contains("Zoned"), "Debug output should contain 'Zoned'");
 }
 
 #[test]
@@ -250,10 +245,7 @@ fn test_zoned_with_different_timezones() {
 
         // All should represent the same instant, allowing tiny scheduling jitter.
         let diff = (local.timestamp_millis() - utc_time.timestamp_millis()).abs();
-        assert!(
-            diff <= 10,
-            "timestamp drift too large for timezone {tz}: diff={diff}ms"
-        );
+        assert!(diff <= 10, "timestamp drift too large for timezone {tz}: diff={diff}ms");
 
         // But hours might be different
         println!("{}: {} (UTC: {})", tz, local.hour(), utc_time.hour());

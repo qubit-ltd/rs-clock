@@ -70,19 +70,14 @@ fn test_mock_time_advance_drives_clock_and_sleeper() {
     });
 
     assert!(
-        mock.timeline().wait_for_blocked_waiters(
-            MockWaiterKind::Sleep,
-            1,
-            StdDuration::from_secs(1),
-        ),
+        mock.timeline()
+            .wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, StdDuration::from_secs(1),),
         "sleeper should be blocked before mock time advances",
     );
 
     mock.advance(StdDuration::from_millis(99));
     assert!(
-        done_receiver
-            .recv_timeout(StdDuration::from_millis(20))
-            .is_err(),
+        done_receiver.recv_timeout(StdDuration::from_millis(20)).is_err(),
         "sleep should not complete before the shared timeline reaches the deadline",
     );
 
@@ -153,8 +148,7 @@ fn test_reset_restores_initial_state() {
 
     mock.advance(StdDuration::from_secs(10));
     mock.set_time(fixed_time() + Duration::hours(1));
-    mock.reset()
-        .expect("mock runtime without waiters should reset");
+    mock.reset().expect("mock runtime without waiters should reset");
 
     assert_eq!(StdDuration::ZERO, mock.elapsed());
     assert_eq!(fixed_time(), mock.clock().time());
@@ -172,17 +166,12 @@ fn test_reset_rejects_active_waiters() {
 
     let worker = thread::spawn(move || {
         sleeper.sleep_for(StdDuration::from_millis(100));
-        done_sender
-            .send(())
-            .expect("test should receive sleeper completion");
+        done_sender.send(()).expect("test should receive sleeper completion");
     });
 
     assert!(
-        mock.timeline().wait_for_blocked_waiters(
-            MockWaiterKind::Sleep,
-            1,
-            StdDuration::from_secs(1),
-        ),
+        mock.timeline()
+            .wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, StdDuration::from_secs(1),),
         "sleeper should be blocked before reset is attempted",
     );
     assert_eq!(Err(MockTimeError::ActiveWaiters), mock.reset());
