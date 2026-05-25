@@ -57,14 +57,8 @@ fn main() {
         items_processed,
         meter.readable_duration()
     );
-    println!(
-        "   Speed: {}",
-        meter.formatted_speed_per_second(items_processed)
-    );
-    println!(
-        "   Speed: {}",
-        meter.formatted_speed_per_minute(items_processed)
-    );
+    println!("   Speed: {}", meter.formatted_speed_per_second(items_processed));
+    println!("   Speed: {}", meter.formatted_speed_per_minute(items_processed));
     println!();
 
     // Example 5: Restart

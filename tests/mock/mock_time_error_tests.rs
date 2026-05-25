@@ -30,10 +30,7 @@ fn test_active_waiters_display_message() {
 /// The test fails if the display text no longer identifies the mismatched ids.
 #[test]
 fn test_mismatched_timeline_display_message() {
-    let error = MockTimeError::MismatchedTimeline {
-        expected: 7,
-        actual: 9,
-    };
+    let error = MockTimeError::MismatchedTimeline { expected: 7, actual: 9 };
 
     assert_eq!(
         "mock instant belongs to timeline 9, but timeline 7 was expected",

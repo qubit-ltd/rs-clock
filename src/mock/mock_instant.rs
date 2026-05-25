@@ -39,10 +39,7 @@ impl MockInstant {
     ///
     /// # Returns
     /// A mock instant representing that offset.
-    pub(crate) const fn from_nanos_since_origin(
-        timeline_id: u64,
-        nanos_since_origin: u128,
-    ) -> Self {
+    pub(crate) const fn from_nanos_since_origin(timeline_id: u64, nanos_since_origin: u128) -> Self {
         Self {
             timeline_id,
             nanos_since_origin,

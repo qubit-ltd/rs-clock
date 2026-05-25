@@ -54,8 +54,7 @@ fn observe_clock_after_sub_millisecond_rollover() -> (i64, i64, i64) {
         let base_nanos = nano_monotonic_base_nanos(&clock);
         let elapsed_nanos = clock.monotonic_nanos();
         let combined_millis = (base_nanos + elapsed_nanos).div_euclid(1_000_000);
-        let separated_millis =
-            base_nanos.div_euclid(1_000_000) + elapsed_nanos.div_euclid(1_000_000);
+        let separated_millis = base_nanos.div_euclid(1_000_000) + elapsed_nanos.div_euclid(1_000_000);
 
         if combined_millis > separated_millis {
             let before_millis = (clock.nanos() / 1_000_000) as i64;
@@ -71,10 +70,7 @@ fn observe_clock_after_sub_millisecond_rollover() -> (i64, i64, i64) {
 fn test_nano_monotonic_clock_new() {
     let clock = NanoMonotonicClock::new();
     let nanos = clock.nanos();
-    assert!(
-        nanos > 0,
-        "NanoMonotonicClock should return positive nanoseconds"
-    );
+    assert!(nanos > 0, "NanoMonotonicClock should return positive nanoseconds");
 }
 
 #[test]
@@ -146,10 +142,7 @@ fn test_nano_monotonic_clock_monotonicity() {
     for _ in 0..100 {
         thread::sleep(Duration::from_millis(1));
         let curr = clock.nanos();
-        assert!(
-            curr >= prev,
-            "NanoMonotonicClock time should never go backwards"
-        );
+        assert!(curr >= prev, "NanoMonotonicClock time should never go backwards");
         prev = curr;
     }
 }
@@ -197,11 +190,7 @@ fn test_nano_monotonic_clock_nanos_millis_consistency() {
     let nanos_as_millis = (nanos / 1_000_000) as i64;
     let diff = (nanos_as_millis - millis).abs();
 
-    assert!(
-        diff <= 1,
-        "nanos() and millis() should be consistent, diff: {}",
-        diff
-    );
+    assert!(diff <= 1, "nanos() and millis() should be consistent, diff: {}", diff);
 }
 
 #[test]
@@ -346,11 +335,7 @@ fn test_nano_monotonic_clock_multiple_threads() {
     // but the difference should be reasonable (within a few seconds)
     let first = results[0];
     let last = results[results.len() - 1];
-    let diff = if last >= first {
-        last - first
-    } else {
-        first - last
-    };
+    let diff = if last >= first { last - first } else { first - last };
     assert!(
         diff < 5_000_000_000,
         "Time difference should be less than 5s in nanoseconds"

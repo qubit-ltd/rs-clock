@@ -559,8 +559,7 @@ fn test_duration_preserves_representable_large_positive_nanos() {
 
     let seconds = elapsed_nanos.div_euclid(1_000_000_000);
     let sub_nanos = elapsed_nanos.rem_euclid(1_000_000_000);
-    let expected = Duration::new(seconds as i64, sub_nanos as u32)
-        .expect("elapsed nanos should fit chrono Duration");
+    let expected = Duration::new(seconds as i64, sub_nanos as u32).expect("elapsed nanos should fit chrono Duration");
 
     assert_eq!(meter.duration(), expected);
     assert!(meter.duration() > Duration::nanoseconds(i64::MAX));
@@ -576,8 +575,7 @@ fn test_duration_preserves_representable_large_negative_nanos() {
 
     let seconds = elapsed_nanos.div_euclid(1_000_000_000);
     let sub_nanos = elapsed_nanos.rem_euclid(1_000_000_000);
-    let expected = Duration::new(seconds as i64, sub_nanos as u32)
-        .expect("elapsed nanos should fit chrono Duration");
+    let expected = Duration::new(seconds as i64, sub_nanos as u32).expect("elapsed nanos should fit chrono Duration");
 
     assert_eq!(meter.duration(), expected);
     assert!(meter.duration() < Duration::nanoseconds(i64::MIN));

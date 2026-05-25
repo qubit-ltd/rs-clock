@@ -57,9 +57,7 @@ fn test_time_and_millis_clamp_negative_overflow() {
     timeline.advance(StdDuration::MAX);
     let clock = MockClock::with_timeline(DateTime::<Utc>::MIN_UTC, timeline.clone());
 
-    timeline
-        .reset()
-        .expect("timeline without waiters should reset");
+    timeline.reset().expect("timeline without waiters should reset");
 
     assert_eq!(DateTime::<Utc>::MIN_UTC, clock.time());
     assert_eq!(i64::MIN, clock.millis());
@@ -75,9 +73,7 @@ fn test_time_clamps_below_chrono_minimum() {
     timeline.advance(StdDuration::from_secs(86_400));
     let clock = MockClock::with_timeline(DateTime::<Utc>::MIN_UTC, timeline.clone());
 
-    timeline
-        .reset()
-        .expect("timeline without waiters should reset");
+    timeline.reset().expect("timeline without waiters should reset");
 
     assert_eq!(DateTime::<Utc>::MIN_UTC, clock.time());
 }

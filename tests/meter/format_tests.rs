@@ -154,10 +154,7 @@ fn test_format_duration_nanos_seconds_and_above() {
 
 #[test]
 fn test_format_duration_nanos_extreme_positive_value() {
-    assert_eq!(
-        format_duration_nanos(i128::MAX),
-        "47261439850130342147690917h 41m 56s",
-    );
+    assert_eq!(format_duration_nanos(i128::MAX), "47261439850130342147690917h 41m 56s",);
 }
 
 #[test]

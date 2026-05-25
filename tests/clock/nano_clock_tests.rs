@@ -111,10 +111,7 @@ fn test_nano_clock_monotonicity() {
     for _ in 0..10 {
         thread::sleep(Duration::from_millis(1));
         let curr = clock.nanos();
-        assert!(
-            curr >= prev,
-            "NanoClock time should be monotonically increasing"
-        );
+        assert!(curr >= prev, "NanoClock time should be monotonically increasing");
         prev = curr;
     }
 }

@@ -70,9 +70,7 @@ fn test_notify_external_change_wakes_event_waiter_without_advancing_time() {
     let (ready_sender, ready_receiver) = mpsc::channel();
 
     let worker = thread::spawn(move || {
-        ready_sender
-            .send(())
-            .expect("test should observe event waiter startup");
+        ready_sender.send(()).expect("test should observe event waiter startup");
         worker_timeline.wait_for_event_after(observed_epoch);
         worker_timeline.event_epoch()
     });
@@ -101,9 +99,7 @@ fn test_wait_for_blocks_until_timeline_reaches_deadline() {
 
     let worker = thread::spawn(move || {
         worker_timeline.wait_for(Duration::from_millis(100));
-        done_sender
-            .send(())
-            .expect("test should receive deadline completion");
+        done_sender.send(()).expect("test should receive deadline completion");
     });
 
     assert!(
@@ -114,9 +110,7 @@ fn test_wait_for_blocks_until_timeline_reaches_deadline() {
 
     timeline.advance(Duration::from_millis(99));
     assert!(
-        done_receiver
-            .recv_timeout(Duration::from_millis(20))
-            .is_err(),
+        done_receiver.recv_timeout(Duration::from_millis(20)).is_err(),
         "deadline wait should not complete before target elapsed time",
     );
 
@@ -124,9 +118,7 @@ fn test_wait_for_blocks_until_timeline_reaches_deadline() {
     done_receiver
         .recv_timeout(Duration::from_secs(1))
         .expect("deadline wait should complete after target elapsed time");
-    worker
-        .join()
-        .expect("deadline waiter should finish cleanly");
+    worker.join().expect("deadline waiter should finish cleanly");
 }
 
 /// Verifies wait-until returns immediately for a reached deadline.
@@ -189,9 +181,7 @@ fn test_wait_for_blocked_waiters_returns_false_after_timeout() {
     let timeline = MockTimeline::new();
 
     assert!(!timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::ZERO,));
-    assert!(
-        !timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::from_millis(1),)
-    );
+    assert!(!timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::from_millis(1),));
 }
 
 /// Verifies waiter observation returns false when the real deadline cannot exist.

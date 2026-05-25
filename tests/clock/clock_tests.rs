@@ -63,10 +63,7 @@ fn test_clock_time_returns_valid_datetime() {
 
     for clock in clocks {
         let time = clock.time();
-        assert!(
-            time.timestamp_millis() > 0,
-            "Clock should return valid DateTime"
-        );
+        assert!(time.timestamp_millis() > 0, "Clock should return valid DateTime");
     }
 }
 
@@ -85,11 +82,7 @@ fn test_clock_millis_and_time_consistency() {
 
         // Allow small difference due to time passing between calls
         let diff = (millis - time_millis).abs();
-        assert!(
-            diff < 10,
-            "millis() and time() should be consistent, diff: {}",
-            diff
-        );
+        assert!(diff < 10, "millis() and time() should be consistent, diff: {}", diff);
     }
 }
 
@@ -104,10 +97,7 @@ fn test_clock_time_clamps_out_of_range_millis() {
 
 #[test]
 fn test_clock_time_progresses() {
-    let clocks: Vec<Box<dyn Clock>> = vec![
-        Box::new(SystemClock::new()),
-        Box::new(MonotonicClock::new()),
-    ];
+    let clocks: Vec<Box<dyn Clock>> = vec![Box::new(SystemClock::new()), Box::new(MonotonicClock::new())];
 
     for clock in clocks {
         let time1 = clock.millis();

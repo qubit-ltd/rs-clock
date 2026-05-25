@@ -462,10 +462,7 @@ fn test_edge_case_large_count() {
     meter.stop();
 
     let large_count = 1_000_000_000;
-    assert_eq!(
-        meter.speed_per_second(large_count),
-        Some(large_count as f64)
-    );
+    assert_eq!(meter.speed_per_second(large_count), Some(large_count as f64));
 }
 
 #[test]
