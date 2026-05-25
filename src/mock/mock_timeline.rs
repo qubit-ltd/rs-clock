@@ -95,12 +95,14 @@ struct MockTimelineState {
 }
 
 /// Registration for a mock timeline waiter.
+#[cfg(feature = "tokio")]
 #[derive(Debug)]
 struct MockTimelineWaiterRegistration {
     timeline: MockTimeline,
     kind: MockWaiterKind,
 }
 
+#[cfg(feature = "tokio")]
 impl MockTimelineWaiterRegistration {
     /// Registers a waiter on a mock timeline.
     ///
@@ -120,6 +122,7 @@ impl MockTimelineWaiterRegistration {
     }
 }
 
+#[cfg(feature = "tokio")]
 impl Drop for MockTimelineWaiterRegistration {
     /// Removes the registered waiter from the timeline.
     fn drop(&mut self) {
