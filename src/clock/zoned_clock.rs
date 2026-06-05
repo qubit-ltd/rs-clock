@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Clock trait with timezone support.
 //!
 //! This module defines the [`ZonedClock`] trait, which extends [`Clock`] to
 //! provide timezone support and local time access.
-//!
 
 use crate::Clock;
 use chrono::{
@@ -35,7 +32,6 @@ use chrono_tz::Tz;
 /// let local = clock.local_time();
 /// println!("Local time in Shanghai: {}", local);
 /// ```
-///
 pub trait ZonedClock: Clock {
     /// Returns the timezone of this clock.
     ///

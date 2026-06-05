@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! The base clock trait providing UTC time.
 //!
 //! This module defines the [`Clock`] trait, which is the foundation of the
 //! clock abstraction. All clock implementations must implement this trait.
-//!
 
 use chrono::{
     DateTime,
@@ -50,7 +47,6 @@ fn clamp_out_of_range_millis(millis: i64) -> DateTime<Utc> {
 /// let time = clock.time();
 /// println!("Current time: {}", time);
 /// ```
-///
 pub trait Clock: Send + Sync {
     /// Returns the current time as a Unix timestamp in milliseconds (UTC).
     ///
@@ -95,6 +91,7 @@ pub trait Clock: Send + Sync {
     #[inline]
     fn time(&self) -> DateTime<Utc> {
         let millis = self.millis();
-        DateTime::from_timestamp_millis(millis).unwrap_or_else(|| clamp_out_of_range_millis(millis))
+        DateTime::from_timestamp_millis(millis)
+            .unwrap_or_else(|| clamp_out_of_range_millis(millis))
     }
 }

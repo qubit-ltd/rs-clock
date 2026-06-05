@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Errors returned by mock time controls.
 
 use std::error::Error;
@@ -40,7 +38,9 @@ impl Display for MockTimeError {
     /// Formats the mock time error.
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ActiveWaiters => write!(f, "mock timeline has active waiters"),
+            Self::ActiveWaiters => {
+                write!(f, "mock timeline has active waiters")
+            }
             Self::MismatchedTimeline { expected, actual } => write!(
                 f,
                 "mock instant belongs to timeline {actual}, but timeline {expected} was expected",

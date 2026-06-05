@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for the NanoClock trait.
 
 use chrono::{
@@ -111,7 +109,10 @@ fn test_nano_clock_monotonicity() {
     for _ in 0..10 {
         thread::sleep(Duration::from_millis(1));
         let curr = clock.nanos();
-        assert!(curr >= prev, "NanoClock time should be monotonically increasing");
+        assert!(
+            curr >= prev,
+            "NanoClock time should be monotonically increasing"
+        );
         prev = curr;
     }
 }
@@ -167,11 +168,13 @@ fn test_nano_clock_time_precise_clamps_out_of_range_nanos() {
     let min_clock = FixedNanoClock::new(i128::MIN);
     assert_eq!(min_clock.time_precise(), DateTime::<Utc>::MIN_UTC);
 
-    let beyond_chrono_max = (DateTime::<Utc>::MAX_UTC.timestamp() as i128 + 1) * 1_000_000_000;
+    let beyond_chrono_max =
+        (DateTime::<Utc>::MAX_UTC.timestamp() as i128 + 1) * 1_000_000_000;
     let max_clock = FixedNanoClock::new(beyond_chrono_max);
     assert_eq!(max_clock.time_precise(), DateTime::<Utc>::MAX_UTC);
 
-    let beyond_chrono_min = (DateTime::<Utc>::MIN_UTC.timestamp() as i128 - 1) * 1_000_000_000;
+    let beyond_chrono_min =
+        (DateTime::<Utc>::MIN_UTC.timestamp() as i128 - 1) * 1_000_000_000;
     let min_clock = FixedNanoClock::new(beyond_chrono_min);
     assert_eq!(min_clock.time_precise(), DateTime::<Utc>::MIN_UTC);
 }

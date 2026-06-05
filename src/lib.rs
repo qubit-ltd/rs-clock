@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Thread-safe clock abstractions for Rust.
 //!
 //! This crate provides a flexible and type-safe clock abstraction system with
@@ -17,7 +15,8 @@
 //! - **Timezone support**: Convert to local time in any timezone
 //! - **Monotonic time**: Time that never goes backwards
 //! - **Testing support**: Shared mock timelines for clocks and sleepers
-//! - **Mockable sleeps**: Relative sleep abstractions with real and mock implementations
+//! - **Mockable sleeps**: Relative sleep abstractions with real and mock
+//!   implementations
 //!
 //! # Architecture
 //!
@@ -30,7 +29,8 @@
 //! - [`sleep::Sleeper`]: Relative blocking sleep abstraction
 //! - `sleep::AsyncSleeper`: Tokio async relative sleep abstraction enabled by
 //!   the `tokio` feature
-//! - [`MockTimeline`]: Shared monotonic mock time source for deterministic tests
+//! - [`MockTimeline`]: Shared monotonic mock time source for deterministic
+//!   tests
 //!
 //! # Implementations
 //!
@@ -44,8 +44,8 @@
 //! - [`Zoned<C>`](Zoned): Wrapper that adds timezone support to any clock
 //! - [`sleep::SystemSleeper`]: Real relative sleeper, with async support when
 //!   the `tokio` feature is enabled
-//! - [`sleep::MockSleeper`]: Timeline-backed relative sleeper for tests,
-//!   with async support when the `tokio` feature is enabled
+//! - [`sleep::MockSleeper`]: Timeline-backed relative sleeper for tests, with
+//!   async support when the `tokio` feature is enabled
 //!
 //! # Examples
 //!
@@ -141,12 +141,11 @@
 //!
 //! # Design Principles
 //!
-//! - **Interface Segregation**: Don't force implementations to provide
-//!   features they don't need
+//! - **Interface Segregation**: Don't force implementations to provide features
+//!   they don't need
 //! - **Single Responsibility**: Each trait and type has one clear purpose
 //! - **Composition over Inheritance**: Extend functionality through wrappers
 //! - **Zero-Cost Abstractions**: Pay only for what you use
-//!
 
 // Re-export chrono types for convenience
 pub use chrono::{

@@ -1,20 +1,18 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Time measurement utilities.
 //!
 //! This module provides time meters for measuring elapsed time with
 //! different precision levels:
 //!
 //! - [`TimeMeter`]: Millisecond precision time meter for general use cases
-//! - [`NanoTimeMeter`]: Nanosecond precision time meter for
-//!   high-precision measurements
+//! - [`NanoTimeMeter`]: Nanosecond precision time meter for high-precision
+//!   measurements
 //!
 //! # Examples
 //!
@@ -43,7 +41,6 @@
 //! meter.stop();
 //! println!("Elapsed: {} ns", meter.nanos());
 //! ```
-//!
 
 mod format;
 mod nano_time_meter;

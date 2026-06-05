@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 use std::time::Duration;
 
 use crate::sleep::AsyncSleepFuture;
@@ -25,5 +23,8 @@ pub trait AsyncSleeper: Send + Sync {
     /// # Returns
     ///
     /// A future that resolves after the duration has elapsed.
-    fn sleep_for_async<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a>;
+    fn sleep_for_async<'a>(
+        &'a self,
+        duration: Duration,
+    ) -> AsyncSleepFuture<'a>;
 }

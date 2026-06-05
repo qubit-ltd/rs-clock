@@ -1,18 +1,15 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Millisecond-precision time meter implementation.
 //!
 //! This module provides [`TimeMeter`], a simple yet powerful time
 //! measurement tool with millisecond precision. For nanosecond precision,
 //! use [`NanoTimeMeter`](super::NanoTimeMeter).
-//!
 
 use crate::meter::format::{
     format_duration_millis,
@@ -29,13 +26,12 @@ use chrono::Duration;
 /// This meter provides a simple and powerful tool for time measurement
 /// with the following features:
 ///
-/// - **Flexible clock source**: Supports any clock implementing `Clock`
-///   trait via generic parameter
-/// - **High precision**: Uses `MonotonicClock` by default, based on
-///   `Instant`
+/// - **Flexible clock source**: Supports any clock implementing `Clock` trait
+///   via generic parameter
+/// - **High precision**: Uses `MonotonicClock` by default, based on `Instant`
 /// - **Easy to use**: Provides simple start/stop interface
-/// - **Multiple output formats**: Supports milliseconds, seconds, minutes,
-///   and human-readable format
+/// - **Multiple output formats**: Supports milliseconds, seconds, minutes, and
+///   human-readable format
 /// - **Speed calculation**: Provides per-second and per-minute speed
 ///   calculation
 /// - **Test-friendly**: Supports injecting `MockClock` for unit testing
@@ -45,10 +41,10 @@ use chrono::Duration;
 /// `TimeMeter` uses dependency injection pattern through the `Clock`
 /// trait. This design brings the following benefits:
 ///
-/// 1. **Production reliability**: Uses `MonotonicClock` by default,
-///    ensuring time measurement is not affected by system time adjustments
-/// 2. **Test controllability**: Can inject `MockClock` for deterministic
-///    time testing
+/// 1. **Production reliability**: Uses `MonotonicClock` by default, ensuring
+///    time measurement is not affected by system time adjustments
+/// 2. **Test controllability**: Can inject `MockClock` for deterministic time
+///    testing
 /// 3. **Extensibility**: Can implement custom `Clock` to meet special
 ///    requirements
 /// 4. **Compatibility**: Fully compatible with standard Java time API
@@ -58,10 +54,9 @@ use chrono::Duration;
 /// If no clock is specified, this meter uses `MonotonicClock` as the
 /// default clock instead of system clock. This is because:
 ///
-/// - `MonotonicClock` is based on `Instant`, providing monotonically
-///   increasing time
-/// - Not affected by system time adjustments (e.g., NTP sync, manual
-///   settings)
+/// - `MonotonicClock` is based on `Instant`, providing monotonically increasing
+///   time
+/// - Not affected by system time adjustments (e.g., NTP sync, manual settings)
 /// - More suitable for performance measurement and benchmarking scenarios
 /// - Provides more stable and reliable results in most use cases
 ///
@@ -97,7 +92,6 @@ use chrono::Duration;
 ///     println!("Running: {}", meter.readable_duration());
 /// }
 /// ```
-///
 pub struct TimeMeter<C: Clock> {
     /// The clock used by this meter.
     clock: C,

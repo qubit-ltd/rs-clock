@@ -1,18 +1,15 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Nanosecond-precision time meter implementation.
 //!
 //! This module provides [`NanoTimeMeter`], a high-precision time
 //! measurement tool with nanosecond precision. For millisecond precision,
 //! use [`TimeMeter`](super::TimeMeter).
-//!
 
 use crate::meter::format::{
     format_duration_nanos,
@@ -59,7 +56,8 @@ fn duration_from_nanos(nanos: i128) -> Duration {
 
     let seconds = nanos.div_euclid(NANOS_PER_SECOND);
     let sub_nanos = nanos.rem_euclid(NANOS_PER_SECOND) as u32;
-    Duration::new(seconds as i64, sub_nanos).expect("nanos within chrono bounds should construct Duration")
+    Duration::new(seconds as i64, sub_nanos)
+        .expect("nanos within chrono bounds should construct Duration")
 }
 
 /// A time meter for measuring elapsed time with nanosecond precision.
@@ -71,12 +69,12 @@ fn duration_from_nanos(nanos: i128) -> Duration {
 ///
 /// # Differences from TimeMeter
 ///
-/// - **Precision**: NanoTimeMeter provides nanosecond precision,
-///   TimeMeter provides millisecond precision
-/// - **Performance**: NanoTimeMeter has slightly higher computational
-///   overhead, but offers higher precision
-/// - **Use Cases**: NanoTimeMeter is suitable for microbenchmarking,
-///   TimeMeter is suitable for general business monitoring
+/// - **Precision**: NanoTimeMeter provides nanosecond precision, TimeMeter
+///   provides millisecond precision
+/// - **Performance**: NanoTimeMeter has slightly higher computational overhead,
+///   but offers higher precision
+/// - **Use Cases**: NanoTimeMeter is suitable for microbenchmarking, TimeMeter
+///   is suitable for general business monitoring
 ///
 /// # Thread Safety
 ///
@@ -97,7 +95,6 @@ fn duration_from_nanos(nanos: i128) -> Duration {
 /// println!("Elapsed: {} nanos", meter.nanos());
 /// println!("Elapsed: {}", meter.readable_duration());
 /// ```
-///
 pub struct NanoTimeMeter<C: NanoClock> {
     /// The clock used by this meter.
     clock: C,

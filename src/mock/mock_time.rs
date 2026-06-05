@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Facade for a complete mock time runtime.
 
 use std::time::Duration as StdDuration;
@@ -24,7 +22,8 @@ use crate::{
     MockTimeline,
 };
 
-/// A complete mock time runtime sharing one timeline across clocks and sleepers.
+/// A complete mock time runtime sharing one timeline across clocks and
+/// sleepers.
 ///
 /// `MockTime` is the recommended entry point for tests that need both "what
 /// time is it?" and "how long should this operation sleep?" to use the same
@@ -156,7 +155,8 @@ impl MockTime {
     /// `Ok(())` when reset succeeds.
     ///
     /// # Errors
-    /// Returns [`MockTimeError::ActiveWaiters`] when timeline waiters are active.
+    /// Returns [`MockTimeError::ActiveWaiters`] when timeline waiters are
+    /// active.
     pub fn reset(&self) -> Result<(), MockTimeError> {
         self.timeline.reset()?;
         self.clock.reset_wall_anchor();

@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Shared monotonic timeline for mock time components.
 
 use parking_lot::{
@@ -49,8 +47,8 @@ static NEXT_MOCK_TIMELINE_ID: AtomicU64 = AtomicU64::new(1);
 /// The timeline maintains two related notions of progress:
 ///
 /// - **elapsed time** is the monotonic duration since the timeline origin.
-///   [`MockClock`](crate::MockClock) and
-///   [`crate::sleep::MockSleeper`] derive their behavior from this value.
+///   [`MockClock`](crate::MockClock) and [`crate::sleep::MockSleeper`] derive
+///   their behavior from this value.
 /// - **event epoch** is a notification counter incremented when time advances
 ///   or when [`notify_external_change`](Self::notify_external_change) is
 ///   called. It lets monitor-like primitives wait for either a state change or
@@ -217,7 +215,8 @@ impl MockTimeline {
     pub fn advance(&self, duration: Duration) {
         let event_epoch = {
             let mut state = self.lock_state();
-            state.elapsed_nanos = state.elapsed_nanos.saturating_add(duration.as_nanos());
+            state.elapsed_nanos =
+                state.elapsed_nanos.saturating_add(duration.as_nanos());
             state.time_epoch = state.time_epoch.wrapping_add(1);
             state.event_epoch = state.event_epoch.wrapping_add(1);
             state.event_epoch
@@ -231,7 +230,8 @@ impl MockTimeline {
     /// `Ok(())` when reset succeeds.
     ///
     /// # Errors
-    /// Returns [`MockTimeError::ActiveWaiters`] when timeline waiters are active.
+    /// Returns [`MockTimeError::ActiveWaiters`] when timeline waiters are
+    /// active.
     pub fn reset(&self) -> Result<(), MockTimeError> {
         let event_epoch = {
             let mut state = self.lock_state();
@@ -249,8 +249,8 @@ impl MockTimeline {
 
     /// Wakes waiters without changing elapsed time.
     ///
-    /// This is intended for synchronization primitives that combine state-change
-    /// notifications with timeout deadlines.
+    /// This is intended for synchronization primitives that combine
+    /// state-change notifications with timeout deadlines.
     pub fn notify_external_change(&self) {
         let event_epoch = {
             let mut state = self.lock_state();
@@ -272,7 +272,10 @@ impl MockTimeline {
     /// Returns [`MockTimeError::MismatchedTimeline`] if `deadline` was created
     /// by a different timeline.
     #[inline]
-    pub fn wait_until(&self, deadline: MockInstant) -> Result<(), MockTimeError> {
+    pub fn wait_until(
+        &self,
+        deadline: MockInstant,
+    ) -> Result<(), MockTimeError> {
         self.wait_until_with_kind(deadline, MockWaiterKind::Deadline)
     }
 
@@ -282,8 +285,9 @@ impl MockTimeline {
     /// - `duration`: Relative mock duration to wait.
     #[inline]
     pub fn wait_for(&self, duration: Duration) {
-        self.wait_until(self.now().saturating_add(duration))
-            .expect("relative waits should create deadlines on the same timeline");
+        self.wait_until(self.now().saturating_add(duration)).expect(
+            "relative waits should create deadlines on the same timeline",
+        );
     }
 
     /// Blocks until the event epoch changes after `observed_epoch`.
@@ -297,7 +301,8 @@ impl MockTimeline {
         }
     }
 
-    /// Blocks until a registered waiter count is observed or real timeout expires.
+    /// Blocks until a registered waiter count is observed or real timeout
+    /// expires.
     ///
     /// # Parameters
     /// - `kind`: Waiter group to inspect.
@@ -307,17 +312,27 @@ impl MockTimeline {
     ///
     /// # Returns
     /// `true` when enough waiters are observed before the real timeout.
-    pub fn wait_for_blocked_waiters(&self, kind: MockWaiterKind, count: usize, real_timeout: Duration) -> bool {
+    pub fn wait_for_blocked_waiters(
+        &self,
+        kind: MockWaiterKind,
+        count: usize,
+        real_timeout: Duration,
+    ) -> bool {
         let Some(deadline) = Instant::now().checked_add(real_timeout) else {
             return false;
         };
         let mut state = self.lock_state();
         while Self::waiter_count(&state, kind) < count {
-            let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+            let Some(remaining) =
+                deadline.checked_duration_since(Instant::now())
+            else {
                 return false;
             };
-            let wait_result = self.shared.waiters_changed.wait_for(&mut state, remaining);
-            if wait_result.timed_out() && Self::waiter_count(&state, kind) < count {
+            let wait_result =
+                self.shared.waiters_changed.wait_for(&mut state, remaining);
+            if wait_result.timed_out()
+                && Self::waiter_count(&state, kind) < count
+            {
                 return false;
             }
         }
@@ -367,7 +382,8 @@ impl MockTimeline {
         if self.elapsed_nanos() >= deadline.nanos_since_origin() {
             return Ok(Box::pin(async {}));
         }
-        let registration = MockTimelineWaiterRegistration::new(self.clone(), kind);
+        let registration =
+            MockTimelineWaiterRegistration::new(self.clone(), kind);
         let mut event_receiver = self.async_event_sender.subscribe();
         Ok(Box::pin(async move {
             let _registration = registration;
@@ -394,7 +410,10 @@ impl MockTimeline {
     /// # Errors
     /// Returns [`MockTimeError::MismatchedTimeline`] when the instant belongs
     /// to a different timeline.
-    fn ensure_own_instant(&self, instant: MockInstant) -> Result<(), MockTimeError> {
+    fn ensure_own_instant(
+        &self,
+        instant: MockInstant,
+    ) -> Result<(), MockTimeError> {
         if instant.timeline_id() == self.id {
             Ok(())
         } else {
@@ -453,7 +472,8 @@ impl MockTimeline {
                 state.sleep_waiters = state.sleep_waiters.saturating_add(1);
             }
             MockWaiterKind::Deadline => {
-                state.deadline_waiters = state.deadline_waiters.saturating_add(1);
+                state.deadline_waiters =
+                    state.deadline_waiters.saturating_add(1);
             }
         }
     }
@@ -469,7 +489,8 @@ impl MockTimeline {
                 state.sleep_waiters = state.sleep_waiters.saturating_sub(1);
             }
             MockWaiterKind::Deadline => {
-                state.deadline_waiters = state.deadline_waiters.saturating_sub(1);
+                state.deadline_waiters =
+                    state.deadline_waiters.saturating_sub(1);
             }
         }
     }
@@ -528,7 +549,12 @@ fn next_mock_timeline_id() -> u64 {
         let current = NEXT_MOCK_TIMELINE_ID.load(Ordering::Relaxed);
         assert_ne!(current, u64::MAX, "mock timeline id space exhausted");
         if NEXT_MOCK_TIMELINE_ID
-            .compare_exchange_weak(current, current + 1, Ordering::Relaxed, Ordering::Relaxed)
+            .compare_exchange_weak(
+                current,
+                current + 1,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            )
             .is_ok()
         {
             return current;

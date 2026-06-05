@@ -1,18 +1,15 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! System clock implementation.
 //!
 //! This module provides [`SystemClock`], a clock implementation that uses the
 //! system's wall clock time. The time is subject to system time adjustments
 //! (e.g., NTP synchronization, manual changes).
-//!
 
 use crate::Clock;
 use chrono::{
@@ -46,7 +43,6 @@ use chrono::{
 /// let time = clock.time();
 /// println!("Current system time: {}", time);
 /// ```
-///
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemClock;
 
@@ -64,7 +60,6 @@ impl SystemClock {
     ///
     /// let clock = SystemClock::new();
     /// ```
-    ///
     #[inline]
     pub fn new() -> Self {
         SystemClock

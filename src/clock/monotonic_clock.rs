@@ -1,18 +1,15 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Monotonic clock implementation.
 //!
 //! This module provides [`MonotonicClock`], a clock implementation that
 //! guarantees monotonically increasing time values, unaffected by system time
 //! adjustments.
-//!
 
 use crate::Clock;
 use chrono::Utc;
@@ -64,7 +61,6 @@ use std::time::{
 /// let elapsed = clock.millis() - start;
 /// assert!(elapsed >= 100);
 /// ```
-///
 #[derive(Debug, Clone)]
 pub struct MonotonicClock {
     /// The base instant when this clock was created.
@@ -91,7 +87,6 @@ impl MonotonicClock {
     ///
     /// let clock = MonotonicClock::new();
     /// ```
-    ///
     #[inline]
     pub fn new() -> Self {
         MonotonicClock {
@@ -163,6 +158,7 @@ impl Default for MonotonicClock {
 impl Clock for MonotonicClock {
     #[inline]
     fn millis(&self) -> i64 {
-        self.system_time_base_millis.saturating_add(self.monotonic_millis())
+        self.system_time_base_millis
+            .saturating_add(self.monotonic_millis())
     }
 }

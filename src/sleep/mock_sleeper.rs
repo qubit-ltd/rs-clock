@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Sleeper backed by a shared mock timeline.
 
 use std::time::Duration;
@@ -90,17 +88,25 @@ impl Sleeper for MockSleeper {
         let deadline = self.timeline.now().saturating_add(duration);
         self.timeline
             .wait_until_with_kind(deadline, MockWaiterKind::Sleep)
-            .expect("mock sleeper deadlines should belong to the sleeper timeline");
+            .expect(
+                "mock sleeper deadlines should belong to the sleeper timeline",
+            );
     }
 }
 
 #[cfg(feature = "tokio")]
 impl AsyncSleeper for MockSleeper {
-    /// Returns a future that resolves when the shared mock timeline reaches the sleep deadline.
-    fn sleep_for_async<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a> {
+    /// Returns a future that resolves when the shared mock timeline reaches the
+    /// sleep deadline.
+    fn sleep_for_async<'a>(
+        &'a self,
+        duration: Duration,
+    ) -> AsyncSleepFuture<'a> {
         let deadline = self.timeline.now().saturating_add(duration);
         self.timeline
             .wait_until_async_with_kind(deadline, MockWaiterKind::Sleep)
-            .expect("mock sleeper deadlines should belong to the sleeper timeline")
+            .expect(
+                "mock sleeper deadlines should belong to the sleeper timeline",
+            )
     }
 }

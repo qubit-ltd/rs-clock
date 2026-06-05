@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Behavior-focused tests for the `MonotonicClock` type.
 
 use chrono::Utc;
@@ -36,12 +34,13 @@ fn test_monotonic_clock_elapsed_matches_monotonic_millis() {
 
     thread::sleep(Duration::from_millis(25));
 
-    let elapsed_millis =
-        i64::try_from(clock.elapsed().as_millis()).expect("short test elapsed duration should fit in i64");
+    let elapsed_millis = i64::try_from(clock.elapsed().as_millis())
+        .expect("short test elapsed duration should fit in i64");
     let monotonic_millis = clock.monotonic_millis();
 
     assert!(
-        (elapsed_millis..=elapsed_millis.saturating_add(1)).contains(&monotonic_millis),
+        (elapsed_millis..=elapsed_millis.saturating_add(1))
+            .contains(&monotonic_millis),
         "monotonic_millis should come from elapsed(): elapsed={elapsed_millis}, monotonic={monotonic_millis}",
     );
 }

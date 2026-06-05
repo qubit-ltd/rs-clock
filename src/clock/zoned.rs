@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Timezone wrapper for clocks.
 //!
 //! This module provides [`Zoned`], a generic wrapper that adds timezone
 //! support to any clock implementation.
-//!
 
 use crate::{
     Clock,
@@ -80,7 +77,6 @@ use std::ops::Deref;
 /// ).unwrap().with_timezone(&Utc);
 /// clock.set_time(time);
 /// ```
-///
 #[derive(Debug, Clone)]
 pub struct Zoned<C: Clock> {
     /// The wrapped clock.
@@ -110,7 +106,6 @@ impl<C: Clock> Zoned<C> {
     ///
     /// let clock = Zoned::new(SystemClock::new(), Shanghai);
     /// ```
-    ///
     #[inline]
     pub fn new(clock: C, timezone: Tz) -> Self {
         Zoned { clock, timezone }
@@ -132,7 +127,6 @@ impl<C: Clock> Zoned<C> {
     /// let inner = clock.inner();
     /// let millis = inner.millis();
     /// ```
-    ///
     #[inline]
     pub fn inner(&self) -> &C {
         &self.clock
@@ -153,7 +147,6 @@ impl<C: Clock> Zoned<C> {
     /// let clock = Zoned::new(SystemClock::new(), Shanghai);
     /// let inner = clock.into_inner();
     /// ```
-    ///
     #[inline]
     pub fn into_inner(self) -> C {
         self.clock

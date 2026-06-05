@@ -1,18 +1,15 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Controllable clock trait for testing.
 //!
 //! This module defines the [`ControllableClock`] trait, which extends
 //! [`Clock`] to provide methods for controlling the clock's time. This is
 //! primarily useful for testing scenarios.
-//!
 
 use crate::Clock;
 use chrono::{
@@ -54,7 +51,6 @@ use chrono::{
 ///     fixed_time + Duration::hours(1)
 /// );
 /// ```
-///
 pub trait ControllableClock: Clock {
     /// Sets or aligns the clock to a specific time.
     ///
