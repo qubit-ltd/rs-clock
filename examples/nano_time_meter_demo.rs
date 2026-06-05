@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Demonstration of NanoTimeMeter usage.
 //!
 //! This example shows how to use NanoTimeMeter for high-precision
@@ -65,7 +63,10 @@ fn main() {
         items_processed,
         meter.readable_duration()
     );
-    println!("   Speed: {}", meter.formatted_speed_per_second(items_processed));
+    println!(
+        "   Speed: {}",
+        meter.formatted_speed_per_second(items_processed)
+    );
     println!();
 
     // Example 5: Microbenchmarking

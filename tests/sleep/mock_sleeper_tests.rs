@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for timeline-backed mock sleepers.
 
 use std::sync::mpsc;
@@ -54,17 +52,25 @@ fn test_sleep_for_blocks_until_timeline_advances() {
 
     let worker = thread::spawn(move || {
         worker_sleeper.sleep_for(Duration::from_millis(100));
-        done_sender.send(()).expect("worker should report when sleep completes");
+        done_sender
+            .send(())
+            .expect("worker should report when sleep completes");
     });
 
     assert!(
-        timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::from_secs(1)),
+        timeline.wait_for_blocked_waiters(
+            MockWaiterKind::Sleep,
+            1,
+            Duration::from_secs(1)
+        ),
         "worker should block in mock sleep before time advances",
     );
 
     timeline.advance(Duration::from_millis(99));
     assert!(
-        done_receiver.recv_timeout(Duration::from_millis(20)).is_err(),
+        done_receiver
+            .recv_timeout(Duration::from_millis(20))
+            .is_err(),
         "mock sleep should not complete before target elapsed time",
     );
 
@@ -89,17 +95,25 @@ fn test_sleep_for_uses_timeline_elapsed_at_call_time() {
 
     let worker = thread::spawn(move || {
         worker_sleeper.sleep_for(Duration::from_millis(100));
-        done_sender.send(()).expect("worker should report when sleep completes");
+        done_sender
+            .send(())
+            .expect("worker should report when sleep completes");
     });
 
     assert!(
-        timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::from_secs(1)),
+        timeline.wait_for_blocked_waiters(
+            MockWaiterKind::Sleep,
+            1,
+            Duration::from_secs(1)
+        ),
         "worker should block in mock sleep before time advances",
     );
 
     timeline.advance(Duration::from_millis(99));
     assert!(
-        done_receiver.recv_timeout(Duration::from_millis(20)).is_err(),
+        done_receiver
+            .recv_timeout(Duration::from_millis(20))
+            .is_err(),
         "sleep should be relative to elapsed at call time",
     );
 

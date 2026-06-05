@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 use std::thread;
 use std::time::Duration;
 
@@ -47,7 +45,10 @@ impl Sleeper for SystemSleeper {
 #[cfg(feature = "tokio")]
 impl AsyncSleeper for SystemSleeper {
     /// Returns a Tokio sleep future for the requested duration.
-    fn sleep_for_async<'a>(&'a self, duration: Duration) -> AsyncSleepFuture<'a> {
+    fn sleep_for_async<'a>(
+        &'a self,
+        duration: Duration,
+    ) -> AsyncSleepFuture<'a> {
         Box::pin(tokio::time::sleep(duration))
     }
 }

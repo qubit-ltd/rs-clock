@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for the ControllableClock trait.
 
 use chrono::{
@@ -69,7 +67,9 @@ fn test_controllable_clock_add_duration_positive() {
 }
 
 #[test]
-#[should_panic(expected = "mock time can only be advanced by a non-negative duration")]
+#[should_panic(
+    expected = "mock time can only be advanced by a non-negative duration"
+)]
 fn test_controllable_clock_add_duration_negative_panics() {
     let clock = MockClock::new();
 
@@ -87,9 +87,12 @@ fn test_controllable_clock_add_duration_multiple_times() {
     clock.add_duration(Duration::seconds(45));
 
     let after = clock.time();
-    let expected_duration = Duration::hours(1) + Duration::minutes(30) + Duration::seconds(45);
+    let expected_duration =
+        Duration::hours(1) + Duration::minutes(30) + Duration::seconds(45);
 
-    let diff = (after - initial - expected_duration).num_milliseconds().abs();
+    let diff = (after - initial - expected_duration)
+        .num_milliseconds()
+        .abs();
     assert!(diff < 10, "Duration should accumulate correctly");
 }
 
@@ -108,7 +111,10 @@ fn test_controllable_clock_reset() {
     // Should be close to initial time
     let after_reset = clock.time();
     let diff = (after_reset - initial).num_milliseconds().abs();
-    assert!(diff < 100, "After reset, time should be close to initial time");
+    assert!(
+        diff < 100,
+        "After reset, time should be close to initial time"
+    );
 }
 
 #[test]
@@ -127,7 +133,10 @@ fn test_controllable_clock_reset_after_set_time() {
 
     let after_reset = clock.time();
     let diff = (after_reset - initial).num_milliseconds().abs();
-    assert!(diff < 100, "After reset, time should be close to initial time");
+    assert!(
+        diff < 100,
+        "After reset, time should be close to initial time"
+    );
 }
 
 #[test]
@@ -148,7 +157,10 @@ fn test_controllable_clock_complex_scenario() {
     // Advance by 12 hours
     clock.add_duration(Duration::hours(12));
     let after_hours = clock.time();
-    assert_eq!(after_hours, start_time + Duration::days(1) + Duration::hours(12));
+    assert_eq!(
+        after_hours,
+        start_time + Duration::days(1) + Duration::hours(12)
+    );
 
     // Reanchor wall time without rewinding the shared monotonic timeline.
     let reanchored = start_time + Duration::hours(6);

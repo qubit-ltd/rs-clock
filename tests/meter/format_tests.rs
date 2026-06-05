@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for duration and speed formatting utilities.
 
 use qubit_clock::meter::{
@@ -133,7 +131,8 @@ fn test_format_duration_nanos_seconds_and_above() {
     assert_eq!(format_duration_nanos(1_000_000_000), "1s");
     // 1.5 seconds
     assert_eq!(format_duration_nanos(1_500_000_000), "1.5s");
-    // 1.949999999 seconds rounds directly to 1 decimal place without double rounding
+    // 1.949999999 seconds rounds directly to 1 decimal place without double
+    // rounding
     assert_eq!(format_duration_nanos(1_949_999_999), "1.9s");
     // 1.95 seconds rounds to 2 seconds
     assert_eq!(format_duration_nanos(1_950_000_000), "2s");
@@ -154,7 +153,10 @@ fn test_format_duration_nanos_seconds_and_above() {
 
 #[test]
 fn test_format_duration_nanos_extreme_positive_value() {
-    assert_eq!(format_duration_nanos(i128::MAX), "47261439850130342147690917h 41m 56s",);
+    assert_eq!(
+        format_duration_nanos(i128::MAX),
+        "47261439850130342147690917h 41m 56s",
+    );
 }
 
 #[test]

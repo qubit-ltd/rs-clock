@@ -1,16 +1,17 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Regression tests for public API names documented in README files.
 
 fn readmes() -> [&'static str; 2] {
-    [include_str!("../README.md"), include_str!("../README.zh_CN.md")]
+    [
+        include_str!("../README.md"),
+        include_str!("../README.zh_CN.md"),
+    ]
 }
 
 #[test]

@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Instant value on a mock timeline.
 
 use std::cmp::Ordering;
@@ -39,7 +37,10 @@ impl MockInstant {
     ///
     /// # Returns
     /// A mock instant representing that offset.
-    pub(crate) const fn from_nanos_since_origin(timeline_id: u64, nanos_since_origin: u128) -> Self {
+    pub(crate) const fn from_nanos_since_origin(
+        timeline_id: u64,
+        nanos_since_origin: u128,
+    ) -> Self {
         Self {
             timeline_id,
             nanos_since_origin,
@@ -75,7 +76,9 @@ impl MockInstant {
     pub fn saturating_add(self, duration: Duration) -> Self {
         Self {
             timeline_id: self.timeline_id,
-            nanos_since_origin: self.nanos_since_origin.saturating_add(duration.as_nanos()),
+            nanos_since_origin: self
+                .nanos_since_origin
+                .saturating_add(duration.as_nanos()),
         }
     }
 }

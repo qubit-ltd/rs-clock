@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for shared mock timelines.
 
 use std::sync::mpsc;
@@ -44,7 +42,8 @@ fn test_new_assigns_unique_timeline_ids() {
     assert_eq!(first.id(), first_clone.id());
 }
 
-/// Verifies elapsed conversion saturates when internal nanoseconds exceed `Duration`.
+/// Verifies elapsed conversion saturates when internal nanoseconds exceed
+/// `Duration`.
 ///
 /// # Errors
 /// The test fails if elapsed conversion overflows instead of saturating.
@@ -70,7 +69,9 @@ fn test_notify_external_change_wakes_event_waiter_without_advancing_time() {
     let (ready_sender, ready_receiver) = mpsc::channel();
 
     let worker = thread::spawn(move || {
-        ready_sender.send(()).expect("test should observe event waiter startup");
+        ready_sender
+            .send(())
+            .expect("test should observe event waiter startup");
         worker_timeline.wait_for_event_after(observed_epoch);
         worker_timeline.event_epoch()
     });
@@ -99,18 +100,26 @@ fn test_wait_for_blocks_until_timeline_reaches_deadline() {
 
     let worker = thread::spawn(move || {
         worker_timeline.wait_for(Duration::from_millis(100));
-        done_sender.send(()).expect("test should receive deadline completion");
+        done_sender
+            .send(())
+            .expect("test should receive deadline completion");
     });
 
     assert!(
-        timeline.wait_for_blocked_waiters(MockWaiterKind::Deadline, 1, Duration::from_secs(1),),
+        timeline.wait_for_blocked_waiters(
+            MockWaiterKind::Deadline,
+            1,
+            Duration::from_secs(1),
+        ),
         "deadline waiter should register before time advances",
     );
     assert_eq!(Err(MockTimeError::ActiveWaiters), timeline.reset());
 
     timeline.advance(Duration::from_millis(99));
     assert!(
-        done_receiver.recv_timeout(Duration::from_millis(20)).is_err(),
+        done_receiver
+            .recv_timeout(Duration::from_millis(20))
+            .is_err(),
         "deadline wait should not complete before target elapsed time",
     );
 
@@ -118,7 +127,9 @@ fn test_wait_for_blocks_until_timeline_reaches_deadline() {
     done_receiver
         .recv_timeout(Duration::from_secs(1))
         .expect("deadline wait should complete after target elapsed time");
-    worker.join().expect("deadline waiter should finish cleanly");
+    worker
+        .join()
+        .expect("deadline waiter should finish cleanly");
 }
 
 /// Verifies wait-until returns immediately for a reached deadline.
@@ -180,11 +191,20 @@ fn test_mock_instant_partial_order_requires_same_timeline() {
 fn test_wait_for_blocked_waiters_returns_false_after_timeout() {
     let timeline = MockTimeline::new();
 
-    assert!(!timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::ZERO,));
-    assert!(!timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::from_millis(1),));
+    assert!(!timeline.wait_for_blocked_waiters(
+        MockWaiterKind::Sleep,
+        1,
+        Duration::ZERO,
+    ));
+    assert!(!timeline.wait_for_blocked_waiters(
+        MockWaiterKind::Sleep,
+        1,
+        Duration::from_millis(1),
+    ));
 }
 
-/// Verifies waiter observation returns false when the real deadline cannot exist.
+/// Verifies waiter observation returns false when the real deadline cannot
+/// exist.
 ///
 /// # Errors
 /// The test fails if an unrepresentable real timeout is not rejected.
@@ -192,5 +212,9 @@ fn test_wait_for_blocked_waiters_returns_false_after_timeout() {
 fn test_wait_for_blocked_waiters_rejects_unrepresentable_timeout() {
     let timeline = MockTimeline::new();
 
-    assert!(!timeline.wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, Duration::MAX,));
+    assert!(!timeline.wait_for_blocked_waiters(
+        MockWaiterKind::Sleep,
+        1,
+        Duration::MAX,
+    ));
 }

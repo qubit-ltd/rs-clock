@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for the ZonedClock trait.
 
 use chrono::{
@@ -28,7 +26,8 @@ use qubit_clock::{
     ZonedClock,
 };
 
-// A simple test implementation that uses the default local_time() implementation
+// A simple test implementation that uses the default local_time()
+// implementation
 #[derive(Debug, Clone)]
 struct TestZonedClock {
     clock: MockClock,
@@ -58,7 +57,8 @@ impl ZonedClock for TestZonedClock {
     fn timezone(&self) -> Tz {
         self.tz
     }
-    // Note: We deliberately don't override local_time() to test the default implementation
+    // Note: We deliberately don't override local_time() to test the default
+    // implementation
 }
 
 impl ControllableClock for TestZonedClock {

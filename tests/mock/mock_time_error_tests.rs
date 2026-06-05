@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for mock time errors.
 
 use std::error::Error;
@@ -30,7 +28,10 @@ fn test_active_waiters_display_message() {
 /// The test fails if the display text no longer identifies the mismatched ids.
 #[test]
 fn test_mismatched_timeline_display_message() {
-    let error = MockTimeError::MismatchedTimeline { expected: 7, actual: 9 };
+    let error = MockTimeError::MismatchedTimeline {
+        expected: 7,
+        actual: 9,
+    };
 
     assert_eq!(
         "mock instant belongs to timeline 9, but timeline 7 was expected",

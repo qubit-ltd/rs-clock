@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for TimeMeter.
 
 use chrono::Duration;
@@ -462,7 +460,10 @@ fn test_edge_case_large_count() {
     meter.stop();
 
     let large_count = 1_000_000_000;
-    assert_eq!(meter.speed_per_second(large_count), Some(large_count as f64));
+    assert_eq!(
+        meter.speed_per_second(large_count),
+        Some(large_count as f64)
+    );
 }
 
 #[test]
@@ -506,7 +507,8 @@ fn test_millis_uses_current_time_when_running() {
     // Advance time more
     clock.advance(StdDuration::from_millis(50));
 
-    // Second call - should again use self.clock.millis() because end_time is still None
+    // Second call - should again use self.clock.millis() because end_time is
+    // still None
     let elapsed2 = meter.millis();
     assert_eq!(elapsed2, 150);
 

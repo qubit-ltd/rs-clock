@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Integration tests for the unified mock time runtime.
 
 use std::sync::mpsc;
@@ -41,7 +39,8 @@ fn fixed_time() -> DateTime<Utc> {
 /// Verifies the Unix epoch runtime exposes a zero-elapsed shared timeline.
 ///
 /// # Errors
-/// The test fails if the facade accessors do not share the expected initial state.
+/// The test fails if the facade accessors do not share the expected initial
+/// state.
 #[test]
 fn test_unix_epoch_starts_at_epoch_and_zero_elapsed() {
     let mock = MockTime::unix_epoch();
@@ -70,14 +69,19 @@ fn test_mock_time_advance_drives_clock_and_sleeper() {
     });
 
     assert!(
-        mock.timeline()
-            .wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, StdDuration::from_secs(1),),
+        mock.timeline().wait_for_blocked_waiters(
+            MockWaiterKind::Sleep,
+            1,
+            StdDuration::from_secs(1),
+        ),
         "sleeper should be blocked before mock time advances",
     );
 
     mock.advance(StdDuration::from_millis(99));
     assert!(
-        done_receiver.recv_timeout(StdDuration::from_millis(20)).is_err(),
+        done_receiver
+            .recv_timeout(StdDuration::from_millis(20))
+            .is_err(),
         "sleep should not complete before the shared timeline reaches the deadline",
     );
 
@@ -91,7 +95,8 @@ fn test_mock_time_advance_drives_clock_and_sleeper() {
     worker.join().expect("worker should finish cleanly");
 }
 
-/// Verifies `MockClock` exposes nanosecond precision through the shared timeline.
+/// Verifies `MockClock` exposes nanosecond precision through the shared
+/// timeline.
 ///
 /// # Errors
 /// The test fails if `MockClock` no longer implements [`NanoClock`] semantics.
@@ -125,7 +130,8 @@ fn test_nano_time_meter_uses_mock_clock_timeline() {
 /// Verifies setting time reanchors the clock without changing elapsed time.
 ///
 /// # Errors
-/// The test fails if `set_time` advances the timeline or ignores the new anchor.
+/// The test fails if `set_time` advances the timeline or ignores the new
+/// anchor.
 #[test]
 fn test_set_time_reanchors_clock_without_changing_elapsed() {
     let mock = MockTime::unix_epoch();
@@ -138,7 +144,8 @@ fn test_set_time_reanchors_clock_without_changing_elapsed() {
     assert_eq!(new_time, mock.clock().time());
 }
 
-/// Verifies reset restores the runtime's initial timeline and wall-clock anchor.
+/// Verifies reset restores the runtime's initial timeline and wall-clock
+/// anchor.
 ///
 /// # Errors
 /// The test fails if reset leaves elapsed time or clock reads advanced.
@@ -148,7 +155,8 @@ fn test_reset_restores_initial_state() {
 
     mock.advance(StdDuration::from_secs(10));
     mock.set_time(fixed_time() + Duration::hours(1));
-    mock.reset().expect("mock runtime without waiters should reset");
+    mock.reset()
+        .expect("mock runtime without waiters should reset");
 
     assert_eq!(StdDuration::ZERO, mock.elapsed());
     assert_eq!(fixed_time(), mock.clock().time());
@@ -166,12 +174,17 @@ fn test_reset_rejects_active_waiters() {
 
     let worker = thread::spawn(move || {
         sleeper.sleep_for(StdDuration::from_millis(100));
-        done_sender.send(()).expect("test should receive sleeper completion");
+        done_sender
+            .send(())
+            .expect("test should receive sleeper completion");
     });
 
     assert!(
-        mock.timeline()
-            .wait_for_blocked_waiters(MockWaiterKind::Sleep, 1, StdDuration::from_secs(1),),
+        mock.timeline().wait_for_blocked_waiters(
+            MockWaiterKind::Sleep,
+            1,
+            StdDuration::from_secs(1),
+        ),
         "sleeper should be blocked before reset is attempted",
     );
     assert_eq!(Err(MockTimeError::ActiveWaiters), mock.reset());

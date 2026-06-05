@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for SystemClock.
 
 use chrono::Datelike;
@@ -21,7 +19,10 @@ use std::time::Duration;
 fn test_system_clock_new() {
     let clock = SystemClock::new();
     let millis = clock.millis();
-    assert!(millis > 0, "SystemClock should return positive milliseconds");
+    assert!(
+        millis > 0,
+        "SystemClock should return positive milliseconds"
+    );
 }
 
 #[test]
@@ -50,7 +51,10 @@ fn test_system_clock_time() {
     let time = clock.time();
 
     // Should be a reasonable year
-    assert!(time.year() >= 2020, "SystemClock should return a reasonable year");
+    assert!(
+        time.year() >= 2020,
+        "SystemClock should return a reasonable year"
+    );
 }
 
 #[test]
@@ -61,7 +65,11 @@ fn test_system_clock_consistency() {
 
     // They should be very close (within a few milliseconds)
     let diff = (millis - time.timestamp_millis()).abs();
-    assert!(diff < 10, "millis() and time() should be consistent, diff: {}", diff);
+    assert!(
+        diff < 10,
+        "millis() and time() should be consistent, diff: {}",
+        diff
+    );
 }
 
 #[test]
@@ -76,7 +84,11 @@ fn test_system_clock_progresses() {
     assert!(time2 >= time1, "SystemClock time should progress");
 
     let elapsed = time2 - time1;
-    assert!(elapsed >= 50, "At least 50ms should have elapsed, got: {}", elapsed);
+    assert!(
+        elapsed >= 50,
+        "At least 50ms should have elapsed, got: {}",
+        elapsed
+    );
 }
 
 #[test]
@@ -89,7 +101,10 @@ fn test_system_clock_multiple_instances() {
 
     // Should be very close
     let diff = (time1 - time2).abs();
-    assert!(diff < 10, "Multiple SystemClock instances should return similar times");
+    assert!(
+        diff < 10,
+        "Multiple SystemClock instances should return similar times"
+    );
 }
 
 #[test]

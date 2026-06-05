@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! High-precision clock trait providing nanosecond accuracy.
 //!
 //! This module defines the [`NanoClock`] trait, which extends [`Clock`] to
 //! provide nanosecond-precision time measurements.
-//!
 
 use crate::Clock;
 use chrono::{
@@ -45,7 +42,6 @@ use chrono::{
 /// let elapsed = clock.nanos() - start;
 /// println!("Elapsed: {} ns", elapsed);
 /// ```
-///
 pub trait NanoClock: Clock {
     /// Returns the current time as a Unix timestamp in nanoseconds (UTC).
     ///

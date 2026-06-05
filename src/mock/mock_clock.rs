@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Clock view backed by a shared mock timeline.
 
 use std::time::Duration as StdDuration;
@@ -103,7 +101,8 @@ impl MockClock {
     /// A mock clock view over the provided timeline.
     #[must_use]
     pub fn with_timeline(start: DateTime<Utc>, timeline: MockTimeline) -> Self {
-        let wall_origin_nanos = datetime_to_nanos(start).saturating_sub(timeline_elapsed_i128(&timeline));
+        let wall_origin_nanos = datetime_to_nanos(start)
+            .saturating_sub(timeline_elapsed_i128(&timeline));
         Self {
             timeline,
             anchor: Arc::new(Mutex::new(MockClockAnchor {
@@ -137,7 +136,8 @@ impl MockClock {
     /// `Ok(())` when reset succeeds.
     ///
     /// # Errors
-    /// Returns [`MockTimeError::ActiveWaiters`] when timeline waiters are active.
+    /// Returns [`MockTimeError::ActiveWaiters`] when timeline waiters are
+    /// active.
     pub fn try_reset(&self) -> Result<(), MockTimeError> {
         self.timeline.reset()?;
         self.reset_wall_anchor();
@@ -203,7 +203,8 @@ impl ControllableClock for MockClock {
     /// Reanchors this clock so the current timeline instant reads as `instant`.
     fn set_time(&self, instant: DateTime<Utc>) {
         let mut anchor = self.lock_anchor();
-        anchor.wall_origin_nanos = datetime_to_nanos(instant).saturating_sub(timeline_elapsed_i128(&self.timeline));
+        anchor.wall_origin_nanos = datetime_to_nanos(instant)
+            .saturating_sub(timeline_elapsed_i128(&self.timeline));
     }
 
     /// Advances the shared mock timeline by a non-negative duration.
@@ -212,9 +213,9 @@ impl ControllableClock for MockClock {
     /// Panics if `duration` is negative or cannot be represented as
     /// [`std::time::Duration`].
     fn add_duration(&self, duration: Duration) {
-        let duration = duration
-            .to_std()
-            .expect("mock time can only be advanced by a non-negative duration");
+        let duration = duration.to_std().expect(
+            "mock time can only be advanced by a non-negative duration",
+        );
         self.timeline.advance(duration);
     }
 
@@ -265,7 +266,8 @@ fn datetime_from_nanos(nanos: i128) -> DateTime<Utc> {
     })
 }
 
-/// Converts Unix nanoseconds to timestamp milliseconds using Euclidean division.
+/// Converts Unix nanoseconds to timestamp milliseconds using Euclidean
+/// division.
 ///
 /// # Parameters
 /// - `nanos`: Unix timestamp in nanoseconds.
