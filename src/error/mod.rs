@@ -1,0 +1,10 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+// =============================================================================
+//! Error types exposed by this crate.
+
+mod time_error;
+
+pub use time_error::TimeError;

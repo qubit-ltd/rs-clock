@@ -7,7 +7,12 @@
 // =============================================================================
 //! Tests for the sleep module.
 
-#[cfg(feature = "tokio")]
 mod async_sleeper_tests;
-mod mock_sleeper_tests;
-mod system_sleeper_tests;
+mod blocking_sleeper_tests;
+mod manual_async_sleeper_tests;
+mod manual_blocking_sleeper_tests;
+mod manual_sleep_future_tests;
+mod sleep_future_tests;
+mod std_blocking_sleeper_tests;
+#[cfg(feature = "tokio")]
+mod tokio_async_sleeper_tests;

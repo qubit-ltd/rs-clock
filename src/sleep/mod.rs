@@ -2,29 +2,26 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Thread-blocking and asynchronous sleep abstractions.
-//!
-//! The sleep module intentionally models only relative sleeps. It does not
-//! expose deadlines, notifications, or condition waits; those belong to
-//! synchronization primitives such as monitors.
-//! [`SystemSleeper`] and [`MockSleeper`] implement [`Sleeper`], and also
-//! implement `AsyncSleeper` when the `tokio` feature is enabled.
+//! Blocking and asynchronous sleep capabilities based on monotonic clocks.
 
-#[cfg(feature = "tokio")]
-mod async_sleep_future;
-#[cfg(feature = "tokio")]
 mod async_sleeper;
-mod mock_sleeper;
-mod sleeper;
-mod system_sleeper;
+mod blocking_sleeper;
+mod manual_async_sleeper;
+mod manual_blocking_sleeper;
+mod manual_sleep_future;
+mod sleep_future;
+mod std_blocking_sleeper;
 
 #[cfg(feature = "tokio")]
-pub use async_sleep_future::AsyncSleepFuture;
-#[cfg(feature = "tokio")]
+mod tokio_async_sleeper;
+
 pub use async_sleeper::AsyncSleeper;
-pub use mock_sleeper::MockSleeper;
-pub use sleeper::Sleeper;
-pub use system_sleeper::SystemSleeper;
+pub use blocking_sleeper::BlockingSleeper;
+pub use manual_async_sleeper::ManualAsyncSleeper;
+pub use manual_blocking_sleeper::ManualBlockingSleeper;
+pub use sleep_future::SleepFuture;
+pub use std_blocking_sleeper::StdBlockingSleeper;
+
+#[cfg(feature = "tokio")]
+pub use tokio_async_sleeper::TokioAsyncSleeper;

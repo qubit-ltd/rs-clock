@@ -7,639 +7,161 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-为 Rust 提供线程安全的时钟与 sleep 抽象，包含单调时钟和模拟实现。
+为 Rust 提供可注入的 wall clock、monotonic clock，以及可确定性测试的同步和异步 sleeper。
 
-## 概述
+## 设计
 
-Qubit Clock 为 Rust 应用程序提供了灵活且类型安全的时钟抽象系统。它提供强大的、线程安全的时钟实现，支持基本时间访问、高精度测量、时区处理、单调时间、可模拟 relative sleep 和测试支持。
+Qubit Clock 将时间拆成四种能力：
 
-## 特性
+- `WallClock`：以 `SystemTime` 读取现实世界时间。
+- `MonotonicClock`：读取属于特定 clock domain 的 `MonotonicInstant`。
+- `BlockingSleeper`：按 monotonic deadline 阻塞当前线程。
+- `AsyncSleeper`：返回按 monotonic deadline 完成的 future。
 
-### 🕐 **时钟抽象**
-- **基于 Trait 的设计**：通过正交的 trait 实现灵活的时钟抽象
-- **接口隔离**：不强制实现不需要的功能
-- **组合优于继承**：通过包装器扩展功能
-- **零成本抽象**：只为使用的功能付出代价
+Wall time 可能跳变，monotonic time 永不倒退。每个 sleeper 都显式基于对应的 concrete monotonic clock，不维护第二套时间状态。
 
-### ⏰ **时钟实现**
-- **SystemClock**：使用系统墙上时钟时间
-- **MonotonicClock**：单调时间（不受系统时间变化影响）
-- **NanoMonotonicClock**：纳秒精度的单调时间
-- **MockClock**：由 mock timeline 驱动的可控制 UTC 与纳秒时钟
-- **MockTimeline**：确定性测试共享的单调 mock 时间源
-- **MockTime**：组合一个 timeline、clock 和 sleeper 的便捷入口
-- **Zoned\<C\>**：为任何时钟添加时区支持的包装器
+## 实现
 
-### ⏱️ **时间计量器**
-- **TimeMeter**：毫秒精度的时间测量，适用于一般场景
-- **NanoTimeMeter**：纳秒精度的时间测量，适用于高精度需求
-- **人类可读输出**：将耗时格式化为可读字符串
-- **速度计算**：计算处理速度（每秒/每分钟处理项数）
-- **测试友好**：支持注入模拟时钟以实现确定性测试
+| 能力 | 真实时间实现 | 确定性测试实现 |
+|---|---|---|
+| Wall time | `StdWallClock` | `FixedWallClock`、`ManualWallClock` |
+| Monotonic time | `StdMonotonicClock`、`TokioMonotonicClock` | `ManualMonotonicClock` |
+| 同步 sleep | `StdBlockingSleeper` | `ManualBlockingSleeper` |
+| 异步 sleep | `TokioAsyncSleeper` | `ManualAsyncSleeper` |
 
-### ⏲️ **Sleep 抽象**
-- **Sleeper**：阻塞式 relative sleep 抽象
-- **AsyncSleeper**：Tokio 异步 relative sleep 抽象
-- **SystemSleeper**：真实 elapsed time sleeper，实现 `Sleeper`，启用
-  `tokio` feature 后也实现 `AsyncSleeper`
-- **MockSleeper**：由测试手动控制 elapsed time 的确定性 sleeper，实现
-  `Sleeper`，启用 `tokio` feature 后也实现 `AsyncSleeper`
-
-### 🔒 **线程安全**
-- 所有时钟实现都是 `Send + Sync`
-- 系统时钟和单调时钟采用不可变设计
-- 模拟时钟采用细粒度锁机制
-- 可安全地在线程间共享
-
-### 🌍 **时区支持**
-- 将 UTC 时间转换为任何时区
-- 为任何时钟包装时区支持
-- 基于 `chrono-tz` 提供全面的时区数据库
-
-### 🧪 **测试支持**
-- 为 clock、sleeper 和 timeout-aware 测试工具共享 mock timeline
-- 可控墙钟读数和纳秒读数的模拟时钟
-- 可控单调 elapsed time 的模拟 sleeper
-- 设置时间到特定时间点
-- 编程方式推进时间
+Tokio 类型需要启用可选的 `tokio` feature。Manual async sleeper 不依赖 Tokio runtime。
 
 ## 安装
 
-在 `Cargo.toml` 中添加：
+```toml
+[dependencies]
+qubit-clock = "0.9"
+```
+
+需要 Tokio 集成时：
 
 ```toml
 [dependencies]
-qubit-clock = "0.8"
+qubit-clock = { version = "0.9", features = ["tokio"] }
 ```
 
-## 快速开始
-
-### 基本使用
+## Wall Time
 
 ```rust
-use qubit_clock::{Clock, SystemClock};
+use qubit_clock::{StdWallClock, WallClock};
 
-let clock = SystemClock::new();
-let timestamp = clock.millis();
-let time = clock.time();
-println!("当前时间: {}", time);
+let clock = StdWallClock::new();
+let now = clock.now();
+println!("当前 wall time：{now:?}");
 ```
 
-### 使用时区
+## Monotonic Time
 
 ```rust
-use qubit_clock::{Clock, ZonedClock, SystemClock, Zoned};
-use chrono_tz::Asia::Shanghai;
+use qubit_clock::{MonotonicClock, StdMonotonicClock};
 
-let clock = Zoned::new(SystemClock::new(), Shanghai);
-let local = clock.local_time();
-println!("上海本地时间: {}", local);
+let clock = StdMonotonicClock::new();
+let start = clock.now();
+let elapsed = clock
+    .now()
+    .duration_since(start)
+    .expect("两个 instant 来自同一个 clock");
+println!("耗时：{elapsed:?}");
 ```
 
-### 使用单调时间进行性能测量
+## 确定性同步 Sleep
+
+通过 `Arc` 显式表达多个组件共享同一个 clock：
 
 ```rust
-use qubit_clock::{Clock, MonotonicClock};
-use std::thread;
+use qubit_clock::{
+    BlockingSleeper, ManualBlockingSleeper, ManualMonotonicClock,
+};
+use std::sync::Arc;
 use std::time::Duration;
 
-let clock = MonotonicClock::new();
-let start = clock.millis();
+let clock = Arc::new(ManualMonotonicClock::new());
+let sleeper = Arc::new(ManualBlockingSleeper::from_clock(
+    Arc::clone(&clock),
+));
+let worker_sleeper = Arc::clone(&sleeper);
 
-thread::sleep(Duration::from_millis(100));
-
-let elapsed = clock.millis() - start;
-println!("耗时: {} 毫秒", elapsed);
-```
-
-### 使用 MockClock 进行测试
-
-```rust
-use qubit_clock::{Clock, ControllableClock, MockClock};
-use chrono::{DateTime, Duration, Utc};
-
-let clock = MockClock::new();
-
-// 设置到特定时间
-let fixed_time = DateTime::parse_from_rfc3339(
-    "2024-01-01T00:00:00Z"
-).unwrap().with_timezone(&Utc);
-clock.set_time(fixed_time);
-
-assert_eq!(clock.time(), fixed_time);
-
-// 推进时间
-clock.add_duration(Duration::hours(1));
-assert_eq!(clock.time(), fixed_time + Duration::hours(1));
-```
-
-### 高精度测量
-
-```rust
-use qubit_clock::{NanoClock, NanoMonotonicClock};
-
-let clock = NanoMonotonicClock::new();
-let start = clock.nanos();
-
-// 执行一些操作
-for _ in 0..1000 {
-    // 一些工作
-}
-
-let elapsed = clock.nanos() - start;
-println!("耗时: {} 纳秒", elapsed);
-```
-
-### 使用时间计量器测量耗时
-
-```rust
-use qubit_clock::meter::TimeMeter;
-use std::thread;
-use std::time::Duration;
-
-let mut meter = TimeMeter::new();
-meter.start();
-thread::sleep(Duration::from_millis(100));
-meter.stop();
-println!("耗时: {}", meter.readable_duration());
-```
-
-### 使用统一 MockTime 测试时间逻辑
-
-`MockClock` 和 `MockSleeper` 都可以挂在同一个 `MockTimeline` 上：
-
-- `MockClock` 控制代码“读到的当前时间”，适合测试依赖 `Clock::time()`、
-  `Clock::millis()`、`NanoClock::nanos()` 或 time meter 的逻辑。
-- `MockSleeper` 控制代码“等待了多久”，适合测试 retry、backoff、轮询间隔等
-  会调用 `sleep_for` / `sleep_for_async` 的逻辑。
-- 使用 `MockTime` 可以一次性构造共享同一个 timeline 的 clock 和 sleeper；
-  测试只需要推进这个 timeline，两个组件就会按同一套 mock 时间前进。
-
-```rust
-use qubit_clock::{Clock, MockTime};
-
-let mock = MockTime::unix_epoch();
-let clock = mock.clock();
-let start = clock.millis();
-
-mock.advance(std::time::Duration::from_secs(30));
-assert_eq!(clock.millis(), start + 30_000);
-```
-
-```rust
-use qubit_clock::MockTime;
-use qubit_clock::sleep::Sleeper;
-use std::time::Duration;
-
-let mock = MockTime::unix_epoch();
-let sleeper = mock.sleeper();
-let worker = sleeper.clone();
-let handle = std::thread::spawn(move || {
-    worker.sleep_for(Duration::from_secs(5));
+let worker = std::thread::spawn(move || {
+    worker_sleeper
+        .sleep_for(Duration::from_secs(10))
+        .expect("manual sleep 应正常完成");
 });
 
-assert!(mock.timeline().wait_for_blocked_waiters(
-    qubit_clock::MockWaiterKind::Sleep,
-    1,
-    Duration::from_secs(1),
-));
-mock.advance(Duration::from_secs(5));
-handle.join().expect("mock sleep should finish");
+assert!(sleeper.wait_for_waiters(1, Duration::from_secs(1)));
+clock
+    .advance(Duration::from_secs(10))
+    .expect("manual time 应推进成功");
+worker.join().expect("工作线程不应 panic");
 ```
 
-### 高精度时间计量器
+## Manual Wall Time
+
+`ManualWallClock` 将一个 manual monotonic timeline 映射到 wall-time anchor：
 
 ```rust
-use qubit_clock::meter::NanoTimeMeter;
+use qubit_clock::{
+    ManualMonotonicClock, ManualWallClock, WallClock,
+};
+use std::sync::Arc;
+use std::time::{Duration, UNIX_EPOCH};
 
-let mut meter = NanoTimeMeter::new();
-meter.start();
+let monotonic_clock = Arc::new(ManualMonotonicClock::new());
+let wall_clock = ManualWallClock::from_clock(
+    UNIX_EPOCH,
+    Arc::clone(&monotonic_clock),
+);
 
-// 执行一些操作
-for _ in 0..1000 {
-    // 一些工作
-}
+monotonic_clock
+    .advance(Duration::from_secs(600))
+    .expect("manual time 应推进成功");
+assert_eq!(UNIX_EPOCH + Duration::from_secs(600), wall_clock.now());
 
-meter.stop();
-println!("耗时: {} 纳秒", meter.nanos());
-println!("可读格式: {}", meter.readable_duration());
+wall_clock.reanchor(UNIX_EPOCH);
+assert_eq!(UNIX_EPOCH, wall_clock.now());
 ```
 
-### 使用时间计量器计算速度
+重新设置 wall anchor 不会改变 monotonic deadline。
+如果 wall anchor 加上手动推进的时长超出平台可表示的 `SystemTime` 范围，
+`ManualWallClock::now()` 会 panic。
+
+## 统一 Manual Time Driver
+
+同一个 `ManualMonotonicClock` 可以同时驱动 blocking 和 async sleeper。
+`pending_waiters()` 汇总两类 waiter，`next_deadline()` 查看最早的未来
+deadline，`advance_to_next_deadline()` 原子地推进到该 deadline。异步测试可用
+`ManualMonotonicClock::wait_for_waiters_async(&clock, expected_count)` 等待注册，
+无需轮询，也不绑定特定 runtime。
+
+## Manual Advance 通知
+
+需要让自身 notification 与 manual deadline 竞争的同步测试替身，可以订阅 clock advance：
 
 ```rust
-use qubit_clock::meter::TimeMeter;
-use std::thread;
-use std::time::Duration;
+use qubit_clock::ManualMonotonicClock;
+use std::sync::Arc;
 
-let mut meter = TimeMeter::new();
-meter.start();
-
-// 处理 1000 个项目
-for _ in 0..1000 {
-    thread::sleep(Duration::from_micros(100));
-}
-
-meter.stop();
-println!("处理 1000 个项目耗时 {}", meter.readable_duration());
-println!("速度: {}", meter.formatted_speed_per_second(1000));
+let clock = Arc::new(ManualMonotonicClock::new());
+let subscription = ManualMonotonicClock::subscribe_advances(
+    &clock,
+    || {
+        // 唤醒测试替身自己的 Condvar、watch channel 或 task waker。
+    },
+);
 ```
 
-## 架构
+callback 在 clock mutex 外同步执行。它应可重复调用，并且只负责唤醒另一个等待原语。并发 advance 可能无序、并发地执行 callback。如果 callback panic，本次 advance 已捕获的所有 callback 仍会执行，随后在推进线程恢复第一个 panic。丢弃 `subscription` 会阻止后续 advance 注册 callback，但已被某次进行中的 advance 捕获的 callback 仍可能执行一次。
 
-本 crate 围绕几个正交的 trait 构建：
+## 设计文档
 
-- **Clock**：提供 UTC 时间的基础 trait
-- **NanoClock**：纳秒精度的扩展
-- **ZonedClock**：时区支持的扩展
-- **ControllableClock**：时间控制的扩展（测试用）
-- **Sleeper**：阻塞式 relative sleep 操作
-- **AsyncSleeper**：Tokio 异步 relative sleep 操作
-
-这种设计遵循**接口隔离原则**，确保实现只需要提供它们实际支持的功能。
-
-## 时钟实现
-
-### SystemClock
-
-- 基于系统墙上时钟时间
-- 受系统时间调整影响（NTP、手动更改）
-- 零大小类型（ZST），无运行时开销
-- 适用于：日志记录、时间戳、一般时间查询
-
-### MonotonicClock
-
-- 基于 `std::time::Instant`（单调递增）
-- 不受系统时间调整影响
-- 毫秒精度
-- 创建时记录基准点
-- 适用于：性能监控、超时控制、时间间隔测量
-
-### NanoMonotonicClock
-
-- 基于 `std::time::Instant`，纳秒精度
-- 不受系统时间调整影响
-- 比 `MonotonicClock` 精度更高
-- 适用于：高精度测量、微基准测试
-
-### MockClock
-
-- 可控制的 UTC 与纳秒测试时钟
-- 由 `MockTimeline` 驱动
-- 使用非 poisoning 同步原语保护共享状态
-- 实现 `Clock`、`NanoClock` 和 `ControllableClock`
-- 支持设置墙钟锚点，并推进共享 mock 时间
-- 在关联 timeline 被测试推进前保持冻结
-- 适用于：单元测试、集成测试、时间相关逻辑测试
-
-### MockTimeline
-
-- 共享的单调 mock 时间源
-- 驱动 `MockClock`、`MockSleeper` 以及后续 timeout-aware 测试原语
-- 支持瞬间推进时间和外部事件通知
-- 跟踪 active waiter，避免在仍有等待者时 unsafe reset timeline
-- 为每个 timeline 分配唯一 id，防止 `MockInstant` deadline 被用于错误的 timeline
-- 拒绝来自其他 mock timeline 的 deadline
-- 适用于：需要 clock 和 sleep 遵循同一套 mock 时间源的确定性测试
-
-### MockTime
-
-- 围绕一个 `MockTimeline`、`MockClock` 和 `MockSleeper` 的便捷 facade
-- `advance(duration)` 会让关联组件一起前进
-- `set_time(instant)` 会在当前 timeline instant 上重新锚定 clock
-- 适用于：同时需要控制“当前时间”和“等待耗时”的测试
-
-### Zoned\<C\>
-
-- 为任何时钟添加时区支持的包装器
-- 泛型支持任何 `Clock` 实现
-- 将 UTC 时间转换为指定时区的本地时间
-- 适用于：显示本地时间、时区转换
-
-## Sleep 实现
-
-### SystemSleeper
-
-- 实现 `Sleeper`，使用 `std::thread::sleep` 执行阻塞式 relative sleep
-- 启用 `tokio` feature 后实现 `AsyncSleeper`，使用 `tokio::time::sleep`
-- 零大小类型（ZST），没有运行时状态
-- 适用于：生产代码中需要可注入 relative sleep 的场景
-
-### MockSleeper
-
-- 面向确定性测试的 timeline-backed relative sleeper，实现 `Sleeper`
-- 使用底层 `MockTimeline` 的 elapsed time
-- clone 共享同一个 timeline
-- 通过 `MockTimeline` 或 `MockTime` 推进时间来完成 sleep
-- 启用 `tokio` feature 后实现 `AsyncSleeper`，支持异步 sleep
-- 适用于：不等待真实时间就测试 retry 和 backoff 逻辑
-
-## 时间计量器
-
-### TimeMeter
-
-毫秒精度的时间计量器，用于测量耗时，具有以下特性：
-
-- **灵活的时钟源**：支持任何实现 `Clock` trait 的时钟
-- **默认使用 MonotonicClock**：默认使用单调时间以获得稳定的测量结果
-- **多种输出格式**：毫秒、秒、分钟和人类可读格式
-- **速度计算**：计算处理速度（每秒/每分钟处理项数）
-- **实时监控**：无需停止计量器即可获取耗时
-- **测试友好**：注入 `MockClock` 实现确定性测试
-
-输出格式示例：
-- `123 ms` - 小于 1 秒
-- `1.5s` - 1-60 秒
-- `1m 23s` - 超过 1 分钟
-- `1h 1m 5s` - 超过 1 小时
-
-### NanoTimeMeter
-
-纳秒精度的时间计量器，具有与 `TimeMeter` 类似的特性：
-
-- **纳秒精度**：基于 `NanoClock` trait
-- **默认使用 NanoMonotonicClock**：使用高精度单调时间
-- **人类可读输出**：自动选择合适的单位（ns、μs、ms、s、m、h）
-- **速度计算**：高精度速度计算
-- **测试友好**：支持注入任何实现 `NanoClock` 的测试时钟
-
-输出格式示例：
-- `123 ns` - 小于 1 微秒
-- `123.4 μs` - 1-1000 微秒
-- `123.4 ms` - 1-1000 毫秒
-- `1.5s` - 1-60 秒
-- `1m 23s` - 超过 1 分钟
-- `1h 1m 5s` - 超过 1 小时
-
-## 为什么不直接使用 `std::time::Instant`？
-
-`std::time::Instant` 是生产代码中测量真实耗时的正确基础工具。它单调、
-快速且简单：
-
-```rust
-let start = std::time::Instant::now();
-// 执行工作
-let elapsed = start.elapsed();
-```
-
-本 crate 关注的是“计时”之外的几个常见需求：
-
-- 当测试需要可控逻辑时间时，使用 `MockClock`。它同时实现 `Clock` 和
-  `NanoClock`，在 mock timeline 推进前保持冻结，并可以重新锚定到任意
-  UTC instant。
-- 当应用代码需要可复用的 start/stop 计量器、可读耗时、速度计算以及可注入
-  的时钟源时，使用 `TimeMeter` 或 `NanoTimeMeter`。它们默认使用单调时钟；
-  `TimeMeter` 可以注入 `MockClock`，`NanoTimeMeter` 可以注入 `MockClock`
-  或其他实现 `NanoClock` 的测试时钟。
-- 当代码需要可注入 relative sleep 时，使用 `SystemSleeper` 或
-  `MockSleeper`。它们实现阻塞式 `Sleeper`；启用 `tokio` feature 后也实现
-  `AsyncSleeper`。mock sleeper 会在底层 `MockTimeline` 推进后完成，而不是
-  等待真实 wall-clock 时间。
-- 当一个测试需要 clock 和 sleeper 共享同一套 mock elapsed time 时，使用
-  `MockTime`。
-- 当业务逻辑依赖“当前时间”且需要可测试时，使用 `Clock` 系列 trait，避免
-  直接耦合到系统时钟或 `Instant::now()`。
-
-简而言之，`Instant` 用来测量真实流逝的时间；mock 时钟让测试中的时间
-可控；时间计量器把耗时测量封装成可复用、可格式化、可测试的抽象。
-
-## API 参考
-
-### Clock Trait
-
-核心 `Clock` trait 提供：
-
-- `millis()` - 返回自 Unix 纪元以来的毫秒数
-- `time()` - 返回当前时间的 `DateTime<Utc>`
-
-### NanoClock Trait
-
-高精度时钟的扩展 trait：
-
-- `nanos()` - 返回自 Unix 纪元以来的纳秒数
-- `time_precise()` - 返回高精度的 `DateTime<Utc>`
-
-### ZonedClock Trait
-
-时区支持的扩展 trait：
-
-- `timezone()` - 返回时钟的时区
-- `local_time()` - 返回时钟时区的当前时间
-
-使用 `Zoned::new(clock, tz)` 为时钟指定时区。
-
-### ControllableClock Trait
-
-可控制时钟的扩展 trait（用于测试）：
-
-- `set_time(instant)` - 在当前 timeline instant 上将可控 mock 时钟重新锚定到指定逻辑时间
-- `add_duration(duration)` - 将时钟推进指定的非负时长
-- `reset()` - 将时钟重置到初始状态
-
-### Mock Time Runtime
-
-Mock time API 位于 crate root：
-
-- `MockTimeline` - 共享的单调 mock 时间源
-- `MockInstant` - 绑定 timeline 的单调 instant，用于 deadline
-- `MockClock` - timeline-backed 的 `Clock`、`NanoClock` 和
-  `ControllableClock` 实现
-- `MockTime` - 便捷 facade，返回共享同一 timeline 的 clock 和 sleeper
-- `MockWaiterKind` - 用于测试观测的 waiter 分类
-- `MockTimeError` - active waiter 导致 reset 被拒绝，或 deadline 属于其他
-  mock timeline 时返回的错误
-
-### Sleep Trait
-
-Sleep API 位于 `qubit_clock::sleep` 下：
-
-- `Sleeper` - 提供阻塞式 relative sleep
-- `AsyncSleeper` - 提供 Tokio 异步 relative sleep
-- `SystemSleeper` - 使用真实 elapsed time 实现 `Sleeper`，启用 `tokio`
-  feature 后也实现 `AsyncSleeper`
-- `MockSleeper` - 使用 `MockTimeline` 实现确定性测试，实现 `Sleeper`，
-  启用 `tokio` feature 后也实现 `AsyncSleeper`
-
-Sleep API 只表达 relative sleep。notification wait、condition wait 和
-timeout wait 属于 `qubit-lock` 的 monitor 原语。
-
-## 设计原则
-
-### 接口隔离
-
-本 crate 遵循接口隔离原则，为不同的能力提供独立的 trait：
-
-- 并非所有时钟都需要纳秒精度 → `NanoClock` 是独立的
-- 并非所有时钟都需要时区支持 → `ZonedClock` 是独立的
-- 只有测试时钟需要可控性 → `ControllableClock` 是独立的
-- 只有 relative sleep 用户需要 sleep 注入 → sleep trait 放在 `sleep` 模块下
-
-这使得实现只需提供它们需要的功能，保持 API 简洁和专注。
-
-### 单一职责
-
-每个 trait 和类型都有一个明确的目的：
-
-- `Clock` - 提供 UTC 时间
-- `NanoClock` - 提供高精度时间
-- `ZonedClock` - 提供时区转换
-- `ControllableClock` - 提供测试用的时间控制
-- `Sleeper` - 提供阻塞式 relative sleep
-- `AsyncSleeper` - 提供 Tokio 异步 relative sleep
-
-### 组合优于继承
-
-通过包装器而不是继承来扩展功能：
-
-- `Zoned<C>` 包装任何 `Clock` 以添加时区支持
-- 时间计量器通过泛型接受任何 `Clock` 实现
-
-### 零成本抽象
-
-设计确保只为使用的功能付出代价：
-
-- `SystemClock` 和 `MonotonicClock` 是零大小或最小开销
-- Trait 方法通常会被内联
-- 泛型代码在编译时单态化
-
-## 测试与代码覆盖率
-
-本项目保持全面的测试覆盖，对所有功能进行详细验证。
-
-### 运行测试
-
-```bash
-# 运行所有测试
-cargo test
-
-# 运行覆盖率报告
-./coverage.sh
-
-# 生成文本格式报告
-./coverage.sh text
-
-# 运行 CI 检查（测试、lint、格式化）
-./ci-check.sh
-```
-
-## 依赖项
-
-- **chrono**：日期和时间处理，支持序列化
-- **chrono-tz**：全面的时区数据库
-- **parking_lot**：mock time runtime 使用的非 poisoning 同步原语
-- **tokio**：启用 `tokio` feature 后为 `sleep::AsyncSleeper` 提供可选异步运行时支持
-
-## 使用场景
-
-### 性能监控
-
-```rust
-use qubit_clock::meter::TimeMeter;
-
-let mut meter = TimeMeter::new();
-meter.start();
-
-// 执行操作
-process_data();
-
-meter.stop();
-log::info!("处理耗时: {}", meter.readable_duration());
-```
-
-### 可模拟 sleep 控制
-
-```rust
-use qubit_clock::MockTime;
-use qubit_clock::sleep::Sleeper;
-use std::time::Duration;
-
-fn retry_once<S: Sleeper>(sleeper: &S) {
-    sleeper.sleep_for(Duration::from_millis(10));
-}
-
-let mock = MockTime::unix_epoch();
-let sleeper = mock.sleeper();
-let worker = sleeper.clone();
-let handle = std::thread::spawn(move || retry_once(&worker));
-
-assert!(mock.timeline().wait_for_blocked_waiters(
-    qubit_clock::MockWaiterKind::Sleep,
-    1,
-    Duration::from_secs(1),
-));
-mock.advance(Duration::from_millis(10));
-handle.join().expect("retry should finish");
-```
-
-### 测试时间相关逻辑
-
-```rust
-use qubit_clock::{Clock, ControllableClock, MockClock};
-use chrono::Duration;
-
-#[test]
-fn test_expiration() {
-    let clock = MockClock::new();
-    let item = Item::new(clock.clone());
-
-    // 快进 1 小时
-    clock.add_duration(Duration::hours(1));
-
-    assert!(item.is_expired());
-}
-```
-
-### 基准测试
-
-```rust
-use qubit_clock::meter::NanoTimeMeter;
-
-let mut meter = NanoTimeMeter::new();
-meter.start();
-
-for _ in 0..10000 {
-    expensive_operation();
-}
-
-meter.stop();
-println!("每次操作平均耗时: {} 纳秒", meter.nanos() / 10000);
-```
+- [重构设计](doc/clock_refactoring_design.zh_CN.md)
+- [实施计划](doc/clock_refactoring_implementation_plan.zh_CN.md)
+- [下游接入计划](doc/downstream_integration_implementation_plan.zh_CN.md)
 
 ## 许可证
 
-Copyright (c) 2025 - 2026. Haixing Hu.
-
-根据 Apache 许可证 2.0 版（"许可证"）授权；
-除非遵守许可证，否则您不得使用此文件。
-您可以在以下位置获取许可证副本：
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-除非适用法律要求或书面同意，否则根据许可证分发的软件
-按"原样"分发，不附带任何明示或暗示的担保或条件。
-有关许可证下的特定语言管理权限和限制，请参阅许可证。
-
-完整的许可证文本请参阅 [LICENSE](LICENSE)。
-
-## 贡献
-
-欢迎贡献！请随时提交 Pull Request。
-
-### 开发指南
-
-- 遵循 Rust API 指南
-- 保持全面的测试覆盖
-- 为所有公共 API 编写文档和示例
-- 提交 PR 前确保所有测试通过
-
-## 作者
-
-**胡海星** - *Qubit Co. Ltd.*
-
-## 相关项目
-
-Qubit 旗下的更多 Rust 库发布在 GitHub 组织 [qubit-ltd](https://github.com/qubit-ltd)。
-
----
-
-仓库地址：[https://github.com/qubit-ltd/rs-clock](https://github.com/qubit-ltd/rs-clock)
+使用 Apache License 2.0 许可。

@@ -7,623 +7,168 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-Thread-safe clock and sleep abstractions for Rust with monotonic and mock implementations.
+Injectable wall clocks, monotonic clocks, and deterministic blocking or async sleepers for Rust.
 
-## Overview
+## Design
 
-Qubit Clock provides a flexible and type-safe clock abstraction system for Rust applications. It offers robust, thread-safe clock implementations with support for basic time access, high-precision measurements, timezone handling, monotonic time, mockable relative sleeps, and testing support.
+Qubit Clock separates four capabilities:
 
-## Features
+- `WallClock` reads civil time as `SystemTime`.
+- `MonotonicClock` reads domain-scoped `MonotonicInstant` values.
+- `BlockingSleeper` blocks against a monotonic deadline.
+- `AsyncSleeper` returns a future against a monotonic deadline.
 
-### 🕐 **Clock Abstractions**
-- **Trait-based Design**: Flexible clock abstraction through orthogonal traits
-- **Interface Segregation**: Don't force implementations to provide features they don't need
-- **Composition over Inheritance**: Extend functionality through wrappers
-- **Zero-Cost Abstractions**: Pay only for what you use
+Wall time may jump. Monotonic time never moves backward. Sleepers are always paired with a concrete monotonic clock and never maintain a second time source.
 
-### ⏰ **Clock Implementations**
-- **SystemClock**: Uses system wall clock time
-- **MonotonicClock**: Monotonic time (unaffected by system time changes)
-- **NanoMonotonicClock**: Monotonic time with nanosecond precision
-- **MockClock**: Controllable UTC and nanosecond clock backed by a mock timeline
-- **MockTimeline**: Shared monotonic mock time source for deterministic tests
-- **MockTime**: Convenience facade bundling one timeline, clock, and sleeper
-- **Zoned\<C\>**: Wrapper that adds timezone support to any clock
+## Implementations
 
-### ⏱️ **Time Meters**
-- **TimeMeter**: Millisecond-precision time measurement for general use
-- **NanoTimeMeter**: Nanosecond-precision time measurement for high-precision needs
-- **Human-Readable Output**: Format elapsed time in readable strings
-- **Speed Calculation**: Calculate processing speed (items per second/minute)
-- **Test-Friendly**: Support injecting mock clocks for deterministic testing
+| Capability | Real time | Deterministic tests |
+|---|---|---|
+| Wall time | `StdWallClock` | `FixedWallClock`, `ManualWallClock` |
+| Monotonic time | `StdMonotonicClock`, `TokioMonotonicClock` | `ManualMonotonicClock` |
+| Blocking sleep | `StdBlockingSleeper` | `ManualBlockingSleeper` |
+| Async sleep | `TokioAsyncSleeper` | `ManualAsyncSleeper` |
 
-### ⏲️ **Sleep Abstractions**
-- **Sleeper**: Blocking relative sleep abstraction
-- **AsyncSleeper**: Tokio async relative sleep abstraction
-- **SystemSleeper**: Real elapsed-time sleeper that implements `Sleeper`, and
-  also implements `AsyncSleeper` when the `tokio` feature is enabled
-- **MockSleeper**: Deterministic elapsed-time sleeper that implements
-  `Sleeper`, and also implements `AsyncSleeper` when the `tokio` feature is
-  enabled
-
-### 🔒 **Thread Safety**
-- All clock implementations are `Send + Sync`
-- Immutable design for system and monotonic clocks
-- Fine-grained locking for mock clock
-- Safe to share across threads
-
-### 🌍 **Timezone Support**
-- Convert UTC time to any timezone
-- Wrap any clock with timezone support
-- Based on `chrono-tz` for comprehensive timezone database
-
-### 🧪 **Testing Support**
-- Shared mock timeline for clocks, sleepers, and timeout-aware test utilities
-- Mock clock with controllable wall-clock and nanosecond readings
-- Mock sleeper with controllable monotonic elapsed time
-- Set time to specific points
-- Advance time programmatically
+Tokio types require the optional `tokio` feature. Manual async sleep is runtime-neutral and available without that feature.
 
 ## Installation
 
-Add this to your `Cargo.toml`:
+```toml
+[dependencies]
+qubit-clock = "0.9"
+```
+
+Enable Tokio integration when required:
 
 ```toml
 [dependencies]
-qubit-clock = "0.8"
+qubit-clock = { version = "0.9", features = ["tokio"] }
 ```
 
-## Quick Start
-
-### Basic Usage
+## Wall Time
 
 ```rust
-use qubit_clock::{Clock, SystemClock};
+use qubit_clock::{StdWallClock, WallClock};
 
-let clock = SystemClock::new();
-let timestamp = clock.millis();
-let time = clock.time();
-println!("Current time: {}", time);
+let clock = StdWallClock::new();
+let now = clock.now();
+println!("Current wall time: {now:?}");
 ```
 
-### With Timezone
+## Monotonic Time
 
 ```rust
-use qubit_clock::{Clock, ZonedClock, SystemClock, Zoned};
-use chrono_tz::Asia::Shanghai;
+use qubit_clock::{MonotonicClock, StdMonotonicClock};
 
-let clock = Zoned::new(SystemClock::new(), Shanghai);
-let local = clock.local_time();
-println!("Local time in Shanghai: {}", local);
+let clock = StdMonotonicClock::new();
+let start = clock.now();
+let elapsed = clock
+    .now()
+    .duration_since(start)
+    .expect("instants come from the same clock");
+println!("Elapsed: {elapsed:?}");
 ```
 
-### Monotonic Time for Performance Measurement
+## Deterministic Blocking Sleep
+
+Shared clock identity is explicit through `Arc`:
 
 ```rust
-use qubit_clock::{Clock, MonotonicClock};
-use std::thread;
+use qubit_clock::{
+    BlockingSleeper, ManualBlockingSleeper, ManualMonotonicClock,
+};
+use std::sync::Arc;
 use std::time::Duration;
 
-let clock = MonotonicClock::new();
-let start = clock.millis();
+let clock = Arc::new(ManualMonotonicClock::new());
+let sleeper = Arc::new(ManualBlockingSleeper::from_clock(
+    Arc::clone(&clock),
+));
+let worker_sleeper = Arc::clone(&sleeper);
 
-thread::sleep(Duration::from_millis(100));
-
-let elapsed = clock.millis() - start;
-println!("Elapsed: {} ms", elapsed);
-```
-
-### Testing with MockClock
-
-```rust
-use qubit_clock::{Clock, ControllableClock, MockClock};
-use chrono::{DateTime, Duration, Utc};
-
-let clock = MockClock::new();
-
-// Set to a specific time
-let fixed_time = DateTime::parse_from_rfc3339(
-    "2024-01-01T00:00:00Z"
-).unwrap().with_timezone(&Utc);
-clock.set_time(fixed_time);
-
-assert_eq!(clock.time(), fixed_time);
-
-// Advance time
-clock.add_duration(Duration::hours(1));
-assert_eq!(clock.time(), fixed_time + Duration::hours(1));
-```
-
-### High-Precision Measurements
-
-```rust
-use qubit_clock::{NanoClock, NanoMonotonicClock};
-
-let clock = NanoMonotonicClock::new();
-let start = clock.nanos();
-
-// Perform some operation
-for _ in 0..1000 {
-    // Some work
-}
-
-let elapsed = clock.nanos() - start;
-println!("Elapsed: {} ns", elapsed);
-```
-
-### Time Meters for Elapsed Time Measurement
-
-```rust
-use qubit_clock::meter::TimeMeter;
-use std::thread;
-use std::time::Duration;
-
-let mut meter = TimeMeter::new();
-meter.start();
-thread::sleep(Duration::from_millis(100));
-meter.stop();
-println!("Elapsed: {}", meter.readable_duration());
-```
-
-### Unified Mock Time for Tests
-
-```rust
-use qubit_clock::{Clock, MockTime};
-use qubit_clock::sleep::Sleeper;
-use std::time::Duration;
-
-let mock = MockTime::unix_epoch();
-let clock = mock.clock();
-let sleeper = mock.sleeper();
-let worker = sleeper.clone();
-let handle = std::thread::spawn(move || {
-    worker.sleep_for(Duration::from_secs(5));
+let worker = std::thread::spawn(move || {
+    worker_sleeper
+        .sleep_for(Duration::from_secs(10))
+        .expect("manual sleep should complete");
 });
 
-assert!(mock.timeline().wait_for_blocked_waiters(
-    qubit_clock::MockWaiterKind::Sleep,
-    1,
-    Duration::from_secs(1),
-));
-mock.advance(Duration::from_secs(5));
-handle.join().expect("mock sleep should finish");
-assert_eq!(clock.millis(), 5_000);
+assert!(sleeper.wait_for_waiters(1, Duration::from_secs(1)));
+clock
+    .advance(Duration::from_secs(10))
+    .expect("manual time should advance");
+worker.join().expect("worker should not panic");
 ```
 
-### High-Precision Time Meter
+## Manual Wall Time
+
+`ManualWallClock` projects one manual monotonic timeline onto a wall-time anchor:
 
 ```rust
-use qubit_clock::meter::NanoTimeMeter;
+use qubit_clock::{
+    ManualMonotonicClock, ManualWallClock, WallClock,
+};
+use std::sync::Arc;
+use std::time::{Duration, UNIX_EPOCH};
 
-let mut meter = NanoTimeMeter::new();
-meter.start();
+let monotonic_clock = Arc::new(ManualMonotonicClock::new());
+let wall_clock = ManualWallClock::from_clock(
+    UNIX_EPOCH,
+    Arc::clone(&monotonic_clock),
+);
 
-// Perform some operation
-for _ in 0..1000 {
-    // Some work
-}
+monotonic_clock
+    .advance(Duration::from_secs(600))
+    .expect("manual time should advance");
+assert_eq!(UNIX_EPOCH + Duration::from_secs(600), wall_clock.now());
 
-meter.stop();
-println!("Elapsed: {} ns", meter.nanos());
-println!("Readable: {}", meter.readable_duration());
+wall_clock.reanchor(UNIX_EPOCH);
+assert_eq!(UNIX_EPOCH, wall_clock.now());
 ```
 
-### Speed Calculation with Time Meter
+Reanchoring wall time never changes monotonic deadlines.
+`ManualWallClock::now()` panics if the anchor plus manually advanced duration
+exceeds the platform's representable `SystemTime` range.
+
+## Unified Manual-Time Driver
+
+One `ManualMonotonicClock` can drive blocking and async sleepers together.
+`pending_waiters()` counts both kinds, `next_deadline()` inspects their earliest
+future deadline, and `advance_to_next_deadline()` advances atomically to it.
+Async test coordination can await
+`ManualMonotonicClock::wait_for_waiters_async(&clock, expected_count)` without
+polling or depending on a particular runtime.
+
+## Manual Advance Notifications
+
+Synchronization test doubles that must race their own notification with a
+manual deadline can subscribe to clock advances:
 
 ```rust
-use qubit_clock::meter::TimeMeter;
-use std::thread;
-use std::time::Duration;
+use qubit_clock::ManualMonotonicClock;
+use std::sync::Arc;
 
-let mut meter = TimeMeter::new();
-meter.start();
-
-// Process 1000 items
-for _ in 0..1000 {
-    thread::sleep(Duration::from_micros(100));
-}
-
-meter.stop();
-println!("Processed 1000 items in {}", meter.readable_duration());
-println!("Speed: {}", meter.formatted_speed_per_second(1000));
+let clock = Arc::new(ManualMonotonicClock::new());
+let subscription = ManualMonotonicClock::subscribe_advances(
+    &clock,
+    || {
+        // Signal the test double's Condvar, watch channel, or task wakers.
+    },
+);
 ```
 
-## Architecture
-
-The crate is built around several orthogonal traits:
-
-- **Clock**: Base trait providing UTC time
-- **NanoClock**: Extension for nanosecond precision
-- **ZonedClock**: Extension for timezone support
-- **ControllableClock**: Extension for time control (testing)
-- **Sleeper**: Blocking relative sleep operations
-- **AsyncSleeper**: Tokio async relative sleep operations
-
-This design follows the **Interface Segregation Principle**, ensuring that implementations only need to provide the features they actually support.
-
-## Clock Implementations
-
-### SystemClock
-
-- Based on system wall clock time
-- Subject to system time adjustments (NTP, manual changes)
-- Zero-sized type (ZST) with no runtime overhead
-- Use for: logging, timestamps, general time queries
-
-### MonotonicClock
-
-- Based on `std::time::Instant` (monotonically increasing)
-- Unaffected by system time adjustments
-- Millisecond precision
-- Records base point on creation
-- Use for: performance monitoring, timeout control, time interval measurements
-
-### NanoMonotonicClock
-
-- Based on `std::time::Instant` with nanosecond precision
-- Unaffected by system time adjustments
-- Higher precision than `MonotonicClock`
-- Use for: high-precision measurements, microbenchmarking
-
-### MockClock
-
-- Controllable UTC and nanosecond clock for testing
-- Backed by a `MockTimeline`
-- Thread-safe with shared state guarded by non-poisoning synchronization
-- Implements `Clock`, `NanoClock`, and `ControllableClock`
-- Supports setting the wall-clock anchor and advancing shared mock time
-- Frozen until the associated timeline is advanced by the test
-- Use for: unit tests, integration tests, time-dependent logic testing
-
-### MockTimeline
-
-- Shared monotonic mock time source
-- Drives `MockClock`, `MockSleeper`, and future timeout-aware test primitives
-- Supports instant time advancement and external event notifications
-- Tracks active waiters so reset can reject unsafe timeline rewinds
-- Assigns a unique id to each timeline so `MockInstant` deadlines cannot be
-  used with the wrong timeline
-- Rejects deadlines created by a different mock timeline
-- Use for: deterministic tests that need clocks and sleeps to follow one time source
-
-### MockTime
-
-- Convenience facade around one `MockTimeline`, `MockClock`, and `MockSleeper`
-- `advance(duration)` moves all associated components together
-- `set_time(instant)` reanchors the clock at the current timeline instant
-- Use for: tests that need both "current time" and "elapsed sleep" control
-
-### Zoned\<C\>
-
-- Wrapper that adds timezone support to any clock
-- Generic over any `Clock` implementation
-- Converts UTC time to local time in specified timezone
-- Use for: displaying local time, timezone conversions
-
-## Sleep Implementations
-
-### SystemSleeper
-
-- Implements `Sleeper` using `std::thread::sleep` for blocking relative sleeps
-- Implements `AsyncSleeper` using `tokio::time::sleep` when the `tokio` feature
-  is enabled
-- Zero-sized type (ZST) with no runtime state
-- Use for: production code that needs an injectable relative sleeper
-
-### MockSleeper
-
-- Timeline-backed relative sleeper for deterministic tests that implements
-  `Sleeper`
-- Uses the elapsed time from its backing `MockTimeline`
-- Clones share the same timeline
-- Complete sleeps by advancing the timeline through `MockTimeline` or `MockTime`
-- Implements `AsyncSleeper` for asynchronous sleeps when the `tokio` feature is
-  enabled
-- Use for: testing retry and backoff logic without waiting for real time
-
-## Time Meters
-
-### TimeMeter
-
-A millisecond-precision time meter for measuring elapsed time with the following features:
-
-- **Flexible Clock Source**: Supports any clock implementing `Clock` trait
-- **Default to MonotonicClock**: Uses monotonic time by default for stable measurements
-- **Multiple Output Formats**: Milliseconds, seconds, minutes, and human-readable format
-- **Speed Calculation**: Calculate processing speed (items per second/minute)
-- **Real-Time Monitoring**: Get elapsed time without stopping the meter
-- **Test-Friendly**: Inject `MockClock` for deterministic testing
-
-Example output formats:
-- `123 ms` - Less than 1 second
-- `1.5s` - 1-60 seconds
-- `1m 23s` - More than 1 minute
-- `1h 1m 5s` - More than 1 hour
-
-### NanoTimeMeter
-
-A nanosecond-precision time meter with features similar to `TimeMeter`:
-
-- **Nanosecond Precision**: Based on `NanoClock` trait
-- **Default to NanoMonotonicClock**: Uses high-precision monotonic time
-- **Human-Readable Output**: Automatically chooses appropriate unit (ns, μs, ms, s, m, h)
-- **Speed Calculation**: High-precision speed calculation
-- **Test-Friendly**: Supports any injected test clock that implements `NanoClock`
-
-Example output formats:
-- `123 ns` - Less than 1 microsecond
-- `123.4 μs` - 1-1000 microseconds
-- `123.4 ms` - 1-1000 milliseconds
-- `1.5s` - 1-60 seconds
-- `1m 23s` - More than 1 minute
-- `1h 1m 5s` - More than 1 hour
-
-## Why Not Just Use `std::time::Instant`?
-
-`std::time::Instant` is the right primitive for measuring real elapsed time in
-production code. It is monotonic, fast, and simple:
-
-```rust
-let start = std::time::Instant::now();
-// do work
-let elapsed = start.elapsed();
-```
-
-This crate exists for the cases where elapsed-time measurement is only part of
-the problem:
-
-- Use `MockClock` when tests need controllable logical time. It implements both
-  `Clock` and `NanoClock`, freezes until the mock timeline advances, and can
-  be reanchored to any UTC instant.
-- Use `TimeMeter` or `NanoTimeMeter` when application code needs a reusable
-  start/stop meter with formatted durations, speed calculations, and an
-  injectable clock source. They use monotonic clocks by default; `TimeMeter`
-  can accept `MockClock`, while `NanoTimeMeter` can accept `MockClock` or any
-  other `NanoClock` implementation.
-- Use `SystemSleeper` or `MockSleeper` when code needs injectable relative
-  sleeps. They implement the blocking `Sleeper` trait, and also implement
-  `AsyncSleeper` when the `tokio` feature is enabled. Mock sleepers complete
-  when their backing `MockTimeline` advances instead of waiting for wall-clock
-  time.
-- Use `MockTime` when one test needs a clock and sleeper to share the same
-  mock elapsed time source.
-- Use the `Clock` traits when business logic depends on "current time" and must
-  be testable without coupling directly to the system clock or `Instant::now()`.
-
-In short, `Instant` measures real elapsed time; mock clocks make time
-controllable for tests; time meters turn elapsed-time measurement into a
-reusable, formatted, testable abstraction.
-
-## API Reference
-
-### Clock Trait
-
-The core `Clock` trait provides:
-
-- `millis()` - Returns current time in milliseconds since Unix epoch
-- `time()` - Returns current time as `DateTime<Utc>`
-
-### NanoClock Trait
-
-Extension trait for high-precision clocks:
-
-- `nanos()` - Returns current time in nanoseconds since Unix epoch
-- `time_precise()` - Returns high-precision `DateTime<Utc>`
-
-### ZonedClock Trait
-
-Extension trait for timezone support:
-
-- `timezone()` - Returns the clock's timezone
-- `local_time()` - Returns current time in the clock's timezone
-
-Use `Zoned::new(clock, tz)` to select the timezone for a clock.
-
-### ControllableClock Trait
-
-Extension trait for controllable clocks (testing):
-
-- `set_time(instant)` - Reanchors controllable mock clocks to a logical time at the current timeline instant
-- `add_duration(duration)` - Advances the clock by a non-negative duration
-- `reset()` - Resets the clock to initial state
-
-### Mock Time Runtime
-
-Mock time APIs are available at the crate root:
-
-- `MockTimeline` - Shared monotonic mock time source
-- `MockInstant` - Timeline-bound monotonic instant used for deadlines
-- `MockClock` - Timeline-backed implementation of `Clock`, `NanoClock`, and
-  `ControllableClock`
-- `MockTime` - Convenience facade that returns one shared clock and sleeper
-- `MockWaiterKind` - Waiter category used for test observability
-- `MockTimeError` - Error returned when reset is rejected with active waiters
-  or a deadline belongs to a different mock timeline
-
-### Sleep Traits
-
-Sleep APIs are available under `qubit_clock::sleep`:
-
-- `Sleeper` - Provides blocking relative sleeps
-- `AsyncSleeper` - Provides Tokio async relative sleeps
-- `SystemSleeper` - Uses real elapsed time, implements `Sleeper`, and also
-  implements `AsyncSleeper` when the `tokio` feature is enabled
-- `MockSleeper` - Uses a `MockTimeline` for deterministic tests, implements
-  `Sleeper`, and also implements `AsyncSleeper` when the `tokio` feature is
-  enabled
-
-Sleep APIs intentionally model only relative sleeping. Notification waits,
-condition waits, and timeout waits belong to monitor primitives in `qubit-lock`.
-
-## Design Principles
-
-### Interface Segregation
-
-The crate follows the Interface Segregation Principle by providing separate traits for different capabilities:
-
-- Not all clocks need nanosecond precision → `NanoClock` is separate
-- Not all clocks need timezone support → `ZonedClock` is separate
-- Only test clocks need controllability → `ControllableClock` is separate
-- Only relative sleep users need sleep injection → sleep traits live under `sleep`
-
-This allows implementations to provide only the features they need, keeping the API clean and focused.
-
-### Single Responsibility
-
-Each trait and type has one clear purpose:
-
-- `Clock` - Provide UTC time
-- `NanoClock` - Provide high-precision time
-- `ZonedClock` - Provide timezone conversion
-- `ControllableClock` - Provide time control for testing
-- `Sleeper` - Provide blocking relative sleeps
-- `AsyncSleeper` - Provide Tokio async relative sleeps
-
-### Composition over Inheritance
-
-Functionality is extended through wrappers rather than inheritance:
-
-- `Zoned<C>` wraps any `Clock` to add timezone support
-- Time meters accept any `Clock` implementation via generics
-
-### Zero-Cost Abstractions
-
-The design ensures you only pay for what you use:
-
-- `SystemClock` and `MonotonicClock` are zero-sized or minimal overhead
-- Trait methods are often inlined
-- Generic code is monomorphized at compile time
-
-## Testing & Code Coverage
-
-This project maintains comprehensive test coverage with detailed validation of all functionality.
-
-### Running Tests
-
-```bash
-# Run all tests
-cargo test
-
-# Run with coverage report
-./coverage.sh
-
-# Generate text format report
-./coverage.sh text
-
-# Run CI checks (tests, lints, formatting)
-./ci-check.sh
-```
-
-## Dependencies
-
-- **chrono**: Date and time handling with serialization support
-- **chrono-tz**: Comprehensive timezone database
-- **parking_lot**: Non-poisoning synchronization primitives used by the mock
-  time runtime
-- **tokio**: Optional dependency for `sleep::AsyncSleeper` when the `tokio` feature is enabled
-
-## Use Cases
-
-### Performance Monitoring
-
-```rust
-use qubit_clock::meter::TimeMeter;
-
-let mut meter = TimeMeter::new();
-meter.start();
-
-// Perform operation
-process_data();
-
-meter.stop();
-log::info!("Processing took: {}", meter.readable_duration());
-```
-
-### Mockable Sleep Control
-
-```rust
-use qubit_clock::MockTime;
-use qubit_clock::sleep::Sleeper;
-use std::time::Duration;
-
-fn retry_once<S: Sleeper>(sleeper: &S) {
-    sleeper.sleep_for(Duration::from_millis(10));
-}
-
-let mock = MockTime::unix_epoch();
-let sleeper = mock.sleeper();
-let worker = sleeper.clone();
-let handle = std::thread::spawn(move || retry_once(&worker));
-
-assert!(mock.timeline().wait_for_blocked_waiters(
-    qubit_clock::MockWaiterKind::Sleep,
-    1,
-    Duration::from_secs(1),
-));
-mock.advance(Duration::from_millis(10));
-handle.join().expect("retry should finish");
-```
-
-### Testing Time-Dependent Logic
-
-```rust
-use qubit_clock::{Clock, ControllableClock, MockClock};
-use chrono::Duration;
-
-#[test]
-fn test_expiration() {
-    let clock = MockClock::new();
-    let item = Item::new(clock.clone());
-
-    // Fast-forward 1 hour
-    clock.add_duration(Duration::hours(1));
-
-    assert!(item.is_expired());
-}
-```
-
-### Benchmarking
-
-```rust
-use qubit_clock::meter::NanoTimeMeter;
-
-let mut meter = NanoTimeMeter::new();
-meter.start();
-
-for _ in 0..10000 {
-    expensive_operation();
-}
-
-meter.stop();
-println!("Average time per operation: {} ns", meter.nanos() / 10000);
-```
+The callback runs synchronously outside the clock mutex. It should be
+idempotent and only signal another waiting primitive. Concurrent advances may
+invoke callbacks concurrently and without ordering. If callbacks panic, all
+callbacks captured for that advance are attempted before the first panic is
+resumed. Dropping `subscription` prevents later registrations, but one callback
+already captured by an in-flight advance may still run.
+
+## Documentation
+
+- [Refactoring design](doc/clock_refactoring_design.zh_CN.md)
+- [Implementation plan](doc/clock_refactoring_implementation_plan.zh_CN.md)
+- [Downstream integration plan](doc/downstream_integration_implementation_plan.zh_CN.md)
 
 ## License
 
-Copyright (c) 2025 - 2026. Haixing Hu.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-See [LICENSE](LICENSE) for the full license text.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Author
-
-**Haixing Hu** - *Qubit Co. Ltd.*
-
----
-
-For more information about the Qubit open source projects, visit our [GitHub homepage](https://github.com/qubit-ltd).
+Licensed under the Apache License, Version 2.0.

@@ -2,101 +2,65 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-use std::time::{
-    Duration,
-    Instant,
-};
 
-use qubit_clock::sleep::{
-    AsyncSleeper,
-    MockSleeper,
-    SystemSleeper,
-};
 use qubit_clock::{
-    MockTimeError,
-    MockWaiterKind,
+    AsyncSleeper,
+    ManualAsyncSleeper,
+    ManualMonotonicClock,
+    MonotonicClock,
+    TimeError,
 };
+use std::sync::Arc;
+use std::time::Duration;
+
+/// Requires a value that owns everything needed for its full lifetime.
+fn assert_static<T: 'static>(_value: T) {}
 
 #[tokio::test]
-async fn test_system_sleep_for_async_waits_real_duration() {
-    let sleeper = SystemSleeper::new();
-    let start = Instant::now();
+async fn test_async_sleeper_supports_trait_object() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper: Arc<dyn AsyncSleeper> =
+        Arc::new(ManualAsyncSleeper::from_clock(Arc::clone(&clock)));
 
-    sleeper.sleep_for_async(Duration::from_millis(2)).await;
-
-    assert!(start.elapsed() >= Duration::from_millis(1));
-}
-
-#[tokio::test]
-async fn test_mock_sleep_for_async_completes_after_advance() {
-    let sleeper = MockSleeper::new();
-    let sleep = sleeper.sleep_for_async(Duration::from_millis(100));
-
-    sleeper.timeline().advance(Duration::from_millis(100));
-    tokio::time::timeout(Duration::from_millis(50), sleep)
+    assert_eq!(clock.now().domain_id(), sleeper.now().domain_id());
+    sleeper
+        .sleep_for_async(Duration::ZERO)
         .await
-        .expect("mock async sleep should complete after time advances");
+        .expect("zero sleep should complete immediately");
 }
 
 #[tokio::test]
-async fn test_mock_sleep_for_async_zero_duration_completes_immediately() {
-    let sleeper = MockSleeper::new();
+async fn test_async_sleeper_box_delegates_to_inner_sleeper() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper: Box<dyn AsyncSleeper> =
+        Box::new(ManualAsyncSleeper::from_clock(Arc::clone(&clock)));
 
-    tokio::time::timeout(
-        Duration::from_millis(50),
-        sleeper.sleep_for_async(Duration::ZERO),
-    )
-    .await
-    .expect("zero-duration mock async sleep should complete immediately");
-    sleeper.timeline().reset().expect(
-        "completed zero-duration sleep should not register an active waiter",
-    );
-}
-
-#[tokio::test]
-async fn test_mock_sleep_for_async_registers_active_waiter_until_completion() {
-    let sleeper = MockSleeper::new();
-    let timeline = sleeper.timeline();
-    let sleep = sleeper.sleep_for_async(Duration::from_millis(100));
-
-    assert!(
-        timeline.wait_for_blocked_waiters(
-            MockWaiterKind::Sleep,
-            1,
-            Duration::from_millis(20)
-        ),
-        "async sleep should register as an active mock waiter at call time",
-    );
-    assert_eq!(Err(MockTimeError::ActiveWaiters), timeline.reset());
-
-    drop(sleep);
-    timeline
-        .reset()
-        .expect("dropping async sleep should unregister the waiter");
-}
-
-#[tokio::test]
-async fn test_mock_sleep_for_async_uses_elapsed_at_call_time() {
-    let sleeper = MockSleeper::new();
-    sleeper.timeline().advance(Duration::from_millis(10));
-    let sleep = sleeper.sleep_for_async(Duration::from_millis(100));
-    tokio::pin!(sleep);
-
-    sleeper.timeline().advance(Duration::from_millis(99));
-    assert!(
-        tokio::time::timeout(Duration::from_millis(20), &mut sleep)
-            .await
-            .is_err(),
-        "mock async sleep should be relative to elapsed at call time",
-    );
-
-    sleeper.timeline().advance(Duration::from_millis(1));
-    tokio::time::timeout(Duration::from_millis(50), &mut sleep)
+    sleeper
+        .sleep_until_async(clock.now())
         .await
-        .expect(
-            "mock async sleep should complete after full relative duration",
-        );
+        .expect("reached deadline should complete immediately");
+}
+
+#[tokio::test]
+async fn test_async_sleeper_reports_relative_deadline_overflow() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    clock
+        .advance(Duration::MAX)
+        .expect("maximum duration should fit from zero");
+    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+
+    assert_eq!(
+        Err(TimeError::InstantOverflow),
+        sleeper.sleep_for_async(Duration::from_nanos(1)).await,
+    );
+}
+
+#[test]
+fn test_async_sleeper_returns_static_future() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualAsyncSleeper::from_clock(clock);
+    let sleep = sleeper.sleep_for_async(Duration::ZERO);
+
+    assert_static(sleep);
 }
