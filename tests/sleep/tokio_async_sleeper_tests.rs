@@ -14,6 +14,16 @@ use qubit_clock::{
 use std::sync::Arc;
 use std::time::Duration;
 
+#[test]
+fn test_tokio_async_sleeper_future_can_be_created_outside_runtime() {
+    let clock = Arc::new(TokioMonotonicClock::new());
+    let sleeper = TokioAsyncSleeper::from_clock(clock);
+
+    let sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+
+    drop(sleep);
+}
+
 #[tokio::test(start_paused = true)]
 async fn test_tokio_async_sleeper_uses_supplied_clock_domain() {
     let clock = Arc::new(TokioMonotonicClock::new());
