@@ -49,7 +49,7 @@ impl ManualWallClock {
     ///
     /// This operation may move wall time forward or backward. It does not
     /// advance the monotonic clock and does not wake monotonic sleepers. The
-    /// The anchor mutex remains held while the monotonic clock is sampled, so
+    /// anchor mutex remains held while the monotonic clock is sampled, so
     /// concurrent calls to [`now()`](WallClock::now) observe either the old or
     /// the new mapping without combining both snapshots.
     pub fn reanchor(&self, wall_time: SystemTime) {

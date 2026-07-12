@@ -20,6 +20,9 @@ use std::sync::Weak;
 /// every callback collected for that advance before resuming the first panic.
 /// Dropping this handle unregisters future notifications, although an in-flight
 /// advance that already captured the callback may still invoke it once.
+/// The handle must therefore be retained for as long as notifications are
+/// required.
+#[must_use = "dropping the subscription unregisters the callback"]
 pub struct ManualAdvanceSubscription {
     clock: Weak<ManualMonotonicClock>,
     subscriber_id: u64,

@@ -44,7 +44,6 @@ impl MonotonicClock for ManualBlockingSleeper {
 impl BlockingSleeper for ManualBlockingSleeper {
     /// Blocks until explicit manual time reaches `deadline`.
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
-        deadline.ensure_domain(self.clock.domain_id())?;
         self.clock.wait_until_blocking(deadline)
     }
 }

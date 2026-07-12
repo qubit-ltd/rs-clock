@@ -137,6 +137,8 @@ future deadline, and `advance_to_next_deadline()` advances atomically to it.
 Async test coordination can await `clock.wait_for_waiters_async(expected_count)`
 without polling or depending on a particular runtime. Once the requested count
 is reached, completion remains latched even if a waiter is immediately dropped.
+`ManualAsyncSleeper` registers its waiter when the sleep future is created, so
+an unpolled manual sleep already contributes to these coordination methods.
 
 ## Manual Advance Notifications
 
@@ -157,14 +159,17 @@ The callback runs synchronously outside the clock mutex. It should be
 idempotent and only signal another waiting primitive. Concurrent advances may
 invoke callbacks concurrently and without ordering. If callbacks panic, all
 callbacks captured for that advance are attempted before the first panic is
-resumed. Dropping `subscription` prevents later registrations, but one callback
-already captured by an in-flight advance may still run.
+resumed. Retain `subscription` for as long as notifications are needed. Dropping
+it unregisters future notifications, but one callback already captured by an
+in-flight advance may still run.
 
 ## Documentation
 
 - [Refactoring design](doc/clock_refactoring_design.zh_CN.md)
 - [Implementation plan](doc/clock_refactoring_implementation_plan.zh_CN.md)
 - [Downstream integration plan](doc/downstream_integration_implementation_plan.zh_CN.md)
+- [Quality follow-up design](doc/clock_quality_followup_design.zh_CN.md)
+- [Quality follow-up plan](doc/clock_quality_followup_implementation_plan.zh_CN.md)
 
 ## License
 
