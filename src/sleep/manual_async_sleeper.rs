@@ -44,6 +44,10 @@ impl MonotonicClock for ManualAsyncSleeper {
 
 impl AsyncSleeper for ManualAsyncSleeper {
     /// Creates a cancellation-safe future in the manual clock domain.
+    ///
+    /// The waiter is registered before this method returns, rather than when
+    /// the future is first polled. Dropping an incomplete future unregisters
+    /// it.
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         Box::pin(ManualSleepFuture::new(Arc::clone(&self.clock), deadline))
     }

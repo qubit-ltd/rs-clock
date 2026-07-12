@@ -16,8 +16,9 @@ use std::task::{
 
 /// A future that completes when a manual clock has enough registered waiters.
 ///
-/// This is a deterministic synchronization primitive for tests. Dropping an
-/// incomplete future unregisters its observer from the clock.
+/// This is a deterministic synchronization primitive for tests. Its observer
+/// is registered when the future is created, before its first poll. Dropping
+/// an incomplete future unregisters the observer from the clock.
 #[derive(Debug)]
 pub struct ManualWaiterFuture {
     clock: Arc<ManualMonotonicClock>,

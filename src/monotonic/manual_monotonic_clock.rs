@@ -66,6 +66,12 @@ impl ManualMonotonicClock {
     /// Returns [`TimeError::InstantOverflow`] when the resulting elapsed time
     /// cannot be represented. A zero duration succeeds as a no-op and does not
     /// notify observers.
+    ///
+    /// # Panics
+    ///
+    /// Panics if waking a registered task or invoking an advance subscriber
+    /// panics. When subscribers panic, every subscriber collected for this
+    /// advance is attempted before the first panic is resumed.
     pub fn advance(&self, duration: Duration) -> Result<(), TimeError> {
         if duration.is_zero() {
             return Ok(());
@@ -87,6 +93,12 @@ impl ManualMonotonicClock {
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign instant and
     /// [`TimeError::CannotMoveBackward`] when `target` precedes the current
     /// instant.
+    ///
+    /// # Panics
+    ///
+    /// Panics if waking a registered task or invoking an advance subscriber
+    /// panics. When subscribers panic, every subscriber collected for this
+    /// advance is attempted before the first panic is resumed.
     pub fn advance_to(
         &self,
         target: MonotonicInstant,
@@ -178,6 +190,12 @@ impl ManualMonotonicClock {
     ///
     /// Returns `Some` with the reached instant, or `None` when no future
     /// deadline is registered. Due registrations awaiting cleanup are ignored.
+    ///
+    /// # Panics
+    ///
+    /// Panics if waking a registered task or invoking an advance subscriber
+    /// panics. When subscribers panic, every subscriber collected for this
+    /// advance is attempted before the first panic is resumed.
     pub fn advance_to_next_deadline(&self) -> Option<MonotonicInstant> {
         let (target, notifications) = {
             let mut state = self.lock_state();
@@ -203,7 +221,8 @@ impl ManualMonotonicClock {
     /// Blocking and asynchronous deadline waiters both contribute to the
     /// count. Reaching the count is latched even if waiters unregister before
     /// the returned future is polled again. The `self: &Arc<Self>` receiver
-    /// ensures the future keeps this exact clock instance alive.
+    /// ensures the future keeps this exact clock instance alive. The observer
+    /// is registered before this method returns, rather than on the first poll.
     #[must_use]
     pub fn wait_for_waiters_async(
         self: &Arc<Self>,

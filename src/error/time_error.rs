@@ -12,6 +12,26 @@ use std::fmt::{
 };
 
 /// Describes an invalid monotonic-time operation.
+///
+/// Callers must include a wildcard arm when matching this enum so future
+/// versions can add errors without breaking downstream code:
+///
+/// ```
+/// use qubit_clock::TimeError;
+///
+/// fn message(error: TimeError) -> &'static str {
+///     match error {
+///         TimeError::ClockDomainMismatch { .. } => "domain mismatch",
+///         TimeError::InstantOverflow => "overflow",
+///         TimeError::CannotMoveBackward => "backward move",
+///         TimeError::InvalidInstantOrder => "invalid order",
+///         _ => "other time error",
+///     }
+/// }
+///
+/// assert_eq!("overflow", message(TimeError::InstantOverflow));
+/// ```
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimeError {
     /// Two monotonic instants belong to different clock domains.
