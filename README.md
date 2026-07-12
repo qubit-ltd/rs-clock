@@ -92,7 +92,7 @@ let worker = std::thread::spawn(move || {
         .expect("manual sleep should complete");
 });
 
-assert!(sleeper.wait_for_waiters(1, Duration::from_secs(1)));
+assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
 clock
     .advance(Duration::from_secs(10))
     .expect("manual time should advance");
@@ -134,9 +134,9 @@ exceeds the platform's representable `SystemTime` range.
 One `ManualMonotonicClock` can drive blocking and async sleepers together.
 `pending_waiters()` counts both kinds, `next_deadline()` inspects their earliest
 future deadline, and `advance_to_next_deadline()` advances atomically to it.
-Async test coordination can await
-`ManualMonotonicClock::wait_for_waiters_async(&clock, expected_count)` without
-polling or depending on a particular runtime.
+Async test coordination can await `clock.wait_for_waiters_async(expected_count)`
+without polling or depending on a particular runtime. Once the requested count
+is reached, completion remains latched even if a waiter is immediately dropped.
 
 ## Manual Advance Notifications
 
@@ -148,12 +148,9 @@ use qubit_clock::ManualMonotonicClock;
 use std::sync::Arc;
 
 let clock = Arc::new(ManualMonotonicClock::new());
-let subscription = ManualMonotonicClock::subscribe_advances(
-    &clock,
-    || {
-        // Signal the test double's Condvar, watch channel, or task wakers.
-    },
-);
+let subscription = clock.subscribe_advances(|| {
+    // Signal the test double's Condvar, watch channel, or task wakers.
+});
 ```
 
 The callback runs synchronously outside the clock mutex. It should be

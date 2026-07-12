@@ -36,7 +36,7 @@ fn test_blocking_lock_timeout_is_driven_by_manual_time() {
         true
     });
 
-    assert!(sleeper.wait_for_waiters(1, Duration::from_secs(1)));
+    assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
     clock
         .advance(Duration::from_secs(20))
         .expect("manual timeout advance should succeed");
@@ -49,7 +49,7 @@ async fn test_async_lock_timeout_is_driven_by_manual_time() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
     let wait = sleeper.sleep_for_async(Duration::from_secs(20));
-    assert_eq!(1, sleeper.pending_waiters());
+    assert_eq!(1, clock.pending_waiters());
 
     clock
         .advance(Duration::from_secs(20))
@@ -63,14 +63,13 @@ fn test_mock_monitor_timeout_observes_manual_time_advance() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let monitor_state = Arc::new((Mutex::new((false, false)), Condvar::new()));
     let advance_notification_state = Arc::clone(&monitor_state);
-    let _subscription =
-        ManualMonotonicClock::subscribe_advances(&clock, move || {
-            let (lock, condition) = &*advance_notification_state;
-            let _state = lock
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            condition.notify_all();
-        });
+    let _subscription = clock.subscribe_advances(move || {
+        let (lock, condition) = &*advance_notification_state;
+        let _state = lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        condition.notify_all();
+    });
     let worker_clock = Arc::clone(&clock);
     let worker_state = Arc::clone(&monitor_state);
     let worker = thread::spawn(move || {

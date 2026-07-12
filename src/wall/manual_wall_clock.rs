@@ -49,12 +49,13 @@ impl ManualWallClock {
     ///
     /// This operation may move wall time forward or backward. It does not
     /// advance the monotonic clock and does not wake monotonic sleepers. The
-    /// anchor is sampled from the monotonic clock before this method acquires
-    /// its wall-time mutex, so a concurrent advance may become visible
-    /// immediately after reanchoring.
+    /// The anchor mutex remains held while the monotonic clock is sampled, so
+    /// concurrent calls to [`now()`](WallClock::now) observe either the old or
+    /// the new mapping without combining both snapshots.
     pub fn reanchor(&self, wall_time: SystemTime) {
+        let mut anchor = self.lock_anchor();
         let monotonic_anchor = self.clock.now();
-        *self.lock_anchor() = (wall_time, monotonic_anchor);
+        *anchor = (wall_time, monotonic_anchor);
     }
 
     /// Locks the wall and monotonic anchor pair, recovering after poisoning.
@@ -73,11 +74,13 @@ impl WallClock for ManualWallClock {
     /// Panics if the manually advanced duration cannot be represented by
     /// [`SystemTime`]. Normal application and test durations are representable.
     fn now(&self) -> SystemTime {
-        let (wall_anchor, monotonic_anchor) = *self.lock_anchor();
-        let elapsed =
-            self.clock.now().duration_since(monotonic_anchor).expect(
-                "manual wall clock must retain its monotonic clock domain",
-            );
+        let anchor = self.lock_anchor();
+        let (wall_anchor, monotonic_anchor) = *anchor;
+        let monotonic_now = self.clock.now();
+        drop(anchor);
+        let elapsed = monotonic_now
+            .duration_since(monotonic_anchor)
+            .expect("manual wall clock must retain its monotonic clock domain");
         wall_anchor
             .checked_add(elapsed)
             .expect("manual wall time exceeded SystemTime range")

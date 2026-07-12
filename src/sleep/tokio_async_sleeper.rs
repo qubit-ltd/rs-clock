@@ -61,6 +61,11 @@ impl MonotonicClock for TokioAsyncSleeper {
 
 impl AsyncSleeper for TokioAsyncSleeper {
     /// Returns a future driven by Tokio's time driver.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called without a Tokio runtime whose time driver is enabled,
+    /// because Tokio creates the native timer when this method is called.
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         let deadline = match self.native_deadline(deadline) {
             Ok(deadline) => deadline,

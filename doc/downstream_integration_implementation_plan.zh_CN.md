@@ -36,7 +36,7 @@
 **接口：**
 
 - `AsyncSleeper::sleep_until_async` 和 `sleep_for_async` 返回 `SleepFuture<'static>`。
-- `subscribe_advances` 保持现有签名，但明确 synchronous callback、并发、panic、in-flight drop 和 lock-order 契约。
+- `subscribe_advances` 使用显式 `Arc` receiver，并明确 synchronous callback、并发、panic、in-flight drop 和 lock-order 契约。
 - 删除没有消费者的内部 `revision` 状态。
 
 - [x] 先增加 `'static` future 编译契约测试并确认旧签名编译失败。

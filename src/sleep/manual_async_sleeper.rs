@@ -28,20 +28,6 @@ impl ManualAsyncSleeper {
     pub const fn from_clock(clock: Arc<ManualMonotonicClock>) -> Self {
         Self { clock }
     }
-
-    /// Returns the number of currently registered async sleep futures.
-    #[must_use]
-    pub fn pending_waiters(&self) -> usize {
-        self.clock.pending_async_waiters()
-    }
-
-    /// Returns the earliest pending async deadline.
-    ///
-    /// `None` means no async sleep future is currently registered.
-    #[must_use]
-    pub fn next_deadline(&self) -> Option<MonotonicInstant> {
-        self.clock.next_async_deadline()
-    }
 }
 
 impl MonotonicClock for ManualAsyncSleeper {

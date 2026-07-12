@@ -134,7 +134,7 @@ async fn test_manual_monotonic_clock_drives_mixed_waiters_in_deadline_order() {
             .sleep_for(Duration::from_secs(5))
             .expect("blocking wait should complete");
     });
-    assert!(blocking_sleeper.wait_for_waiters(1, Duration::from_secs(1)));
+    assert!(clock.wait_for_waiters(2, Duration::from_secs(1)));
 
     assert_eq!(2, clock.pending_waiters());
     assert_eq!(
@@ -148,7 +148,6 @@ async fn test_manual_monotonic_clock_drives_mixed_waiters_in_deadline_order() {
         Duration::from_secs(2),
         clock
             .advance_to_next_deadline()
-            .expect("advancing to registered deadline should succeed")
             .expect("async deadline should exist")
             .elapsed_since_origin(),
     );
@@ -159,12 +158,11 @@ async fn test_manual_monotonic_clock_drives_mixed_waiters_in_deadline_order() {
         Duration::from_secs(5),
         clock
             .advance_to_next_deadline()
-            .expect("advancing to blocking deadline should succeed")
             .expect("blocking deadline should exist")
             .elapsed_since_origin(),
     );
     worker.join().expect("blocking waiter should finish");
-    assert_eq!(None, clock.advance_to_next_deadline().unwrap());
+    assert_eq!(None, clock.advance_to_next_deadline());
 }
 
 #[test]
@@ -195,4 +193,16 @@ fn test_manual_monotonic_clock_concurrent_advances_are_not_lost() {
         Duration::from_nanos((THREADS * ADVANCES_PER_THREAD) as u64),
         clock.elapsed_since_origin(),
     );
+}
+
+#[test]
+fn test_manual_monotonic_clock_wait_for_waiters_times_out() {
+    let clock = ManualMonotonicClock::new();
+    assert!(!clock.wait_for_waiters(1, Duration::from_millis(1)));
+}
+
+#[test]
+fn test_manual_monotonic_clock_rejects_unrepresentable_guard_timeout() {
+    let clock = ManualMonotonicClock::new();
+    assert!(!clock.wait_for_waiters(1, Duration::MAX));
 }

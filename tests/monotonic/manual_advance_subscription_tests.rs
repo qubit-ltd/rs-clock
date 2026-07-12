@@ -20,10 +20,9 @@ fn test_manual_advance_subscription_observes_time_changes() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let notifications = Arc::new(AtomicUsize::new(0));
     let observed_notifications = Arc::clone(&notifications);
-    let _subscription =
-        ManualMonotonicClock::subscribe_advances(&clock, move || {
-            observed_notifications.fetch_add(1, Ordering::SeqCst);
-        });
+    let _subscription = clock.subscribe_advances(move || {
+        observed_notifications.fetch_add(1, Ordering::SeqCst);
+    });
 
     clock
         .advance(Duration::from_secs(1))
@@ -47,10 +46,9 @@ fn test_manual_advance_subscription_unregisters_on_drop() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let notifications = Arc::new(AtomicUsize::new(0));
     let observed_notifications = Arc::clone(&notifications);
-    let subscription =
-        ManualMonotonicClock::subscribe_advances(&clock, move || {
-            observed_notifications.fetch_add(1, Ordering::SeqCst);
-        });
+    let subscription = clock.subscribe_advances(move || {
+        observed_notifications.fetch_add(1, Ordering::SeqCst);
+    });
     drop(subscription);
 
     clock
@@ -64,8 +62,7 @@ fn test_manual_advance_subscription_unregisters_on_drop() {
 fn test_manual_advance_subscription_debug_and_expired_clock_drop() {
     let subscription = {
         let clock = Arc::new(ManualMonotonicClock::new());
-        let subscription =
-            ManualMonotonicClock::subscribe_advances(&clock, || {});
+        let subscription = clock.subscribe_advances(|| {});
         assert!(format!("{subscription:?}").contains("subscriber_id"));
         subscription
     };
@@ -79,16 +76,15 @@ fn test_manual_advance_subscription_callback_can_read_clock() {
     let callback_clock = Arc::downgrade(&clock);
     let observed_elapsed = Arc::new(std::sync::Mutex::new(Duration::ZERO));
     let callback_elapsed = Arc::clone(&observed_elapsed);
-    let _subscription =
-        ManualMonotonicClock::subscribe_advances(&clock, move || {
-            let clock = callback_clock
-                .upgrade()
-                .expect("clock should live while subscription is active");
-            let mut elapsed = callback_elapsed
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            *elapsed = clock.now().elapsed_since_origin();
-        });
+    let _subscription = clock.subscribe_advances(move || {
+        let clock = callback_clock
+            .upgrade()
+            .expect("clock should live while subscription is active");
+        let mut elapsed = callback_elapsed
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        *elapsed = clock.now().elapsed_since_origin();
+    });
 
     clock
         .advance(Duration::from_secs(3))
@@ -108,11 +104,11 @@ fn test_manual_advance_subscription_runs_all_callbacks_before_resuming_panic() {
     let attempted_callbacks = Arc::new(AtomicUsize::new(0));
     let first_counter = Arc::clone(&attempted_callbacks);
     let second_counter = Arc::clone(&attempted_callbacks);
-    let _first = ManualMonotonicClock::subscribe_advances(&clock, move || {
+    let _first = clock.subscribe_advances(move || {
         first_counter.fetch_add(1, Ordering::SeqCst);
         panic!("first callback panic");
     });
-    let _second = ManualMonotonicClock::subscribe_advances(&clock, move || {
+    let _second = clock.subscribe_advances(move || {
         second_counter.fetch_add(1, Ordering::SeqCst);
         panic!("second callback panic");
     });
@@ -123,4 +119,36 @@ fn test_manual_advance_subscription_runs_all_callbacks_before_resuming_panic() {
 
     assert!(result.is_err());
     assert_eq!(2, attempted_callbacks.load(Ordering::SeqCst));
+}
+
+#[test]
+fn test_manual_advance_subscription_drop_during_callback_blocks_later_calls() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let entered = Arc::new(std::sync::Barrier::new(2));
+    let release = Arc::new(std::sync::Barrier::new(2));
+    let callback_count = Arc::new(AtomicUsize::new(0));
+    let callback_entered = Arc::clone(&entered);
+    let callback_release = Arc::clone(&release);
+    let observed_count = Arc::clone(&callback_count);
+    let subscription = clock.subscribe_advances(move || {
+        observed_count.fetch_add(1, Ordering::SeqCst);
+        callback_entered.wait();
+        callback_release.wait();
+    });
+    let advancing_clock = Arc::clone(&clock);
+    let advance = std::thread::spawn(move || {
+        advancing_clock
+            .advance(Duration::from_secs(1))
+            .expect("first advance should succeed");
+    });
+    entered.wait();
+
+    drop(subscription);
+    release.wait();
+    advance.join().expect("advance thread should finish");
+    clock
+        .advance(Duration::from_secs(1))
+        .expect("second advance should succeed");
+
+    assert_eq!(1, callback_count.load(Ordering::SeqCst));
 }

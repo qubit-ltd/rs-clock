@@ -170,12 +170,14 @@ pub enum TimeError {
     },
     InstantOverflow,
     CannotMoveBackward,
+    InvalidInstantOrder,
 }
 ```
 
 - `ClockDomainMismatch`：不同 monotonic domain 的 instant 被混用。
 - `InstantOverflow`：duration 或 deadline 运算溢出。
 - `CannotMoveBackward`：试图将 manual monotonic time 移动到当前时刻之前。
+- `InvalidInstantOrder`：计算 duration 时传入的 earlier instant 晚于当前 instant。
 
 具体错误类型的模块位置和展示文本在实施阶段确定，但上述错误语义保持不变。
 
@@ -224,7 +226,8 @@ wall_now = wall_anchor + (monotonic_now - monotonic_anchor)
 - 不改变 monotonic time。
 - 不会让 monotonic deadline 提前到期。
 - 不会唤醒 monotonic sleeper。
-- 与并发 `advance()` 不建立跨两个 mutex 的原子快照；一次并发推进可在 `reanchor()` 返回后立即反映到 wall time。
+- `now()` 和 `reanchor()` 在 anchor mutex 内采样 monotonic time，避免旧 wall
+  anchor 与新 monotonic elapsed 组成混合快照。
 
 ## 7. Monotonic Clock 实现
 
@@ -257,7 +260,7 @@ wall_now = wall_anchor + (monotonic_now - monotonic_anchor)
 ```rust
 monotonic_clock.advance(duration)?;
 monotonic_clock.advance_to(deadline)?;
-monotonic_clock.advance_to_next_deadline()?;
+monotonic_clock.advance_to_next_deadline();
 ```
 
 `advance_to()` 校验 deadline 的 domain，并拒绝向后移动；比较 current time、更新 elapsed 和收集唤醒通知在同一次 state lock 中完成。
@@ -265,12 +268,9 @@ monotonic_clock.advance_to_next_deadline()?;
 `ManualMonotonicClock` 还提供 concrete-only 的时间推进订阅机制。该机制供 manual sleeper 和 `rs-lock::MockMonitor` 在时间推进时获得唤醒通知，但不进入 `MonotonicClock` trait：
 
 ```rust
-let subscription = ManualMonotonicClock::subscribe_advances(
-    &monotonic_clock,
-    || {
-        // 唤醒 MockMonitor 自己的 Condvar 或 async waker。
-    },
-);
+let subscription = monotonic_clock.subscribe_advances(|| {
+    // 唤醒 MockMonitor 自己的 Condvar 或 async waker。
+});
 ```
 
 订阅回调在 clock 内部 mutex 释放后同步调用。callback 应幂等并且只负责唤醒订阅方自己的等待原语；并发 advance 的 callback 可能并发执行且没有顺序保证。单个 callback panic 不会中断本次 fanout，所有已收集 callback 执行后在推进线程恢复第一个 panic。丢弃 `ManualAdvanceSubscription` 会阻止后续 advance 收集该 callback，但已被进行中的 advance 收集的 callback 仍可能执行一次。callback 若需要锁另一个同步对象，调用方不得在持有同一把锁时推进 clock。
@@ -429,13 +429,11 @@ monotonic_clock.advance(Duration::from_secs(600))?;
 为了避免测试线程在 waiter 注册前提前推进时间，manual sleeper 提供 concrete-only 的测试辅助能力，例如：
 
 ```rust
-manual_sleeper.pending_waiters();
-manual_sleeper.next_deadline();
-manual_sleeper.wait_for_waiters(expected_count, real_guard_timeout);
 manual_clock.pending_waiters();
 manual_clock.next_deadline();
-manual_clock.advance_to_next_deadline()?;
-ManualMonotonicClock::wait_for_waiters_async(&manual_clock, expected_count).await;
+manual_clock.wait_for_waiters(expected_count, real_guard_timeout);
+manual_clock.advance_to_next_deadline();
+manual_clock.wait_for_waiters_async(expected_count).await;
 ```
 
 其中 `real_guard_timeout` 只用于防止测试永久挂起，不参与业务时间语义。
@@ -579,3 +577,21 @@ pub struct AsyncRetryRunner {
 6. 接入 `rs-lock`，消除 `MockMonitor` 自行维护的 elapsed time。
 7. 删除旧 API、旧依赖和已失效文档内容。
 8. 更新 crate README、公开文档和下游使用示例。
+
+## 19. 发布前第三轮收口
+
+第三轮评估保持四 trait 和 concrete clock/sleeper 架构不变，只收紧 manual
+测试驱动语义：
+
+- `wait_for_waiters_async()` 使用锁存语义；waiter 数量一旦达到目标，后续注销
+  不会让 observer 重新进入 pending。
+- Manual driver 控制 API 统一放在 `ManualMonotonicClock`。Sleeper 只负责等待，
+  不再公开含义不同的同名 waiter 查询方法。
+- `advance_to_next_deadline()` 只可能返回“有下一个 deadline”或“没有”，因此
+  返回 `Option<MonotonicInstant>`，不保留无实际错误路径的 `Result`。
+- `subscribe_advances()` 和 `wait_for_waiters_async()` 使用 `self: &Arc<Self>`，
+  在保持共享身份显式的同时提供方法调用语法。
+- `ManualWallClock::now()` 与 `reanchor()` 在同一个 anchor mutex 保护下采样
+  monotonic time，使两者之间具有明确的一致快照语义。
+- `rs-lock::MockMonitor` 自己维护 active timeout waiter 数量和注册屏障；
+  `rs-clock` 不扩张为通用任务调度器或任意下游 deadline registry。
