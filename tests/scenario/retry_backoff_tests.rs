@@ -48,7 +48,7 @@ fn test_retry_exponential_backoff_uses_no_real_delay() {
             .now()
             .checked_add(Duration::from_secs(seconds))
             .expect("retry deadline should be representable");
-        wait_for_blocking_deadline(&sleeper, expected_deadline);
+        wait_for_blocking_deadline(&clock, expected_deadline);
         assert_eq!(index + 1, attempts.load(Ordering::SeqCst));
         clock
             .advance(Duration::from_secs(seconds))
@@ -61,12 +61,12 @@ fn test_retry_exponential_backoff_uses_no_real_delay() {
 
 /// Waits until the retry worker registers the expected blocking deadline.
 fn wait_for_blocking_deadline(
-    sleeper: &ManualBlockingSleeper,
+    clock: &ManualMonotonicClock,
     expected_deadline: qubit_clock::MonotonicInstant,
 ) {
     let real_deadline = Instant::now() + Duration::from_secs(1);
     while Instant::now() < real_deadline {
-        if sleeper.next_deadline() == Some(expected_deadline) {
+        if clock.next_deadline() == Some(expected_deadline) {
             return;
         }
         thread::yield_now();
@@ -90,24 +90,10 @@ async fn test_async_retry_timeout_uses_manual_deadline() {
         }
     });
 
-    wait_for_async_waiters(&sleeper, 1).await;
+    clock.wait_for_waiters_async(1).await;
     clock
         .advance(Duration::from_secs(30))
         .expect("manual timeout advance should succeed");
 
     assert!(timeout_task.await.expect("timeout task should not panic"),);
-}
-
-/// Yields until async sleeper registration becomes observable.
-async fn wait_for_async_waiters(
-    sleeper: &ManualAsyncSleeper,
-    expected_count: usize,
-) {
-    for _ in 0..100 {
-        if sleeper.pending_waiters() >= expected_count {
-            return;
-        }
-        tokio::task::yield_now().await;
-    }
-    panic!("async waiters did not register before the test guard expired");
 }

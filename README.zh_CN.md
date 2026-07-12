@@ -92,7 +92,7 @@ let worker = std::thread::spawn(move || {
         .expect("manual sleep 应正常完成");
 });
 
-assert!(sleeper.wait_for_waiters(1, Duration::from_secs(1)));
+assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
 clock
     .advance(Duration::from_secs(10))
     .expect("manual time 应推进成功");
@@ -134,8 +134,8 @@ assert_eq!(UNIX_EPOCH, wall_clock.now());
 同一个 `ManualMonotonicClock` 可以同时驱动 blocking 和 async sleeper。
 `pending_waiters()` 汇总两类 waiter，`next_deadline()` 查看最早的未来
 deadline，`advance_to_next_deadline()` 原子地推进到该 deadline。异步测试可用
-`ManualMonotonicClock::wait_for_waiters_async(&clock, expected_count)` 等待注册，
-无需轮询，也不绑定特定 runtime。
+`clock.wait_for_waiters_async(expected_count)` 等待注册，无需轮询，也不绑定特定
+runtime。数量一旦达到目标便会被锁存，即使 waiter 随即注销，等待 future 仍会完成。
 
 ## Manual Advance 通知
 
@@ -146,12 +146,9 @@ use qubit_clock::ManualMonotonicClock;
 use std::sync::Arc;
 
 let clock = Arc::new(ManualMonotonicClock::new());
-let subscription = ManualMonotonicClock::subscribe_advances(
-    &clock,
-    || {
-        // 唤醒测试替身自己的 Condvar、watch channel 或 task waker。
-    },
-);
+let subscription = clock.subscribe_advances(|| {
+    // 唤醒测试替身自己的 Condvar、watch channel 或 task waker。
+});
 ```
 
 callback 在 clock mutex 外同步执行。它应可重复调用，并且只负责唤醒另一个等待原语。并发 advance 可能无序、并发地执行 callback。如果 callback panic，本次 advance 已捕获的所有 callback 仍会执行，随后在推进线程恢复第一个 panic。丢弃 `subscription` 会阻止后续 advance 注册 callback，但已被某次进行中的 advance 捕获的 callback 仍可能执行一次。

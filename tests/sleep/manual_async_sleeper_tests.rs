@@ -34,7 +34,7 @@ async fn test_manual_async_sleeper_rejects_foreign_deadline() {
         }),
         sleeper.sleep_until_async(foreign).await,
     );
-    assert_eq!(0, sleeper.pending_waiters());
+    assert_eq!(0, clock.pending_waiters());
 }
 
 #[tokio::test]
@@ -43,7 +43,7 @@ async fn test_manual_async_sleeper_deadline_is_measured_at_call_time() {
     let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
     let sleep = sleeper.sleep_for_async(Duration::from_secs(10));
 
-    assert_eq!(1, sleeper.pending_waiters());
+    assert_eq!(1, clock.pending_waiters());
     clock
         .advance(Duration::from_secs(5))
         .expect("short advance should succeed");
@@ -71,7 +71,7 @@ async fn test_manual_async_sleeper_wakes_all_waiters_at_deadline() {
     let first = sleeper.sleep_for_async(Duration::from_secs(3));
     let second = sleeper.sleep_for_async(Duration::from_secs(3));
 
-    assert_eq!(2, sleeper.pending_waiters());
+    assert_eq!(2, clock.pending_waiters());
     assert_eq!(
         Some(
             clock
@@ -79,7 +79,7 @@ async fn test_manual_async_sleeper_wakes_all_waiters_at_deadline() {
                 .checked_add(Duration::from_secs(3))
                 .expect("short deadline should be representable"),
         ),
-        sleeper.next_deadline(),
+        clock.next_deadline(),
     );
 
     clock
@@ -88,5 +88,5 @@ async fn test_manual_async_sleeper_wakes_all_waiters_at_deadline() {
     let (first_result, second_result) = tokio::join!(first, second);
     first_result.expect("first sleep should complete");
     second_result.expect("second sleep should complete");
-    assert_eq!(0, sleeper.pending_waiters());
+    assert_eq!(0, clock.pending_waiters());
 }

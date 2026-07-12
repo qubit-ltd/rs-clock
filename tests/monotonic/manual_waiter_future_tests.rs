@@ -39,8 +39,7 @@ impl Wake for WakeCounter {
 fn test_manual_waiter_future_wakes_when_expected_waiter_registers() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    let mut waiter =
-        pin!(ManualMonotonicClock::wait_for_waiters_async(&clock, 1,));
+    let mut waiter = pin!(clock.wait_for_waiters_async(1));
     let wake_counter = Arc::new(WakeCounter::default());
     let waker = Waker::from(Arc::clone(&wake_counter));
     let mut context = Context::from_waker(&waker);
@@ -63,8 +62,7 @@ fn test_manual_waiter_future_replaces_registered_waker() {
     let second_waker = Waker::from(Arc::clone(&second_counter));
     let mut first_context = Context::from_waker(&first_waker);
     let mut second_context = Context::from_waker(&second_waker);
-    let mut waiter =
-        Box::pin(ManualMonotonicClock::wait_for_waiters_async(&clock, 1));
+    let mut waiter = Box::pin(clock.wait_for_waiters_async(1));
     assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut first_context));
     assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut second_context));
 
@@ -83,8 +81,7 @@ fn test_manual_waiter_future_unregisters_on_drop() {
     let wake_counter = Arc::new(WakeCounter::default());
     let waker = Waker::from(Arc::clone(&wake_counter));
     let mut context = Context::from_waker(&waker);
-    let mut waiter =
-        Box::pin(ManualMonotonicClock::wait_for_waiters_async(&clock, 1));
+    let mut waiter = Box::pin(clock.wait_for_waiters_async(1));
     assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut context));
     drop(waiter);
 
@@ -92,4 +89,21 @@ fn test_manual_waiter_future_unregisters_on_drop() {
 
     assert_eq!(0, wake_counter.wakes.load(Ordering::SeqCst));
     drop(sleep);
+}
+
+#[test]
+fn test_manual_waiter_future_latches_reached_count_before_waiter_drops() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let wake_counter = Arc::new(WakeCounter::default());
+    let waker = Waker::from(Arc::clone(&wake_counter));
+    let mut context = Context::from_waker(&waker);
+    let mut waiter = Box::pin(clock.wait_for_waiters_async(1));
+    assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut context));
+
+    let sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    drop(sleep);
+
+    assert_eq!(1, wake_counter.wakes.load(Ordering::SeqCst));
+    assert_eq!(Poll::Ready(()), waiter.as_mut().poll(&mut context));
 }

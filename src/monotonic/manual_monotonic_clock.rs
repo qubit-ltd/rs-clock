@@ -125,17 +125,17 @@ impl ManualMonotonicClock {
     /// consistent lock order: callers must not advance this clock while they
     /// hold that same lock.
     ///
-    /// The explicit `Arc` input makes the shared-clock relationship visible at
-    /// the call site.
+    /// The `self: &Arc<Self>` receiver makes shared-clock identity explicit and
+    /// lets the returned subscription keep only a weak reference to the clock.
     pub fn subscribe_advances<F>(
-        clock: &Arc<Self>,
+        self: &Arc<Self>,
         callback: F,
     ) -> ManualAdvanceSubscription
     where
         F: Fn() + Send + Sync + 'static,
     {
         let subscriber_id = {
-            let mut state = clock.lock_state();
+            let mut state = self.lock_state();
             let subscriber_id = state.next_advance_subscriber_id;
             state.next_advance_subscriber_id = state
                 .next_advance_subscriber_id
@@ -146,7 +146,7 @@ impl ManualMonotonicClock {
                 .insert(subscriber_id, Arc::new(callback));
             subscriber_id
         };
-        ManualAdvanceSubscription::new(Arc::downgrade(clock), subscriber_id)
+        ManualAdvanceSubscription::new(Arc::downgrade(self), subscriber_id)
     }
 
     /// Unregisters an advance subscriber when its registration is dropped.
@@ -176,13 +176,12 @@ impl ManualMonotonicClock {
 
     /// Advances to the earliest registered future deadline.
     ///
-    /// Returns `Ok(None)` when no future deadline is registered.
-    pub fn advance_to_next_deadline(
-        &self,
-    ) -> Result<Option<MonotonicInstant>, TimeError> {
+    /// Returns `Some` with the reached instant, or `None` when no future
+    /// deadline is registered. Due registrations awaiting cleanup are ignored.
+    pub fn advance_to_next_deadline(&self) -> Option<MonotonicInstant> {
         let (target, notifications) = {
             let mut state = self.lock_state();
-            let Some(target_elapsed) = state
+            let target_elapsed = state
                 .blocking_waiters
                 .values()
                 .chain(
@@ -190,29 +189,60 @@ impl ManualMonotonicClock {
                 )
                 .filter(|deadline| **deadline > state.elapsed)
                 .min()
-                .copied()
-            else {
-                return Ok(None);
-            };
+                .copied()?;
             state.elapsed = target_elapsed;
             let target = MonotonicInstant::new(self.domain_id, target_elapsed);
             (target, Self::collect_time_change_notifications(&state))
         };
         self.notify_time_changed(notifications);
-        Ok(Some(target))
+        Some(target)
     }
 
     /// Returns a future that completes after enough waiters are registered.
     ///
     /// Blocking and asynchronous deadline waiters both contribute to the
-    /// count. The explicit `Arc` input ensures the returned future keeps this
-    /// exact manual clock instance alive.
+    /// count. Reaching the count is latched even if waiters unregister before
+    /// the returned future is polled again. The `self: &Arc<Self>` receiver
+    /// ensures the future keeps this exact clock instance alive.
     #[must_use]
     pub fn wait_for_waiters_async(
-        clock: &Arc<Self>,
+        self: &Arc<Self>,
         expected_count: usize,
     ) -> ManualWaiterFuture {
-        ManualWaiterFuture::new(Arc::clone(clock), expected_count)
+        ManualWaiterFuture::new(Arc::clone(self), expected_count)
+    }
+
+    /// Blocks in real time until enough deadline waiters are registered.
+    ///
+    /// Blocking and asynchronous sleeper registrations both contribute to
+    /// `expected_count`. `real_timeout` is only a test guard and never advances
+    /// logical time. Returns `true` when the count is reached and `false` when
+    /// the real-time guard expires first or cannot be represented.
+    #[must_use]
+    pub fn wait_for_waiters(
+        &self,
+        expected_count: usize,
+        real_timeout: Duration,
+    ) -> bool {
+        let Some(real_deadline) = Instant::now().checked_add(real_timeout)
+        else {
+            return false;
+        };
+        let mut state = self.lock_state();
+        while state.waiter_count() < expected_count {
+            let remaining =
+                real_deadline.saturating_duration_since(Instant::now());
+            let (next_state, wait_result) = self
+                .waiters_changed
+                .wait_timeout(state, remaining)
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            state = next_state;
+            if wait_result.timed_out() && state.waiter_count() < expected_count
+            {
+                return false;
+            }
+        }
+        true
     }
 
     /// Blocks until manual time reaches `deadline`.
@@ -234,7 +264,8 @@ impl ManualMonotonicClock {
             .checked_add(1)
             .expect("manual blocking waiter identifiers exhausted");
         state.blocking_waiters.insert(waiter_id, deadline_elapsed);
-        let observer_wakers = Self::collect_waiter_observer_wakers(&state);
+        let observer_wakers =
+            Self::collect_reached_waiter_observer_wakers(&mut state);
         drop(state);
         self.waiters_changed.notify_all();
         for waker in observer_wakers {
@@ -251,51 +282,6 @@ impl ManualMonotonicClock {
         drop(state);
         self.waiters_changed.notify_all();
         Ok(())
-    }
-
-    /// Returns the current blocking waiter count.
-    pub(crate) fn pending_blocking_waiters(&self) -> usize {
-        self.lock_state().blocking_waiters.len()
-    }
-
-    /// Returns the earliest blocking deadline in this clock domain.
-    pub(crate) fn next_blocking_deadline(&self) -> Option<MonotonicInstant> {
-        self.lock_state()
-            .blocking_waiters
-            .values()
-            .min()
-            .copied()
-            .map(|elapsed| MonotonicInstant::new(self.domain_id, elapsed))
-    }
-
-    /// Waits for the requested number of blocking waiter registrations.
-    ///
-    /// Returns `false` if `real_timeout` expires before the count is reached.
-    pub(crate) fn wait_for_blocking_waiters(
-        &self,
-        expected_count: usize,
-        real_timeout: Duration,
-    ) -> bool {
-        let Some(real_deadline) = Instant::now().checked_add(real_timeout)
-        else {
-            return false;
-        };
-        let mut state = self.lock_state();
-        while state.blocking_waiters.len() < expected_count {
-            let remaining =
-                real_deadline.saturating_duration_since(Instant::now());
-            let (next_state, wait_result) = self
-                .waiters_changed
-                .wait_timeout(state, remaining)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            state = next_state;
-            if wait_result.timed_out()
-                && state.blocking_waiters.len() < expected_count
-            {
-                return false;
-            }
-        }
-        true
     }
 
     /// Registers an async deadline at future creation time.
@@ -320,7 +306,8 @@ impl ManualMonotonicClock {
         state
             .async_waiters
             .insert(waiter_id, (deadline_elapsed, None));
-        let observer_wakers = Self::collect_waiter_observer_wakers(&state);
+        let observer_wakers =
+            Self::collect_reached_waiter_observer_wakers(&mut state);
         drop(state);
         self.waiters_changed.notify_all();
         for waker in observer_wakers {
@@ -415,22 +402,6 @@ impl ManualMonotonicClock {
         }
     }
 
-    /// Returns the number of registered async sleep futures.
-    pub(crate) fn pending_async_waiters(&self) -> usize {
-        self.lock_state().async_waiters.len()
-    }
-
-    /// Returns the earliest async deadline in this clock domain.
-    pub(crate) fn next_async_deadline(&self) -> Option<MonotonicInstant> {
-        self.lock_state()
-            .async_waiters
-            .values()
-            .map(|(deadline, _)| deadline)
-            .min()
-            .copied()
-            .map(|elapsed| MonotonicInstant::new(self.domain_id, elapsed))
-    }
-
     /// Locks mutable state, recovering the inner value after poisoning.
     fn lock_state(&self) -> MutexGuard<'_, ManualMonotonicState> {
         self.state
@@ -438,6 +409,7 @@ impl ManualMonotonicClock {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
+    /// Collects due task wakers and current advance subscribers under the lock.
     fn collect_time_change_notifications(
         state: &ManualMonotonicState,
     ) -> TimeChangeNotifications {
@@ -451,19 +423,31 @@ impl ManualMonotonicClock {
         (due_wakers, subscribers)
     }
 
-    /// Collects observers whose expected waiter count has been reached.
-    fn collect_waiter_observer_wakers(
-        state: &ManualMonotonicState,
+    /// Removes reached observers and collects their registered task wakers.
+    ///
+    /// Removing an observer latches the reached state: its future treats a
+    /// missing registration as complete even if waiters unregister before the
+    /// future is polled again.
+    fn collect_reached_waiter_observer_wakers(
+        state: &mut ManualMonotonicState,
     ) -> Vec<Waker> {
         let waiter_count = state.waiter_count();
-        state
-            .waiter_observers
-            .values()
-            .filter(|(expected_count, _)| *expected_count <= waiter_count)
-            .filter_map(|(_, waker)| waker.clone())
-            .collect()
+        let mut wakers = Vec::new();
+        state.waiter_observers.retain(|_, (expected_count, waker)| {
+            if *expected_count <= waiter_count {
+                if let Some(waker) = waker.take() {
+                    wakers.push(waker);
+                }
+                false
+            } else {
+                true
+            }
+        });
+        wakers
     }
 
+    /// Wakes time observers and invokes every collected subscriber outside the
+    /// state lock, resuming the first subscriber panic after fanout completes.
     fn notify_time_changed(
         &self,
         (due_wakers, subscribers): TimeChangeNotifications,

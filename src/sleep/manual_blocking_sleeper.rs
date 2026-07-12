@@ -27,35 +27,6 @@ impl ManualBlockingSleeper {
     pub const fn from_clock(clock: Arc<ManualMonotonicClock>) -> Self {
         Self { clock }
     }
-
-    /// Returns the number of threads currently waiting through this domain.
-    #[must_use]
-    pub fn pending_waiters(&self) -> usize {
-        self.clock.pending_blocking_waiters()
-    }
-
-    /// Returns the earliest pending blocking deadline.
-    ///
-    /// `None` means no blocking sleeper is currently registered.
-    #[must_use]
-    pub fn next_deadline(&self) -> Option<MonotonicInstant> {
-        self.clock.next_blocking_deadline()
-    }
-
-    /// Waits in real time until at least `expected_count` waiters register.
-    ///
-    /// This method is a test coordination guard only; `real_timeout` never
-    /// contributes to manual time. Returns `true` when the count is reached
-    /// and `false` when the real-time guard expires first.
-    #[must_use]
-    pub fn wait_for_waiters(
-        &self,
-        expected_count: usize,
-        real_timeout: Duration,
-    ) -> bool {
-        self.clock
-            .wait_for_blocking_waiters(expected_count, real_timeout)
-    }
 }
 
 impl MonotonicClock for ManualBlockingSleeper {

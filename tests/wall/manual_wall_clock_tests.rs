@@ -11,6 +11,12 @@ use qubit_clock::{
     WallClock,
 };
 use std::sync::Arc;
+use std::sync::Barrier;
+use std::sync::atomic::{
+    AtomicBool,
+    Ordering,
+};
+use std::thread;
 use std::time::{
     Duration,
     UNIX_EPOCH,
@@ -59,4 +65,72 @@ fn test_manual_wall_clock_reanchor_changes_only_wall_mapping() {
         .advance(Duration::from_secs(5))
         .expect("short advance should succeed");
     assert_eq!(UNIX_EPOCH + Duration::from_secs(1_005), wall_clock.now(),);
+}
+
+#[test]
+fn test_manual_wall_clock_concurrent_reanchor_never_mixes_snapshots() {
+    const ITERATIONS: u64 = 10_000;
+    const READERS: usize = 4;
+    const WALL_STRIDE_SECONDS: u64 = 100;
+    let monotonic_clock = Arc::new(ManualMonotonicClock::new());
+    let wall_clock = Arc::new(ManualWallClock::from_clock(
+        UNIX_EPOCH,
+        Arc::clone(&monotonic_clock),
+    ));
+    let barrier = Arc::new(Barrier::new(READERS + 1));
+    let mixed_snapshot_observed = Arc::new(AtomicBool::new(false));
+    let readers: Vec<_> = (0..READERS)
+        .map(|_| {
+            let wall_clock = Arc::clone(&wall_clock);
+            let barrier = Arc::clone(&barrier);
+            let mixed_snapshot_observed = Arc::clone(&mixed_snapshot_observed);
+            thread::spawn(move || {
+                for iteration in 0..ITERATIONS {
+                    barrier.wait();
+                    let observed = wall_clock.now();
+                    let old_mapping = if iteration == 0 {
+                        UNIX_EPOCH
+                    } else {
+                        UNIX_EPOCH
+                            + Duration::from_secs(
+                                iteration * WALL_STRIDE_SECONDS,
+                            )
+                            + Duration::from_nanos(1)
+                    };
+                    let new_mapping = UNIX_EPOCH
+                        + Duration::from_secs(
+                            (iteration + 1) * WALL_STRIDE_SECONDS,
+                        );
+                    let new_mapping_after_advance =
+                        new_mapping + Duration::from_nanos(1);
+                    if observed != old_mapping
+                        && observed != new_mapping
+                        && observed != new_mapping_after_advance
+                    {
+                        mixed_snapshot_observed.store(true, Ordering::SeqCst);
+                    }
+                    barrier.wait();
+                }
+            })
+        })
+        .collect();
+
+    for iteration in 0..ITERATIONS {
+        barrier.wait();
+        wall_clock.reanchor(
+            UNIX_EPOCH
+                + Duration::from_secs((iteration + 1) * WALL_STRIDE_SECONDS),
+        );
+        monotonic_clock
+            .advance(Duration::from_nanos(1))
+            .expect("small concurrent advance should succeed");
+        barrier.wait();
+    }
+    for reader in readers {
+        reader.join().expect("wall-clock reader should finish");
+    }
+    assert!(
+        !mixed_snapshot_observed.load(Ordering::SeqCst),
+        "wall reading mixed an old anchor with a new monotonic sample",
+    );
 }
