@@ -2,29 +2,60 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+//! Defines asynchronous monotonic sleep operations.
+
+use crate::{
+    MonotonicClock,
+    MonotonicInstant,
+    SleepFuture,
+    TimeError,
+};
 use std::time::Duration;
 
-use crate::sleep::AsyncSleepFuture;
+/// Provides asynchronous waits in the implementor's monotonic clock domain.
+pub trait AsyncSleeper: MonotonicClock {
+    /// Returns a future completing when `deadline` is reached.
+    ///
+    /// A reached deadline completes immediately. A foreign deadline resolves
+    /// to [`TimeError::ClockDomainMismatch`]. The returned future owns its
+    /// waiting state and does not borrow this sleeper.
+    fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture;
 
-/// Provides asynchronous relative sleep operations.
-pub trait AsyncSleeper: Send + Sync {
-    /// Returns a future that completes after the specified duration.
+    /// Returns a future completing after `duration` in this sleeper's domain.
     ///
-    /// The duration is measured from the method call, not from the first poll
-    /// of the returned future.
-    ///
-    /// # Arguments
-    ///
-    /// * `duration` - The relative duration to sleep.
-    ///
-    /// # Returns
-    ///
-    /// A future that resolves after the duration has elapsed.
-    fn sleep_for_async<'a>(
-        &'a self,
-        duration: Duration,
-    ) -> AsyncSleepFuture<'a>;
+    /// The deadline is calculated when this method is called, before the
+    /// returned future is first polled. The future owns its waiting state and
+    /// has a `'static` lifetime.
+    fn sleep_for_async(&self, duration: Duration) -> SleepFuture {
+        match self.now().checked_add(duration) {
+            Ok(deadline) => self.sleep_until_async(deadline),
+            Err(error) => ready_sleep_result(Err(error)),
+        }
+    }
+}
+
+impl<T> AsyncSleeper for std::sync::Arc<T>
+where
+    T: AsyncSleeper + ?Sized,
+{
+    /// Delegates asynchronous waiting to the shared sleeper object.
+    fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
+        self.as_ref().sleep_until_async(deadline)
+    }
+}
+
+impl<T> AsyncSleeper for Box<T>
+where
+    T: AsyncSleeper + ?Sized,
+{
+    /// Delegates asynchronous waiting to the boxed sleeper object.
+    fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
+        self.as_ref().sleep_until_async(deadline)
+    }
+}
+
+/// Creates an immediately ready sleep future for a precomputed result.
+pub(crate) fn ready_sleep_result(result: Result<(), TimeError>) -> SleepFuture {
+    Box::pin(async move { result })
 }

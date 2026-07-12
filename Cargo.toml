@@ -1,12 +1,12 @@
 [package]
 name = "qubit-clock"
-version = "0.8.1"
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/qubit-ltd/rs-clock"
-description = "Thread-safe clock abstractions for Rust: monotonic clocks, mock testing, high-precision time meters, and timezone support"
+description = "Injectable wall and monotonic clocks with deterministic blocking and async sleepers"
 homepage = "https://github.com/qubit-ltd/rs-clock"
 documentation = "https://docs.rs/qubit-clock"
 readme = "README.md"
@@ -19,7 +19,7 @@ include = [
     "/README.zh_CN.md",
     "/RUST_CODING_STYLE.md",
     "/RUST_CODING_STYLE.zh_CN.md",
-    "/doc/**/user_guide*.md",
+    "/doc/**",
     "/examples/**",
     "/resources/**",
     "/src/**",
@@ -35,10 +35,7 @@ default = []
 tokio = ["dep:tokio"]
 
 [dependencies]
-chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = "0.10"
-parking_lot = "0.12"
-tokio = { version = "1.52", optional = true, features = ["macros", "rt", "sync", "time"] }
+tokio = { version = "1.52", optional = true, features = ["time"] }
 
 [dev-dependencies]
-serde_json = "1.0"
+tokio = { version = "1.52", features = ["macros", "rt", "sync", "test-util", "time"] }
