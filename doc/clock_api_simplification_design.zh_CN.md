@@ -2,7 +2,7 @@
 
 ## 文档信息
 
-- **状态**：已确认，待实施
+- **状态**：已实施，并于 2026-07-15 完成复核
 - **日期**：2026-07-15
 - **兼容性**：包含破坏性 API 变更，不保留 `0.9` API 兼容性
 
@@ -51,8 +51,9 @@ impl ClockDomain {
 }
 ```
 
-`ClockDomain::new()` 使用现有的进程级 `AtomicU64` 分配逻辑。零值继续保留，
-已经分配的标识符不复用；计数器耗尽时继续 panic。
+`ClockDomain::new()` 使用进程级 `AtomicU64` 分配。零值作为耗尽终态，不会作为
+domain 返回；已经分配的标识符不复用。`u64::MAX` 是最后一个有效标识符：返回它
+的分配会把原子状态切换为零，之后的所有分配均 panic。
 
 `ClockDomain` 实现 `Display`，用于错误信息和日志诊断，但不提供裸 `u64`
 getter，也不实现 `Default`。这可以避免调用方依赖底层表示，或在默认构造时
@@ -187,6 +188,13 @@ pub struct ManualMonotonicClock {
 
 两者当前只有少量结构性重复，抽取 enum 或泛型公共类型带来的复杂度高于收益。
 
+Tokio time driver 的身份不属于 `ClockDomain`，Tokio 也没有提供适合此处校验的稳定
+driver identity。使用暂停或显式推进的 Tokio 时间时，调用方必须在同一个 runtime
+time driver 下创建和读取 `TokioMonotonicClock`，并 poll 配对
+`TokioAsyncSleeper` 的 future。任务可以在同一 runtime 的 worker thread 之间迁移，
+但 clock/sleeper 组合不得跨独立 runtime 使用。该约束通过 rustdoc 和 README 明确，
+不增加新的公开 driver 抽象。
+
 ## 5. Sleeper 改为组合 Clock
 
 ### 5.1 `BlockingSleeper`
@@ -289,7 +297,7 @@ ManualMonotonicClock
 ManualMonotonicState
 ├── elapsed: Duration
 ├── waiters: ManualWaiterRegistry
-└── advance_subscribers: ManualAdvanceRegistry
+└── advances: ManualAdvanceRegistry
 
 ManualWaiterRegistry
 ├── blocking waiters
@@ -302,12 +310,12 @@ ManualAdvanceRegistry
 
 职责如下：
 
-- `ManualMonotonicClock`：公开 façade、mutex/Condvar、阻塞等待，以及锁外的
-  waker 和 callback fanout。
-- `ManualMonotonicState`：elapsed 更新、advance/advance_to 状态转换、
-  next-deadline 决策及 effects 汇总。
+- `ManualMonotonicClock`：公开 façade、mutex/Condvar、elapsed 状态转换、
+  next-deadline 决策、advance effects 汇总，以及锁外的 waker 和 callback fanout。
+- `ManualMonotonicState`：聚合由同一 mutex 保护的 elapsed、waiter registry 和
+  advance registry，并提供总 waiter 数量。
 - `ManualWaiterRegistry`：waiter ID 分配、注册、poll、注销、计数、最早 deadline、
-  到期 waker 和 waiter observer latch。
+  到期 waker 的一次性移出和 waiter observer latch。
 - `ManualAdvanceRegistry`：subscriber ID 分配、注册、注销和 callback 快照。
 - `ManualSleepFuture`、`ManualWaiterFuture`、`ManualAdvanceSubscription`：继续作为
   独立的 RAII/future 类型存在。
@@ -317,18 +325,22 @@ ManualAdvanceRegistry
 
 ### 6.3 锁内状态转换与锁外副作用
 
-状态方法返回显式 effects，例如：
+clock 在持有 state mutex 时完成状态转换，并返回显式 advance effects：
 
 ```rust
 struct AdvanceEffects {
     due_wakers: Vec<Waker>,
-    subscribers: Vec<AdvanceCallback>,
-}
-
-struct WaiterRegistrationEffects {
-    observer_wakers: Vec<Waker>,
+    advance_callbacks: Vec<AdvanceCallback>,
 }
 ```
+
+到期 waiter 的 `Waker` 通过 `Option::take()` 移入 `AdvanceEffects`，因此跨过
+deadline 后、future 再次 poll 前的后续 advance 不会重复 wake 同一个已保存
+waker。waiter 注册本身继续保留到 future poll 或 drop，因此 pending 计数和取消
+语义不变。advance callback 是持久订阅，仍为每次成功推进创建快照。
+
+waiter 注册只产生 observer waker 一种锁外结果，继续直接使用 `Vec<Waker>`，不为
+单字段结果增加 `WaiterRegistrationEffects`。
 
 处理顺序保持不变：
 
@@ -378,7 +390,8 @@ waiter，而不是等到 future 第一次被 poll。
 
 ### 9.1 `ClockDomain` 与外部 Clock
 
-- `ClockDomain::new()` 生成互不相同的 domain。
+- `ClockDomain::new()` 生成互不相同的 domain，不提供 `Default` 构造。
+- allocator 返回 `u64::MAX` 后进入耗尽状态，下一次分配 panic。
 - `ClockDomain` 支持复制、相等比较、哈希、Debug 和 Display。
 - `TimeError::ClockDomainMismatch` 保存并展示强类型 domain。
 - crate 外风格的自定义 `MonotonicClock` 可以通过
@@ -399,6 +412,7 @@ waiter，而不是等到 future 第一次被 poll。
 - blocking 与 async waiter 按 deadline 顺序完成；
 - 相同 deadline 的 waiter 全部被唤醒；
 - async waker 替换与取消清理；
+- async deadline 到期后只移出并 wake 已保存 waker 一次；
 - waiter observer 达标后 latch；
 - waiter 注册与 concurrent advance 不丢失唤醒；
 - concurrent advance 不丢失 elapsed；
@@ -414,7 +428,8 @@ test_manual_async_sleep_completes_after_advance_before_first_poll
 ### 9.4 Native Clock 与 Sleeper
 
 - `StdMonotonicClock` 继续跟随真实 monotonic time。
-- `TokioMonotonicClock` 继续跟随 paused/advanced Tokio time。
+- `TokioMonotonicClock` 继续跟随 paused/advanced Tokio time，并明确 clock 创建、
+  读取和配对 sleeper poll 必须属于同一个 runtime time driver。
 - 两个 native sleeper 保持 domain 校验和 native instant overflow 测试。
 - `StdBlockingSleeper` 测试已到期立即返回和短 deadline 等待；不增加脆弱的
   精确耗时断言。
