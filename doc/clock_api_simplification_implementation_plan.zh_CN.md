@@ -1,5 +1,8 @@
 # rs-clock 时钟 API 简化与手动时钟拆分实施计划
 
+**状态：** 已实施并于 2026-07-15 完成复核；下方 checklist 保留为原始实施记录，
+不再表示当前进度。
+
 Goal: 用 ClockDomain 替换裸 domain ID，收紧 MonotonicClock，让 Sleeper 组合 clock，并拆分 ManualMonotonicClock 的内部状态职责。
 
 Architecture: MonotonicClock 仅返回完整的 MonotonicInstant；Sleeper 用 clock() 组合其配对 clock；manual clock 仍只持有一把状态 mutex，但把 waiter 与 subscriber registry 拆为内部组件。
@@ -66,22 +69,22 @@ Expected: 失败，ClockDomain 或公开 instant 构造函数不存在。
 - [ ] Step 3: 最小实现 ClockDomain。
 
 ~~~
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ClockDomain(u64);
-
-impl ClockDomain {
-    #[must_use]
-    pub fn new() -> Self {
-        Self(NEXT_CLOCK_DOMAIN.fetch_update(
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-            |value| value.checked_add(1),
-        ).expect("monotonic clock domain identifiers exhausted"))
-    }
+fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
+    next.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+        match value {
+            0 => None,
+            u64::MAX => Some(0),
+            value => Some(value + 1),
+        }
+    })
+    .expect("monotonic clock domain identifiers exhausted")
 }
 ~~~
 
-实现 Display；将 instant 字段改为 domain: ClockDomain，保留 elapsed_since_origin()；将 TimeError::ClockDomainMismatch 字段改为 ClockDomain。不提供裸 ID getter 或 from_u64()。
+`ClockDomain::new()` 包装该 helper 的返回值；实现 `Display`；将 instant 字段改为
+`domain: ClockDomain`，保留 `elapsed_since_origin()`；将
+`TimeError::ClockDomainMismatch` 字段改为 `ClockDomain`。不提供 `Default`、裸 ID
+getter 或 `from_u64()`。`u64::MAX` 返回后，零值作为耗尽终态，后续分配 panic。
 
 - [ ] Step 4: 运行 cargo test --test error_tests --test monotonic_tests clock_domain -- --nocapture。
 
@@ -228,7 +231,8 @@ Files:
 - Modify: tests/monotonic/manual_monotonic_clock_tests.rs、manual_waiter_future_tests.rs、manual_advance_subscription_tests.rs
 - Modify: tests/sleep/manual_sleep_future_tests.rs、manual_async_sleeper_tests.rs、manual_blocking_sleeper_tests.rs
 
-Produces: 私有 registry 与锁外 effect 收集；公开 manual API 不变。
+Produces: 私有 registry、具名 `AdvanceEffects` 与锁外 effect 分发；公开 manual API
+不变。
 
 - [ ] Step 1: 写重构保护测试。
 
@@ -266,7 +270,11 @@ pub(crate) struct ManualAdvanceRegistry {
 }
 ~~~
 
-ManualMonotonicState 持有 elapsed、两个 registry，并返回到期 waker、observer waker 和 subscriber snapshot。ManualMonotonicClock 只处理 mutex、Condvar、锁外 wake/fanout。不得引入第二把 state mutex。
+`ManualMonotonicState` 持有 elapsed 和两个 registry；`ManualMonotonicClock` 在持锁
+范围内完成 elapsed 状态转换与 next-deadline 决策，并汇总 `AdvanceEffects`，随后在
+锁外执行 Condvar、wake 和 callback fanout。到期 waker 使用 `Option::take()` 只移出
+一次，waiter 注册继续保留到 poll/drop；subscriber 继续为每次推进创建 callback
+快照。不得引入第二把 state mutex。
 
 - [ ] Step 4: 运行 cargo test --all-features --test monotonic_tests --test sleep_tests -- manual --nocapture。
 
