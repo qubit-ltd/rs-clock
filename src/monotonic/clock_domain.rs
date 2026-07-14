@@ -9,6 +9,7 @@ use std::fmt::{
     Display,
     Formatter,
 };
+use std::num::NonZeroU64;
 use std::sync::atomic::{
     AtomicU64,
     Ordering,
@@ -22,11 +23,8 @@ static NEXT_CLOCK_DOMAIN: AtomicU64 = AtomicU64::new(1);
 /// The maximum `u64` value is returned once and atomically changes `next` to
 /// the terminal zero state. Calls made after that transition panic.
 fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
-    next.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| match value
-    {
-        0 => None,
-        u64::MAX => Some(0),
-        value => Some(value + 1),
+    next.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+        NonZeroU64::new(value).map(|value| value.get().wrapping_add(1))
     })
     .expect("monotonic clock domain identifiers exhausted")
 }

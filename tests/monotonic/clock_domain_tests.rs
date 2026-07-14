@@ -38,12 +38,12 @@ fn test_clock_domain_does_not_implement_default() {
 #[test]
 fn test_clock_domain_allocator_exhausts_after_maximum_identifier() {
     assert!(
-        CLOCK_DOMAIN_SOURCE.contains("u64::MAX => Some(0)"),
-        "the maximum identifier must be returned while marking exhaustion",
+        CLOCK_DOMAIN_SOURCE.contains("NonZeroU64::new(value)"),
+        "the exhausted zero state must reject later allocations",
     );
     assert!(
-        CLOCK_DOMAIN_SOURCE.contains("0 => None"),
-        "the exhausted allocator state must reject later allocations",
+        CLOCK_DOMAIN_SOURCE.contains("value.get().wrapping_add(1)"),
+        "the maximum identifier must be returned while marking exhaustion",
     );
     assert!(
         CLOCK_DOMAIN_SOURCE.contains(
