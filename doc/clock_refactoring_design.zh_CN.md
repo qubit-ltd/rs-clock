@@ -6,6 +6,12 @@
 - **日期**：2026-07-11
 - **兼容性**：允许破坏性变更，不保留现有 API 兼容性
 
+> **后续调整（2026-07-15）**：本文记录最初重构方案。其中的
+> `MonotonicClock` 分解 API、sleeper 继承关系和裸 `u64` domain ID 已由
+> [API 简化设计](clock_api_simplification_design.zh_CN.md) 取代；实施细节以
+> [API 简化实施计划](clock_api_simplification_implementation_plan.zh_CN.md)
+> 为准。
+
 ## 1. 背景与定位
 
 `rs-clock` 的核心价值不是封装系统时间，而是把代码对真实时间流逝的依赖替换成可注入、可控制的时间能力。生产环境使用真实时间实现，测试环境使用手工推进的实现，从而让 retry、timeout、延迟执行、账号锁定和过期判断等逻辑能够快速、确定性地测试。
