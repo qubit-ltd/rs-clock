@@ -8,6 +8,10 @@
 
 **架构：** Wall clock、monotonic clock 和 sleeper 分为三个模块。Concrete sleeper 显式持有对应的 `Arc<ConcreteMonotonicClock>`，并委托 `MonotonicClock`。Manual wall clock、blocking sleeper 和 async sleeper共享同一个 `Arc<ManualMonotonicClock>`。
 
+> **后续调整（2026-07-15）**：本计划记录原始实施过程。后续 API 简化的设计和
+> 实施记录分别见 [API 简化设计](clock_api_simplification_design.zh_CN.md) 与
+> [API 简化实施计划](clock_api_simplification_implementation_plan.zh_CN.md)。
+
 **技术栈：** Rust 1.94、edition 2024、标准库同步原语、可选 Tokio time driver。
 
 ## 全局约束
