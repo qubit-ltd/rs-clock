@@ -90,12 +90,19 @@ impl ManualWaiterRegistry {
             .copied()
     }
 
-    /// Collects cloned wakers for async deadlines reached by elapsed.
-    pub(crate) fn due_async_wakers(&self, elapsed: Duration) -> Vec<Waker> {
+    /// Takes task wakers for async deadlines reached by elapsed.
+    ///
+    /// Waiter registrations remain present until their futures are polled or
+    /// dropped, but subsequent advances cannot wake the same stored waker
+    /// again.
+    pub(crate) fn take_due_async_wakers(
+        &mut self,
+        elapsed: Duration,
+    ) -> Vec<Waker> {
         self.async_waiters
-            .values()
+            .values_mut()
             .filter(|(deadline, _)| *deadline <= elapsed)
-            .filter_map(|(_, waker)| waker.clone())
+            .filter_map(|(_, waker)| waker.take())
             .collect()
     }
 

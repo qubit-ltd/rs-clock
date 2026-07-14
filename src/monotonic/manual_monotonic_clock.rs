@@ -34,7 +34,13 @@ use std::task::{
 use std::time::Duration;
 use std::time::Instant;
 
-type TimeChangeNotifications = (Vec<Waker>, Vec<AdvanceCallback>);
+/// Side effects collected while committing one manual time advance.
+struct AdvanceEffects {
+    /// Task wakers whose deadlines were reached by the advance.
+    due_wakers: Vec<Waker>,
+    /// Persistent subscriber callbacks captured for this advance.
+    advance_callbacks: Vec<AdvanceCallback>,
+}
 
 /// A monotonic clock that advances only when explicitly instructed.
 ///
@@ -80,7 +86,7 @@ impl ManualMonotonicClock {
                 .elapsed
                 .checked_add(duration)
                 .ok_or(TimeError::InstantOverflow)?;
-            Self::collect_time_change_notifications(&state)
+            Self::collect_advance_effects(&mut state)
         };
         self.notify_time_changed(notifications);
         Ok(())
@@ -112,7 +118,7 @@ impl ManualMonotonicClock {
                 return Ok(());
             }
             state.elapsed = target_elapsed;
-            Self::collect_time_change_notifications(&state)
+            Self::collect_advance_effects(&mut state)
         };
         self.notify_time_changed(notifications);
         Ok(())
@@ -189,7 +195,7 @@ impl ManualMonotonicClock {
                 state.waiters.next_future_deadline(state.elapsed)?;
             state.elapsed = target_elapsed;
             let target = MonotonicInstant::new(self.domain, target_elapsed);
-            (target, Self::collect_time_change_notifications(&state))
+            (target, Self::collect_advance_effects(&mut state))
         };
         self.notify_time_changed(notifications);
         Some(target)
@@ -364,29 +370,33 @@ impl ManualMonotonicClock {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    /// Collects due task wakers and current advance subscribers under the lock.
-    fn collect_time_change_notifications(
-        state: &ManualMonotonicState,
-    ) -> TimeChangeNotifications {
-        let due_wakers = state.waiters.due_async_wakers(state.elapsed);
-        let subscribers = state.advances.callbacks();
-        (due_wakers, subscribers)
+    /// Collects due task wakers and current advance callbacks under the lock.
+    fn collect_advance_effects(
+        state: &mut ManualMonotonicState,
+    ) -> AdvanceEffects {
+        let elapsed = state.elapsed;
+        let due_wakers = state.waiters.take_due_async_wakers(elapsed);
+        let advance_callbacks = state.advances.callbacks();
+        AdvanceEffects {
+            due_wakers,
+            advance_callbacks,
+        }
     }
 
     /// Wakes time observers and invokes every collected subscriber outside the
     /// state lock, resuming the first subscriber panic after fanout completes.
-    fn notify_time_changed(
-        &self,
-        (due_wakers, subscribers): TimeChangeNotifications,
-    ) {
+    fn notify_time_changed(&self, effects: AdvanceEffects) {
+        let AdvanceEffects {
+            due_wakers,
+            advance_callbacks,
+        } = effects;
         self.changed.notify_all();
         for waker in due_wakers {
             waker.wake();
         }
         let mut first_panic = None;
-        for subscriber in subscribers {
-            if let Err(payload) =
-                catch_unwind(AssertUnwindSafe(|| subscriber()))
+        for callback in advance_callbacks {
+            if let Err(payload) = catch_unwind(AssertUnwindSafe(|| callback()))
                 && first_panic.is_none()
             {
                 first_panic = Some(payload);
