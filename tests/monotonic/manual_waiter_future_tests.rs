@@ -125,6 +125,21 @@ fn test_manual_waiter_future_replaces_registered_waker() {
     drop(sleep);
 }
 
+/// Verifies that polling with the same waker keeps the observer pending
+/// without replacing its registration.
+#[test]
+fn test_manual_waiter_future_reuses_registered_waker() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let wake_counter = Arc::new(WakeCounter::default());
+    let waker = Waker::from(Arc::clone(&wake_counter));
+    let mut context = Context::from_waker(&waker);
+    let mut waiter = Box::pin(clock.wait_for_waiters_async(1));
+
+    assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut context));
+    assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut context));
+    assert_eq!(0, wake_counter.wakes.load(Ordering::SeqCst));
+}
+
 #[test]
 fn test_manual_waiter_future_unregisters_on_drop() {
     let clock = Arc::new(ManualMonotonicClock::new());
