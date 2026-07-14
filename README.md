@@ -72,6 +72,19 @@ let elapsed = clock
 println!("Elapsed: {elapsed:?}");
 ```
 
+## Tokio Time Driver
+
+`TokioMonotonicClock` and its paired `TokioAsyncSleeper` follow the Tokio time
+context in which they are used. When time is paused or explicitly advanced,
+create and read the clock and poll sleeper futures under the same Tokio runtime
+time driver. Tasks may move between worker threads of that runtime, but the
+clock/sleeper pair must not move between independent runtimes. This affinity is
+a caller contract and is not checked by `qubit-clock`.
+
+Creating a sleep future remains lazy and does not require a runtime. Its first
+poll requires a Tokio runtime with time enabled and, for paused-time behavior,
+the same driver as the paired clock.
+
 ## Deterministic Blocking Sleep
 
 Shared clock identity is explicit through `Arc`:
@@ -142,6 +155,10 @@ without polling or depending on a particular runtime. Once the requested count
 is reached, completion remains latched even if a waiter is immediately dropped.
 `ManualAsyncSleeper` registers its waiter when the sleep future is created, so
 an unpolled manual sleep already contributes to these coordination methods.
+Relative deadlines are fixed at the sleep method call. If manual time reaches
+the deadline before the first poll, that first poll completes immediately.
+Dropping an incomplete future unregisters its waiter, while a foreign deadline
+is reported by an immediately ready error future.
 
 ## Manual Advance Notifications
 

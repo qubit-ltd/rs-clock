@@ -16,6 +16,14 @@ use tokio::time::Instant;
 ///
 /// It follows Tokio pause and advance semantics. The type intentionally does
 /// not implement [`Clone`]; shared identity uses `Arc<TokioMonotonicClock>`.
+///
+/// When Tokio time is paused or explicitly advanced, create this clock after
+/// entering the runtime and read it only from that runtime. A paired
+/// [`TokioAsyncSleeper`](crate::TokioAsyncSleeper) must also be polled by the
+/// same runtime time driver. Moving tasks between worker threads of one runtime
+/// is supported; moving the clock or sleeper between independent runtimes is
+/// not. Driver identity is a caller contract because Tokio does not expose an
+/// identity that this crate can validate.
 #[derive(Debug)]
 pub struct TokioMonotonicClock {
     domain: ClockDomain,
@@ -25,7 +33,10 @@ pub struct TokioMonotonicClock {
 impl TokioMonotonicClock {
     /// Creates a new Tokio clock domain at the current Tokio instant.
     ///
-    /// The paired async sleeper requires a Tokio runtime with time enabled.
+    /// Calling this method does not itself require a Tokio runtime. When using
+    /// paused or explicitly advanced Tokio time, call it after entering the
+    /// runtime whose time driver will read this clock and poll its paired
+    /// sleeper.
     #[must_use]
     pub fn new() -> Self {
         Self {

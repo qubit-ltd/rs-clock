@@ -18,6 +18,12 @@ use std::sync::Arc;
 use tokio::time::Instant;
 
 /// An async sleeper paired with one explicit [`TokioMonotonicClock`].
+///
+/// When Tokio time is paused or explicitly advanced, the paired clock must be
+/// created and read, and this sleeper's futures must be polled, under the same
+/// Tokio runtime time driver. Moving a task between threads of one runtime is
+/// supported, but moving the pair between independent runtimes is not. This
+/// contract is not checked at runtime.
 #[derive(Debug)]
 pub struct TokioAsyncSleeper {
     clock: Arc<TokioMonotonicClock>,
@@ -25,6 +31,9 @@ pub struct TokioAsyncSleeper {
 
 impl TokioAsyncSleeper {
     /// Creates a Tokio sleeper in the supplied clock domain.
+    ///
+    /// The caller must preserve the clock's Tokio time-driver affinity while
+    /// using the returned sleeper.
     #[must_use]
     pub const fn from_clock(clock: Arc<TokioMonotonicClock>) -> Self {
         Self { clock }
@@ -56,6 +65,9 @@ impl AsyncSleeper for TokioAsyncSleeper {
     ///
     /// The native Tokio timer is created when the returned future is first
     /// polled, so creating the future itself does not require a Tokio runtime.
+    /// The first poll must occur under a Tokio runtime with time enabled. When
+    /// using paused or explicitly advanced time, that runtime must be the same
+    /// one used to create and read the paired clock.
     ///
     /// # Panics
     ///

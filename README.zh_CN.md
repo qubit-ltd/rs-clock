@@ -71,6 +71,18 @@ let elapsed = clock
 println!("耗时：{elapsed:?}");
 ```
 
+## Tokio Time Driver
+
+`TokioMonotonicClock` 及与其配对的 `TokioAsyncSleeper` 跟随使用它们时所在的
+Tokio time context。使用暂停或显式推进的 Tokio 时间时，必须在同一个 Tokio
+runtime time driver 下创建并读取 clock、poll sleeper future。任务可以在该
+runtime 的不同 worker thread 之间迁移，但 clock/sleeper 组合不能跨独立 runtime
+使用。`qubit-clock` 无法校验该关联，因此它属于调用方契约。
+
+创建 sleep future 仍是惰性的，不要求当前已进入 runtime；首次 poll 必须位于启用
+time driver 的 Tokio runtime 中。使用暂停时间时，该 driver 还必须与配对 clock
+所使用的 driver 相同。
+
 ## 确定性同步 Sleep
 
 通过 `Arc` 显式表达多个组件共享同一个 clock：
@@ -139,7 +151,10 @@ deadline，`advance_to_next_deadline()` 原子地推进到该 deadline。异步�
 `clock.wait_for_waiters_async(expected_count)` 等待注册，无需轮询，也不绑定特定
 runtime。数量一旦达到目标便会被锁存，即使 waiter 随即注销，等待 future 仍会完成。
 `ManualAsyncSleeper` 会在创建 sleep future 时注册 waiter，因此尚未 poll 的
-manual sleep 也会计入这些协调方法。
+manual sleep 也会计入这些协调方法。相对 deadline 在调用 sleep 方法时即被固定；
+如果首次 poll 前 manual time 已推进到 deadline，该次 poll 会立即完成。丢弃尚未
+完成的 future 会注销 waiter，foreign deadline 则通过立即 ready 的错误 future
+返回。
 
 ## Manual Advance 通知
 

@@ -16,6 +16,11 @@ use crate::{
 use std::sync::Arc;
 
 /// An async sleeper paired with one explicit manual monotonic clock.
+///
+/// Each sleep waiter is registered before the sleep method returns, so an
+/// unpolled future is visible through the clock's waiter coordination methods.
+/// Advancing to its deadline before the first poll makes that first poll ready.
+/// Dropping an incomplete future unregisters its waiter.
 #[derive(Debug)]
 pub struct ManualAsyncSleeper {
     clock: Arc<ManualMonotonicClock>,
@@ -38,8 +43,11 @@ impl AsyncSleeper for ManualAsyncSleeper {
     /// Creates a cancellation-safe future in the manual clock domain.
     ///
     /// The waiter is registered before this method returns, rather than when
-    /// the future is first polled. Dropping an incomplete future unregisters
-    /// it.
+    /// the future is first polled. A relative sleep has already fixed its
+    /// deadline when the default [`AsyncSleeper::sleep_for_async`]
+    /// implementation calls this method. Dropping an incomplete future
+    /// unregisters its waiter; a foreign deadline is returned through an
+    /// immediately ready error future.
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         Box::pin(ManualSleepFuture::new(Arc::clone(&self.clock), deadline))
     }
