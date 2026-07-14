@@ -18,7 +18,7 @@ use std::time::Duration;
 fn test_std_blocking_sleeper_uses_supplied_clock_domain() {
     let clock = Arc::new(StdMonotonicClock::new());
     let sleeper = StdBlockingSleeper::from_clock(Arc::clone(&clock));
-    assert_eq!(clock.now().domain_id(), sleeper.now().domain_id());
+    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
 }
 
 #[test]

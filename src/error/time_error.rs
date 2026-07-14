@@ -5,6 +5,7 @@
 // =============================================================================
 //! Defines errors produced by time-domain operations.
 
+use crate::ClockDomain;
 use std::error::Error;
 use std::fmt::{
     Display,
@@ -37,9 +38,9 @@ pub enum TimeError {
     /// Two monotonic instants belong to different clock domains.
     ClockDomainMismatch {
         /// Domain required by the receiving clock or instant.
-        expected: u64,
+        expected: ClockDomain,
         /// Domain carried by the supplied instant.
-        actual: u64,
+        actual: ClockDomain,
     },
     /// A monotonic instant cannot represent the requested result.
     InstantOverflow,

@@ -28,14 +28,14 @@ fn test_tokio_async_sleeper_future_can_be_created_outside_runtime() {
 async fn test_tokio_async_sleeper_uses_supplied_clock_domain() {
     let clock = Arc::new(TokioMonotonicClock::new());
     let sleeper = TokioAsyncSleeper::from_clock(Arc::clone(&clock));
-    assert_eq!(clock.now().domain_id(), sleeper.now().domain_id());
+    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
 }
 
 #[tokio::test(start_paused = true)]
 async fn test_tokio_async_sleeper_follows_tokio_time() {
     let clock = Arc::new(TokioMonotonicClock::new());
     let sleeper = TokioAsyncSleeper::from_clock(Arc::clone(&clock));
-    let start = sleeper.now();
+    let start = sleeper.clock().now();
 
     sleeper
         .sleep_for_async(Duration::from_secs(5))
@@ -45,6 +45,7 @@ async fn test_tokio_async_sleeper_follows_tokio_time() {
     assert_eq!(
         Duration::from_secs(5),
         sleeper
+            .clock()
             .now()
             .duration_since(start)
             .expect("instants should share one domain"),

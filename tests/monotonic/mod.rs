@@ -4,7 +4,7 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-mod clock_domain_id_tests;
+mod clock_domain_tests;
 mod manual_advance_subscription_tests;
 mod manual_monotonic_clock_tests;
 mod manual_monotonic_state_tests;

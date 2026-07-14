@@ -23,7 +23,7 @@ async fn test_async_sleeper_supports_trait_object() {
     let sleeper: Arc<dyn AsyncSleeper> =
         Arc::new(ManualAsyncSleeper::from_clock(Arc::clone(&clock)));
 
-    assert_eq!(clock.now().domain_id(), sleeper.now().domain_id());
+    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
     sleeper
         .sleep_for_async(Duration::ZERO)
         .await
@@ -36,6 +36,7 @@ async fn test_async_sleeper_box_delegates_to_inner_sleeper() {
     let sleeper: Box<dyn AsyncSleeper> =
         Box::new(ManualAsyncSleeper::from_clock(Arc::clone(&clock)));
 
+    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
     sleeper
         .sleep_until_async(clock.now())
         .await

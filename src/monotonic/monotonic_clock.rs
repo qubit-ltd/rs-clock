@@ -6,34 +6,20 @@
 //! Defines the monotonic clock capability.
 
 use crate::MonotonicInstant;
-use std::time::Duration;
 
 /// Provides the current instant in a stable, non-decreasing clock domain.
 pub trait MonotonicClock: Send + Sync {
-    /// Returns the stable identifier of this clock's monotonic domain.
-    fn domain_id(&self) -> u64;
-
-    /// Returns elapsed time from this clock's private origin.
-    fn elapsed_since_origin(&self) -> Duration;
-
     /// Returns the current instant in this clock's domain.
-    fn now(&self) -> MonotonicInstant {
-        MonotonicInstant::new(self.domain_id(), self.elapsed_since_origin())
-    }
+    fn now(&self) -> MonotonicInstant;
 }
 
 impl<T> MonotonicClock for std::sync::Arc<T>
 where
     T: MonotonicClock + ?Sized,
 {
-    /// Delegates domain identity to the shared clock object.
-    fn domain_id(&self) -> u64 {
-        self.as_ref().domain_id()
-    }
-
-    /// Delegates elapsed time to the shared clock object.
-    fn elapsed_since_origin(&self) -> Duration {
-        self.as_ref().elapsed_since_origin()
+    /// Delegates the current instant to the shared clock object.
+    fn now(&self) -> MonotonicInstant {
+        self.as_ref().now()
     }
 }
 
@@ -41,13 +27,8 @@ impl<T> MonotonicClock for Box<T>
 where
     T: MonotonicClock + ?Sized,
 {
-    /// Delegates domain identity to the boxed clock object.
-    fn domain_id(&self) -> u64 {
-        self.as_ref().domain_id()
-    }
-
-    /// Delegates elapsed time to the boxed clock object.
-    fn elapsed_since_origin(&self) -> Duration {
-        self.as_ref().elapsed_since_origin()
+    /// Delegates the current instant to the boxed clock object.
+    fn now(&self) -> MonotonicInstant {
+        self.as_ref().now()
     }
 }

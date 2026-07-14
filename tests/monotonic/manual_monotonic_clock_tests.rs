@@ -58,12 +58,12 @@ fn test_manual_monotonic_clock_advance_to_rejects_backward_target() {
 fn test_manual_monotonic_clock_advance_to_rejects_foreign_domain() {
     let clock = ManualMonotonicClock::new();
     let foreign = ManualMonotonicClock::new().now();
-    let expected = clock.now().domain_id();
+    let expected = clock.now().domain();
 
     assert_eq!(
         Err(TimeError::ClockDomainMismatch {
             expected,
-            actual: foreign.domain_id(),
+            actual: foreign.domain(),
         }),
         clock.advance_to(foreign),
     );
@@ -74,7 +74,7 @@ fn test_manual_monotonic_clock_instances_have_distinct_domains() {
     let first = ManualMonotonicClock::new();
     let second = ManualMonotonicClock::new();
 
-    assert_ne!(first.now().domain_id(), second.now().domain_id());
+    assert_ne!(first.now().domain(), second.now().domain());
 }
 
 #[test]
@@ -84,9 +84,9 @@ fn test_manual_monotonic_clock_default_starts_at_zero() {
 }
 
 #[test]
-fn test_manual_monotonic_clock_debug_includes_domain_id() {
+fn test_manual_monotonic_clock_debug_includes_domain() {
     let clock = ManualMonotonicClock::new();
-    assert!(format!("{clock:?}").contains("domain_id"));
+    assert!(format!("{clock:?}").contains("domain"));
 }
 
 #[test]
@@ -191,7 +191,7 @@ fn test_manual_monotonic_clock_concurrent_advances_are_not_lost() {
 
     assert_eq!(
         Duration::from_nanos((THREADS * ADVANCES_PER_THREAD) as u64),
-        clock.elapsed_since_origin(),
+        clock.now().elapsed_since_origin(),
     );
 }
 

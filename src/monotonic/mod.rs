@@ -5,11 +5,13 @@
 // =============================================================================
 //! Monotonic clocks and domain-scoped instants.
 
-mod clock_domain_id;
+mod clock_domain;
+mod manual_advance_registry;
 mod manual_advance_subscription;
 mod manual_monotonic_clock;
 mod manual_monotonic_state;
 mod manual_waiter_future;
+mod manual_waiter_registry;
 mod monotonic_clock;
 mod monotonic_instant;
 mod std_monotonic_clock;
@@ -17,7 +19,7 @@ mod std_monotonic_clock;
 #[cfg(feature = "tokio")]
 mod tokio_monotonic_clock;
 
-pub use clock_domain_id::allocate_clock_domain_id;
+pub use clock_domain::ClockDomain;
 pub use manual_advance_subscription::ManualAdvanceSubscription;
 pub use manual_monotonic_clock::ManualMonotonicClock;
 pub use manual_waiter_future::ManualWaiterFuture;

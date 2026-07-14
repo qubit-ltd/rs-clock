@@ -19,7 +19,7 @@ fn test_blocking_sleeper_supports_trait_object() {
     let sleeper: Arc<dyn BlockingSleeper> =
         Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
 
-    assert_eq!(clock.now().domain_id(), sleeper.now().domain_id());
+    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
     sleeper
         .sleep_for(Duration::ZERO)
         .expect("zero sleep should complete immediately");
@@ -31,6 +31,7 @@ fn test_blocking_sleeper_box_delegates_to_inner_sleeper() {
     let sleeper: Box<dyn BlockingSleeper> =
         Box::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
 
+    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
     sleeper
         .sleep_until(clock.now())
         .expect("reached deadline should complete immediately");

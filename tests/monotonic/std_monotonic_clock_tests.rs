@@ -30,11 +30,12 @@ fn test_std_monotonic_clock_instances_have_distinct_domains() {
     let first = StdMonotonicClock::new();
     let second = StdMonotonicClock::new();
 
-    assert_ne!(first.now().domain_id(), second.now().domain_id());
+    assert_ne!(first.now().domain(), second.now().domain());
 }
 
 #[test]
 fn test_std_monotonic_clock_default_creates_clock() {
     let clock = StdMonotonicClock::default();
-    assert_ne!(0, clock.now().domain_id());
+    let other = StdMonotonicClock::new();
+    assert_ne!(clock.now().domain(), other.now().domain());
 }

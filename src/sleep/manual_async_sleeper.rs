@@ -14,7 +14,6 @@ use crate::{
     SleepFuture,
 };
 use std::sync::Arc;
-use std::time::Duration;
 
 /// An async sleeper paired with one explicit manual monotonic clock.
 #[derive(Debug)]
@@ -30,19 +29,12 @@ impl ManualAsyncSleeper {
     }
 }
 
-impl MonotonicClock for ManualAsyncSleeper {
-    /// Delegates domain identity to the explicitly supplied manual clock.
-    fn domain_id(&self) -> u64 {
-        MonotonicClock::domain_id(self.clock.as_ref())
-    }
-
-    /// Delegates elapsed time to the explicitly supplied manual clock.
-    fn elapsed_since_origin(&self) -> Duration {
-        self.clock.elapsed_since_origin()
-    }
-}
-
 impl AsyncSleeper for ManualAsyncSleeper {
+    /// Returns the manual clock driving this sleeper.
+    fn clock(&self) -> &dyn MonotonicClock {
+        self.clock.as_ref()
+    }
+
     /// Creates a cancellation-safe future in the manual clock domain.
     ///
     /// The waiter is registered before this method returns, rather than when

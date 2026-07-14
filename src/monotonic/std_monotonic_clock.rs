@@ -6,10 +6,10 @@
 //! Defines the standard-library monotonic clock implementation.
 
 use crate::{
+    ClockDomain,
     MonotonicClock,
-    allocate_clock_domain_id,
+    MonotonicInstant,
 };
-use std::time::Duration;
 use std::time::Instant;
 
 /// A real monotonic clock backed by [`std::time::Instant`].
@@ -18,7 +18,7 @@ use std::time::Instant;
 /// expressed explicitly with `Arc<StdMonotonicClock>`.
 #[derive(Debug)]
 pub struct StdMonotonicClock {
-    domain_id: u64,
+    domain: ClockDomain,
     origin: Instant,
 }
 
@@ -27,7 +27,7 @@ impl StdMonotonicClock {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            domain_id: allocate_clock_domain_id(),
+            domain: ClockDomain::new(),
             origin: Instant::now(),
         }
     }
@@ -46,13 +46,8 @@ impl Default for StdMonotonicClock {
 }
 
 impl MonotonicClock for StdMonotonicClock {
-    /// Returns this clock's stable domain identifier.
-    fn domain_id(&self) -> u64 {
-        self.domain_id
-    }
-
-    /// Returns elapsed real time from this clock's native origin.
-    fn elapsed_since_origin(&self) -> Duration {
-        self.origin.elapsed()
+    /// Returns the current instant in this clock's domain.
+    fn now(&self) -> MonotonicInstant {
+        MonotonicInstant::new(self.domain, self.origin.elapsed())
     }
 }
