@@ -18,7 +18,10 @@ Qubit Clock separates four capabilities:
 - `BlockingSleeper` blocks against a monotonic deadline.
 - `AsyncSleeper` returns a future against a monotonic deadline.
 
-Wall time may jump. Monotonic time never moves backward. Sleepers are always paired with a concrete monotonic clock and never maintain a second time source.
+Wall time may jump. Monotonic time never moves backward. Sleepers are always
+paired with a concrete monotonic clock and never maintain a second time source.
+They expose that paired clock through `clock()`; a sleeper is not itself a
+`MonotonicClock`.
 
 ## Implementations
 
@@ -167,6 +170,8 @@ in-flight advance may still run.
 
 - [Refactoring design](doc/clock_refactoring_design.zh_CN.md)
 - [Implementation plan](doc/clock_refactoring_implementation_plan.zh_CN.md)
+- [API simplification design](doc/clock_api_simplification_design.zh_CN.md)
+- [API simplification implementation plan](doc/clock_api_simplification_implementation_plan.zh_CN.md)
 - [Downstream integration plan](doc/downstream_integration_implementation_plan.zh_CN.md)
 - [Quality follow-up design](doc/clock_quality_followup_design.zh_CN.md)
 - [Quality follow-up plan](doc/clock_quality_followup_implementation_plan.zh_CN.md)

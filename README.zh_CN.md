@@ -18,7 +18,9 @@ Qubit Clock 将时间拆成四种能力：
 - `BlockingSleeper`：按 monotonic deadline 阻塞当前线程。
 - `AsyncSleeper`：返回按 monotonic deadline 完成的 future。
 
-Wall time 可能跳变，monotonic time 永不倒退。每个 sleeper 都显式基于对应的 concrete monotonic clock，不维护第二套时间状态。
+Wall time 可能跳变，monotonic time 永不倒退。每个 sleeper 都显式基于对应的
+concrete monotonic clock，不维护第二套时间状态。通过 `clock()` 可取得配对
+clock；sleeper 本身不再是 `MonotonicClock`。
 
 ## 实现
 
@@ -159,6 +161,8 @@ callback 在 clock mutex 外同步执行。它应可重复调用，并且只负�
 
 - [重构设计](doc/clock_refactoring_design.zh_CN.md)
 - [实施计划](doc/clock_refactoring_implementation_plan.zh_CN.md)
+- [API 简化设计](doc/clock_api_simplification_design.zh_CN.md)
+- [API 简化实施计划](doc/clock_api_simplification_implementation_plan.zh_CN.md)
 - [下游接入计划](doc/downstream_integration_implementation_plan.zh_CN.md)
 - [质量收口设计](doc/clock_quality_followup_design.zh_CN.md)
 - [质量收口实施计划](doc/clock_quality_followup_implementation_plan.zh_CN.md)
