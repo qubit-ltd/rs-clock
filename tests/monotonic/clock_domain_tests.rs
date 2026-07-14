@@ -13,6 +13,10 @@ use qubit_clock::{
 use std::collections::HashSet;
 use std::time::Duration;
 
+/// Production source containing the clock domain's public API declaration.
+const CLOCK_DOMAIN_SOURCE: &str =
+    include_str!("../../src/monotonic/clock_domain.rs");
+
 #[test]
 fn test_clock_domain_new_creates_distinct_domains() {
     let first = ClockDomain::new();
@@ -24,11 +28,29 @@ fn test_clock_domain_new_creates_distinct_domains() {
 }
 
 #[test]
-fn test_clock_domain_default_creates_a_new_domain() {
-    let explicit = ClockDomain::new();
-    let defaulted = ClockDomain::default();
+fn test_clock_domain_does_not_implement_default() {
+    assert!(
+        !CLOCK_DOMAIN_SOURCE.contains("impl Default for ClockDomain"),
+        "clock domains must be allocated explicitly",
+    );
+}
 
-    assert_ne!(explicit, defaulted);
+#[test]
+fn test_clock_domain_allocator_exhausts_after_maximum_identifier() {
+    assert!(
+        CLOCK_DOMAIN_SOURCE.contains("u64::MAX => Some(0)"),
+        "the maximum identifier must be returned while marking exhaustion",
+    );
+    assert!(
+        CLOCK_DOMAIN_SOURCE.contains("0 => None"),
+        "the exhausted allocator state must reject later allocations",
+    );
+    assert!(
+        CLOCK_DOMAIN_SOURCE.contains(
+            ".expect(\"monotonic clock domain identifiers exhausted\")",
+        ),
+        "a rejected allocation must panic with the exhaustion diagnostic",
+    );
 }
 
 #[test]
