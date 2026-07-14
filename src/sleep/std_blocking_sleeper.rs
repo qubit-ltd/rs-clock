@@ -14,10 +14,7 @@ use crate::{
 };
 use std::sync::Arc;
 use std::thread;
-use std::time::{
-    Duration,
-    Instant,
-};
+use std::time::Instant;
 
 /// A blocking sleeper paired with one explicit [`StdMonotonicClock`].
 #[derive(Debug)]
@@ -40,7 +37,7 @@ impl StdBlockingSleeper {
         &self,
         deadline: MonotonicInstant,
     ) -> Result<Instant, TimeError> {
-        deadline.ensure_domain(self.clock.domain_id())?;
+        deadline.ensure_domain(self.clock.now().domain())?;
         self.clock
             .origin()
             .checked_add(deadline.elapsed_since_origin())
@@ -48,28 +45,19 @@ impl StdBlockingSleeper {
     }
 }
 
-impl MonotonicClock for StdBlockingSleeper {
-    /// Delegates domain identity to the explicitly supplied clock.
-    fn domain_id(&self) -> u64 {
-        MonotonicClock::domain_id(self.clock.as_ref())
-    }
-
-    /// Delegates elapsed time to the explicitly supplied clock.
-    fn elapsed_since_origin(&self) -> Duration {
-        self.clock.elapsed_since_origin()
-    }
-}
-
 impl BlockingSleeper for StdBlockingSleeper {
+    /// Returns the standard monotonic clock driving this sleeper.
+    fn clock(&self) -> &dyn MonotonicClock {
+        self.clock.as_ref()
+    }
+
     /// Blocks the current thread until the native deadline is reached.
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         let deadline = self.native_deadline(deadline)?;
-        loop {
-            let now = Instant::now();
-            let Some(remaining) = deadline.checked_duration_since(now) else {
-                return Ok(());
-            };
+        let now = Instant::now();
+        if let Some(remaining) = deadline.checked_duration_since(now) {
             thread::sleep(remaining);
         }
+        Ok(())
     }
 }

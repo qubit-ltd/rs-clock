@@ -19,7 +19,7 @@ use std::time::Duration;
 fn test_manual_blocking_sleeper_uses_supplied_clock_domain() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let sleeper = ManualBlockingSleeper::from_clock(Arc::clone(&clock));
-    assert_eq!(clock.now().domain_id(), sleeper.now().domain_id());
+    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
 }
 
 #[test]
@@ -30,8 +30,8 @@ fn test_manual_blocking_sleeper_rejects_foreign_deadline() {
 
     assert_eq!(
         Err(TimeError::ClockDomainMismatch {
-            expected: clock.now().domain_id(),
-            actual: foreign.domain_id(),
+            expected: clock.now().domain(),
+            actual: foreign.domain(),
         }),
         sleeper.sleep_until(foreign),
     );

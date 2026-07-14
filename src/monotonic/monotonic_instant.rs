@@ -5,7 +5,10 @@
 // =============================================================================
 //! Defines a monotonic instant scoped to one clock domain.
 
-use crate::TimeError;
+use crate::{
+    ClockDomain,
+    TimeError,
+};
 use std::cmp::Ordering;
 use std::time::Duration;
 
@@ -16,29 +19,29 @@ use std::time::Duration;
 /// [`Duration`] without claiming any particular hardware timer resolution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MonotonicInstant {
-    domain_id: u64,
+    domain: ClockDomain,
     elapsed: Duration,
 }
 
 impl MonotonicInstant {
     /// Creates an instant for a clock implementation.
     ///
-    /// `domain_id` identifies the originating clock and `elapsed` is measured
+    /// domain identifies the originating clock and elapsed is measured
     /// from that clock's private origin.
-    pub(crate) const fn new(domain_id: u64, elapsed: Duration) -> Self {
-        Self { domain_id, elapsed }
+    pub const fn new(domain: ClockDomain, elapsed: Duration) -> Self {
+        Self { domain, elapsed }
     }
 
     /// Returns the identifier of the originating monotonic clock domain.
     #[must_use]
-    pub const fn domain_id(self) -> u64 {
-        self.domain_id
+    pub const fn domain(self) -> ClockDomain {
+        self.domain
     }
 
     /// Returns the elapsed duration from this clock domain's origin.
     ///
     /// The value is meaningful only inside the domain identified by
-    /// [`domain_id()`](Self::domain_id).
+    /// [`domain()`](Self::domain).
     #[must_use]
     pub const fn elapsed_since_origin(self) -> Duration {
         self.elapsed
@@ -53,7 +56,7 @@ impl MonotonicInstant {
             .elapsed
             .checked_add(duration)
             .ok_or(TimeError::InstantOverflow)?;
-        Ok(Self::new(self.domain_id, elapsed))
+        Ok(Self::new(self.domain, elapsed))
     }
 
     /// Calculates the duration elapsed since an earlier instant.
@@ -62,25 +65,25 @@ impl MonotonicInstant {
     /// different clock, and [`TimeError::InvalidInstantOrder`] when `earlier`
     /// is later than this instant.
     pub fn duration_since(self, earlier: Self) -> Result<Duration, TimeError> {
-        earlier.ensure_domain(self.domain_id)?;
+        earlier.ensure_domain(self.domain)?;
         self.elapsed
             .checked_sub(earlier.elapsed)
             .ok_or(TimeError::InvalidInstantOrder)
     }
 
-    /// Verifies that an external instant belongs to `expected_domain_id`.
+    /// Verifies that an external instant belongs to expected_domain.
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign instant.
     pub(crate) fn ensure_domain(
         self,
-        expected_domain_id: u64,
+        expected_domain: ClockDomain,
     ) -> Result<(), TimeError> {
-        if self.domain_id == expected_domain_id {
+        if self.domain == expected_domain {
             Ok(())
         } else {
             Err(TimeError::ClockDomainMismatch {
-                expected: expected_domain_id,
-                actual: self.domain_id,
+                expected: expected_domain,
+                actual: self.domain,
             })
         }
     }
@@ -89,7 +92,6 @@ impl MonotonicInstant {
 impl PartialOrd for MonotonicInstant {
     /// Orders two instants only when they belong to the same clock domain.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        (self.domain_id == other.domain_id)
-            .then(|| self.elapsed.cmp(&other.elapsed))
+        (self.domain == other.domain).then(|| self.elapsed.cmp(&other.elapsed))
     }
 }

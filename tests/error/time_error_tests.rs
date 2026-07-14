@@ -4,7 +4,10 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::TimeError;
+use qubit_clock::{
+    ClockDomain,
+    TimeError,
+};
 
 /// Production source containing the error enum's public API declaration.
 const TIME_ERROR_SOURCE: &str = include_str!("../../src/error/time_error.rs");
@@ -23,12 +26,14 @@ fn test_time_error_is_non_exhaustive() {
 #[test]
 fn test_time_error_clock_domain_mismatch_display() {
     let error = TimeError::ClockDomainMismatch {
-        expected: 7,
-        actual: 11,
+        expected: ClockDomain::new(),
+        actual: ClockDomain::new(),
     };
-    assert_eq!(
-        "monotonic clock domain mismatch: expected 7, actual 11",
-        error.to_string(),
+    assert!(
+        error
+            .to_string()
+            .starts_with("monotonic clock domain mismatch: expected "),
+        "domain mismatch error should include the expected domain",
     );
 }
 

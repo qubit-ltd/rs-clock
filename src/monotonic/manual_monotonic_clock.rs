@@ -5,17 +5,15 @@
 // =============================================================================
 //! Defines an explicitly advanced monotonic clock for deterministic tests.
 
-use crate::monotonic::manual_monotonic_state::{
-    AdvanceCallback,
-    ManualMonotonicState,
-};
+use crate::monotonic::manual_advance_registry::AdvanceCallback;
+use crate::monotonic::manual_monotonic_state::ManualMonotonicState;
 use crate::{
+    ClockDomain,
     ManualAdvanceSubscription,
     ManualWaiterFuture,
     MonotonicClock,
     MonotonicInstant,
     TimeError,
-    allocate_clock_domain_id,
 };
 use std::panic::{
     AssertUnwindSafe,
@@ -43,7 +41,7 @@ type TimeChangeNotifications = (Vec<Waker>, Vec<AdvanceCallback>);
 /// The type intentionally does not implement [`Clone`]. Components that must
 /// observe one shared manual clock use `Arc<ManualMonotonicClock>` explicitly.
 pub struct ManualMonotonicClock {
-    domain_id: u64,
+    domain: ClockDomain,
     state: Mutex<ManualMonotonicState>,
     changed: Condvar,
     waiters_changed: Condvar,
@@ -54,7 +52,7 @@ impl ManualMonotonicClock {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            domain_id: allocate_clock_domain_id(),
+            domain: ClockDomain::new(),
             state: Mutex::new(ManualMonotonicState::new()),
             changed: Condvar::new(),
             waiters_changed: Condvar::new(),
@@ -103,7 +101,7 @@ impl ManualMonotonicClock {
         &self,
         target: MonotonicInstant,
     ) -> Result<(), TimeError> {
-        target.ensure_domain(self.domain_id)?;
+        target.ensure_domain(self.domain)?;
         let target_elapsed = target.elapsed_since_origin();
         let notifications = {
             let mut state = self.lock_state();
@@ -148,22 +146,14 @@ impl ManualMonotonicClock {
     {
         let subscriber_id = {
             let mut state = self.lock_state();
-            let subscriber_id = state.next_advance_subscriber_id;
-            state.next_advance_subscriber_id = state
-                .next_advance_subscriber_id
-                .checked_add(1)
-                .expect("manual advance subscriber identifiers exhausted");
-            state
-                .advance_subscribers
-                .insert(subscriber_id, Arc::new(callback));
-            subscriber_id
+            state.advances.register(Arc::new(callback))
         };
         ManualAdvanceSubscription::new(Arc::downgrade(self), subscriber_id)
     }
 
     /// Unregisters an advance subscriber when its registration is dropped.
     pub(crate) fn unregister_advance_subscriber(&self, subscriber_id: u64) {
-        self.lock_state().advance_subscribers.remove(&subscriber_id);
+        self.lock_state().advances.unregister(subscriber_id);
     }
 
     /// Returns the number of blocking and asynchronous deadline waiters.
@@ -177,13 +167,9 @@ impl ManualMonotonicClock {
     pub fn next_deadline(&self) -> Option<MonotonicInstant> {
         let state = self.lock_state();
         state
-            .blocking_waiters
-            .values()
-            .chain(state.async_waiters.values().map(|(deadline, _)| deadline))
-            .filter(|deadline| **deadline > state.elapsed)
-            .min()
-            .copied()
-            .map(|elapsed| MonotonicInstant::new(self.domain_id, elapsed))
+            .waiters
+            .next_future_deadline(state.elapsed)
+            .map(|elapsed| MonotonicInstant::new(self.domain, elapsed))
     }
 
     /// Advances to the earliest registered future deadline.
@@ -199,17 +185,10 @@ impl ManualMonotonicClock {
     pub fn advance_to_next_deadline(&self) -> Option<MonotonicInstant> {
         let (target, notifications) = {
             let mut state = self.lock_state();
-            let target_elapsed = state
-                .blocking_waiters
-                .values()
-                .chain(
-                    state.async_waiters.values().map(|(deadline, _)| deadline),
-                )
-                .filter(|deadline| **deadline > state.elapsed)
-                .min()
-                .copied()?;
+            let target_elapsed =
+                state.waiters.next_future_deadline(state.elapsed)?;
             state.elapsed = target_elapsed;
-            let target = MonotonicInstant::new(self.domain_id, target_elapsed);
+            let target = MonotonicInstant::new(self.domain, target_elapsed);
             (target, Self::collect_time_change_notifications(&state))
         };
         self.notify_time_changed(notifications);
@@ -271,20 +250,14 @@ impl ManualMonotonicClock {
         &self,
         deadline: MonotonicInstant,
     ) -> Result<(), TimeError> {
-        deadline.ensure_domain(self.domain_id)?;
+        deadline.ensure_domain(self.domain)?;
         let deadline_elapsed = deadline.elapsed_since_origin();
         let mut state = self.lock_state();
         if state.elapsed >= deadline_elapsed {
             return Ok(());
         }
-        let waiter_id = state.next_blocking_waiter_id;
-        state.next_blocking_waiter_id = state
-            .next_blocking_waiter_id
-            .checked_add(1)
-            .expect("manual blocking waiter identifiers exhausted");
-        state.blocking_waiters.insert(waiter_id, deadline_elapsed);
-        let observer_wakers =
-            Self::collect_reached_waiter_observer_wakers(&mut state);
+        let waiter_id = state.waiters.register_blocking(deadline_elapsed);
+        let observer_wakers = state.waiters.reached_observer_wakers();
         drop(state);
         self.waiters_changed.notify_all();
         for waker in observer_wakers {
@@ -297,7 +270,7 @@ impl ManualMonotonicClock {
                 .wait(state)
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
         }
-        state.blocking_waiters.remove(&waiter_id);
+        state.waiters.unregister_blocking(waiter_id);
         drop(state);
         self.waiters_changed.notify_all();
         Ok(())
@@ -311,22 +284,14 @@ impl ManualMonotonicClock {
         &self,
         deadline: MonotonicInstant,
     ) -> Result<Option<u64>, TimeError> {
-        deadline.ensure_domain(self.domain_id)?;
+        deadline.ensure_domain(self.domain)?;
         let deadline_elapsed = deadline.elapsed_since_origin();
         let mut state = self.lock_state();
         if state.elapsed >= deadline_elapsed {
             return Ok(None);
         }
-        let waiter_id = state.next_async_waiter_id;
-        state.next_async_waiter_id = state
-            .next_async_waiter_id
-            .checked_add(1)
-            .expect("manual async waiter identifiers exhausted");
-        state
-            .async_waiters
-            .insert(waiter_id, (deadline_elapsed, None));
-        let observer_wakers =
-            Self::collect_reached_waiter_observer_wakers(&mut state);
+        let waiter_id = state.waiters.register_async(deadline_elapsed);
+        let observer_wakers = state.waiters.reached_observer_wakers();
         drop(state);
         self.waiters_changed.notify_all();
         for waker in observer_wakers {
@@ -341,18 +306,8 @@ impl ManualMonotonicClock {
         expected_count: usize,
     ) -> Option<u64> {
         let mut state = self.lock_state();
-        if state.waiter_count() >= expected_count {
-            return None;
-        }
-        let observer_id = state.next_waiter_observer_id;
-        state.next_waiter_observer_id = state
-            .next_waiter_observer_id
-            .checked_add(1)
-            .expect("manual waiter observer identifiers exhausted");
-        state
-            .waiter_observers
-            .insert(observer_id, (expected_count, None));
-        Some(observer_id)
+        let count = state.waiter_count();
+        state.waiters.register_observer(expected_count, count)
     }
 
     /// Polls an asynchronous observer of the total waiter count.
@@ -362,29 +317,13 @@ impl ManualMonotonicClock {
         context: &Context<'_>,
     ) -> Poll<()> {
         let mut state = self.lock_state();
-        let Some((expected_count, _)) =
-            state.waiter_observers.get(&observer_id)
-        else {
-            return Poll::Ready(());
-        };
-        if state.waiter_count() >= *expected_count {
-            state.waiter_observers.remove(&observer_id);
-            return Poll::Ready(());
-        }
-        if let Some((_, registered_waker)) =
-            state.waiter_observers.get_mut(&observer_id)
-            && registered_waker
-                .as_ref()
-                .is_none_or(|waker| !waker.will_wake(context.waker()))
-        {
-            *registered_waker = Some(context.waker().clone());
-        }
-        Poll::Pending
+        let count = state.waiter_count();
+        state.waiters.poll_observer(observer_id, count, context)
     }
 
     /// Removes an incomplete asynchronous waiter-count observer.
     pub(crate) fn unregister_waiter_observer(&self, observer_id: u64) {
-        self.lock_state().waiter_observers.remove(&observer_id);
+        self.lock_state().waiters.unregister_observer(observer_id);
     }
 
     /// Polls a registered async waiter against current manual time.
@@ -395,27 +334,24 @@ impl ManualMonotonicClock {
         context: &Context<'_>,
     ) -> Poll<Result<(), TimeError>> {
         let mut state = self.lock_state();
-        if state.elapsed >= deadline.elapsed_since_origin() {
-            state.async_waiters.remove(&waiter_id);
+        let elapsed = state.elapsed;
+        let poll_result = state.waiters.poll_async(
+            waiter_id,
+            deadline.elapsed_since_origin(),
+            elapsed,
+            context,
+        );
+        if poll_result.is_ready() {
             drop(state);
             self.waiters_changed.notify_all();
             return Poll::Ready(Ok(()));
-        }
-        if let Some((_, registered_waker)) =
-            state.async_waiters.get_mut(&waiter_id)
-            && registered_waker
-                .as_ref()
-                .is_none_or(|waker| !waker.will_wake(context.waker()))
-        {
-            *registered_waker = Some(context.waker().clone());
         }
         Poll::Pending
     }
 
     /// Removes an async waiter after completion or future cancellation.
     pub(crate) fn unregister_async_waiter(&self, waiter_id: u64) {
-        let removed =
-            self.lock_state().async_waiters.remove(&waiter_id).is_some();
+        let removed = self.lock_state().waiters.unregister_async(waiter_id);
         if removed {
             self.waiters_changed.notify_all();
         }
@@ -432,37 +368,9 @@ impl ManualMonotonicClock {
     fn collect_time_change_notifications(
         state: &ManualMonotonicState,
     ) -> TimeChangeNotifications {
-        let due_wakers = state
-            .async_waiters
-            .values()
-            .filter(|(deadline, _)| *deadline <= state.elapsed)
-            .filter_map(|(_, waker)| waker.clone())
-            .collect();
-        let subscribers = state.advance_subscribers.values().cloned().collect();
+        let due_wakers = state.waiters.due_async_wakers(state.elapsed);
+        let subscribers = state.advances.callbacks();
         (due_wakers, subscribers)
-    }
-
-    /// Removes reached observers and collects their registered task wakers.
-    ///
-    /// Removing an observer latches the reached state: its future treats a
-    /// missing registration as complete even if waiters unregister before the
-    /// future is polled again.
-    fn collect_reached_waiter_observer_wakers(
-        state: &mut ManualMonotonicState,
-    ) -> Vec<Waker> {
-        let waiter_count = state.waiter_count();
-        let mut wakers = Vec::new();
-        state.waiter_observers.retain(|_, (expected_count, waker)| {
-            if *expected_count <= waiter_count {
-                if let Some(waker) = waker.take() {
-                    wakers.push(waker);
-                }
-                false
-            } else {
-                true
-            }
-        });
-        wakers
     }
 
     /// Wakes time observers and invokes every collected subscriber outside the
@@ -494,7 +402,7 @@ impl std::fmt::Debug for ManualMonotonicClock {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("ManualMonotonicClock")
-            .field("domain_id", &self.domain_id)
+            .field("domain", &self.domain)
             .finish_non_exhaustive()
     }
 }
@@ -507,13 +415,8 @@ impl Default for ManualMonotonicClock {
 }
 
 impl MonotonicClock for ManualMonotonicClock {
-    /// Returns this clock's stable domain identifier.
-    fn domain_id(&self) -> u64 {
-        self.domain_id
-    }
-
-    /// Returns current logical elapsed time without advancing it.
-    fn elapsed_since_origin(&self) -> Duration {
-        self.lock_state().elapsed
+    /// Returns the current instant in this clock's domain.
+    fn now(&self) -> MonotonicInstant {
+        MonotonicInstant::new(self.domain, self.lock_state().elapsed)
     }
 }

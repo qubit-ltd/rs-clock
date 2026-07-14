@@ -13,7 +13,6 @@ use crate::{
     TimeError,
 };
 use std::sync::Arc;
-use std::time::Duration;
 
 /// A blocking sleeper paired with one explicit manual monotonic clock.
 #[derive(Debug)]
@@ -29,19 +28,12 @@ impl ManualBlockingSleeper {
     }
 }
 
-impl MonotonicClock for ManualBlockingSleeper {
-    /// Delegates domain identity to the explicitly supplied manual clock.
-    fn domain_id(&self) -> u64 {
-        MonotonicClock::domain_id(self.clock.as_ref())
-    }
-
-    /// Delegates elapsed time to the explicitly supplied manual clock.
-    fn elapsed_since_origin(&self) -> Duration {
-        self.clock.elapsed_since_origin()
-    }
-}
-
 impl BlockingSleeper for ManualBlockingSleeper {
+    /// Returns the manual clock driving this sleeper.
+    fn clock(&self) -> &dyn MonotonicClock {
+        self.clock.as_ref()
+    }
+
     /// Blocks until explicit manual time reaches `deadline`.
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         self.clock.wait_until_blocking(deadline)

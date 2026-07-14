@@ -19,7 +19,7 @@ fn test_monotonic_instant_checked_add_preserves_domain() {
         .checked_add(Duration::from_millis(25))
         .expect("short duration should be representable");
 
-    assert_eq!(start.domain_id(), end.domain_id());
+    assert_eq!(start.domain(), end.domain());
     assert_eq!(
         Duration::from_millis(25),
         end.duration_since(start)
@@ -48,8 +48,8 @@ fn test_monotonic_instant_rejects_foreign_domain() {
 
     assert_eq!(
         Err(TimeError::ClockDomainMismatch {
-            expected: first.domain_id(),
-            actual: second.domain_id(),
+            expected: first.domain(),
+            actual: second.domain(),
         }),
         first.duration_since(second),
     );

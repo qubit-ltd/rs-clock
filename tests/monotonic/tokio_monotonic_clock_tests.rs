@@ -29,5 +29,6 @@ async fn test_tokio_monotonic_clock_follows_tokio_time() {
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monotonic_clock_default_creates_clock() {
     let clock = TokioMonotonicClock::default();
-    assert_ne!(0, clock.now().domain_id());
+    let other = TokioMonotonicClock::new();
+    assert_ne!(clock.now().domain(), other.now().domain());
 }

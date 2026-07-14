@@ -18,7 +18,7 @@ use std::time::Duration;
 async fn test_manual_async_sleeper_uses_supplied_clock_domain() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    assert_eq!(clock.now().domain_id(), sleeper.now().domain_id());
+    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
 }
 
 #[tokio::test]
@@ -29,8 +29,8 @@ async fn test_manual_async_sleeper_rejects_foreign_deadline() {
 
     assert_eq!(
         Err(TimeError::ClockDomainMismatch {
-            expected: clock.now().domain_id(),
-            actual: foreign.domain_id(),
+            expected: clock.now().domain(),
+            actual: foreign.domain(),
         }),
         sleeper.sleep_until_async(foreign).await,
     );
@@ -62,6 +62,21 @@ async fn test_manual_async_sleeper_deadline_is_measured_at_call_time() {
     sleep
         .await
         .expect("sleep should complete at call-time deadline");
+}
+
+#[tokio::test]
+async fn test_manual_async_sleep_completes_after_advance_before_first_poll() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let sleep = sleeper.sleep_for_async(Duration::from_secs(5));
+
+    assert_eq!(1, clock.pending_waiters());
+    clock
+        .advance(Duration::from_secs(5))
+        .expect("manual advance should succeed");
+
+    sleep.await.expect("reached unpolled sleep should complete");
+    assert_eq!(0, clock.pending_waiters());
 }
 
 #[tokio::test]

@@ -44,13 +44,13 @@ pub mod wall;
 
 pub use error::TimeError;
 pub use monotonic::{
+    ClockDomain,
     ManualAdvanceSubscription,
     ManualMonotonicClock,
     ManualWaiterFuture,
     MonotonicClock,
     MonotonicInstant,
     StdMonotonicClock,
-    allocate_clock_domain_id,
 };
 pub use sleep::{
     AsyncSleeper,
