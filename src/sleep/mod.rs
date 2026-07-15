@@ -7,9 +7,9 @@
 
 mod async_sleeper;
 mod blocking_sleeper;
+mod internal;
 mod manual_async_sleeper;
 mod manual_blocking_sleeper;
-mod manual_sleep_future;
 mod sleep_future;
 mod std_blocking_sleeper;
 
