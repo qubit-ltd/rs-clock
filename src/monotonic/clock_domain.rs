@@ -18,14 +18,28 @@ use std::sync::atomic::{
 /// Next unallocated clock domain identifier; zero marks exhaustion.
 static NEXT_CLOCK_DOMAIN: AtomicU64 = AtomicU64::new(1);
 
+/// Returns the allocator state following `identifier`, or `None` when zero
+/// already marks exhaustion.
+///
+/// The maximum identifier transitions to zero so it remains allocatable once
+/// without wrapping into a reused nonzero identifier.
+pub(crate) const fn next_identifier_state(identifier: u64) -> Option<u64> {
+    match NonZeroU64::new(identifier) {
+        Some(identifier) => Some(identifier.get().wrapping_add(1)),
+        None => None,
+    }
+}
+
 /// Allocates an identifier from `next` without wrapping into a reused value.
 ///
 /// The maximum `u64` value is returned once and atomically changes `next` to
 /// the terminal zero state. Calls made after that transition panic.
 fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
-    next.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
-        NonZeroU64::new(value).map(|value| value.get().wrapping_add(1))
-    })
+    next.fetch_update(
+        Ordering::Relaxed,
+        Ordering::Relaxed,
+        next_identifier_state,
+    )
     .expect("monotonic clock domain identifiers exhausted")
 }
 
