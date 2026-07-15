@@ -16,7 +16,7 @@ const TIME_ERROR_SOURCE: &str = include_str!("../../src/error/time_error.rs");
 fn test_time_error_is_non_exhaustive() {
     assert!(
         TIME_ERROR_SOURCE.contains(
-            "#[non_exhaustive]\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\n\
+            "#[non_exhaustive]\n#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]\n\
              pub enum TimeError",
         ),
         "the public error enum must permit backward-compatible new variants",
