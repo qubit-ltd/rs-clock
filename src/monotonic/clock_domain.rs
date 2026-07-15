@@ -23,11 +23,9 @@ static NEXT_CLOCK_DOMAIN: AtomicU64 = AtomicU64::new(1);
 ///
 /// The maximum identifier transitions to zero so it remains allocatable once
 /// without wrapping into a reused nonzero identifier.
-pub(crate) const fn next_identifier_state(identifier: u64) -> Option<u64> {
-    match NonZeroU64::new(identifier) {
-        Some(identifier) => Some(identifier.get().wrapping_add(1)),
-        None => None,
-    }
+pub(crate) fn next_identifier_state(identifier: u64) -> Option<u64> {
+    NonZeroU64::new(identifier)
+        .map(|identifier| identifier.get().wrapping_add(1))
 }
 
 /// Allocates an identifier from `next` without wrapping into a reused value.
