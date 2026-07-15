@@ -24,6 +24,7 @@ use tokio::time::Instant;
 /// is supported; moving the clock or sleeper between independent runtimes is
 /// not. Driver identity is a caller contract because Tokio does not expose an
 /// identity that this crate can validate.
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioMonotonicClock {
     /// Domain carried by instants sampled from this clock.

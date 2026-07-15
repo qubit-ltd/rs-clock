@@ -3,6 +3,7 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
+#![cfg_attr(docsrs, feature(doc_cfg))]
 //! Injectable wall clocks, monotonic clocks, and deterministic sleepers.
 //!
 //! Wall time and monotonic time are deliberately separate. Long-lived
