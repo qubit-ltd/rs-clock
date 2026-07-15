@@ -201,6 +201,59 @@ fn test_manual_monotonic_clock_wait_for_waiters_times_out() {
     assert!(!clock.wait_for_waiters(1, Duration::from_millis(1)));
 }
 
+/// Verifies that deadline coordination waits for a later registration after
+/// the previous blocking waiter becomes due.
+#[test]
+fn test_manual_monotonic_clock_wait_for_next_deadline_tracks_retries() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualBlockingSleeper::from_clock(Arc::clone(&clock));
+    let worker = thread::spawn(move || {
+        sleeper
+            .sleep_for(Duration::from_secs(1))
+            .expect("first manual wait should complete");
+        sleeper
+            .sleep_for(Duration::from_secs(2))
+            .expect("second manual wait should complete");
+    });
+
+    let first_deadline = clock
+        .wait_for_next_deadline(Duration::from_secs(1))
+        .expect("first deadline should be registered");
+    assert_eq!(
+        Duration::from_secs(1),
+        first_deadline
+            .duration_since(clock.now())
+            .expect("first deadline should share the manual domain"),
+    );
+    clock
+        .advance_to(first_deadline)
+        .expect("manual time should reach the first deadline");
+
+    let second_deadline = clock
+        .wait_for_next_deadline(Duration::from_secs(1))
+        .expect("second deadline should be registered");
+    assert_eq!(
+        Duration::from_secs(2),
+        second_deadline
+            .duration_since(clock.now())
+            .expect("second deadline should share the manual domain"),
+    );
+    clock
+        .advance_to(second_deadline)
+        .expect("manual time should reach the second deadline");
+
+    worker.join().expect("retry worker should finish");
+}
+
+/// Verifies that deadline coordination uses its real-time timeout as a guard.
+#[test]
+fn test_manual_monotonic_clock_wait_for_next_deadline_times_out() {
+    let clock = ManualMonotonicClock::new();
+    assert_eq!(None, clock.wait_for_next_deadline(Duration::ZERO));
+    assert_eq!(None, clock.wait_for_next_deadline(Duration::from_millis(1)),);
+    assert_eq!(None, clock.wait_for_next_deadline(Duration::MAX));
+}
+
 #[test]
 fn test_manual_monotonic_clock_rejects_unrepresentable_guard_timeout() {
     let clock = ManualMonotonicClock::new();
