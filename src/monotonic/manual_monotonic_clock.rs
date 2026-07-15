@@ -301,7 +301,10 @@ impl ManualMonotonicClock {
                 return true;
             }
             if wait_result.timed_out() {
-                state.waiters.unregister_observer(observer_id);
+                let removed_waker =
+                    state.waiters.unregister_observer(observer_id);
+                drop(state);
+                drop(removed_waker);
                 return false;
             }
         }
@@ -310,7 +313,11 @@ impl ManualMonotonicClock {
     /// Unregisters an advance subscriber when its registration is dropped.
     #[inline(always)]
     pub(crate) fn unregister_advance_subscriber(&self, subscriber_id: u64) {
-        self.lock_state().advances.unregister(subscriber_id);
+        let removed_callback = {
+            let mut state = self.lock_state();
+            state.advances.unregister(subscriber_id)
+        };
+        drop(removed_callback);
     }
 
     /// Blocks until manual time reaches `deadline`.
@@ -397,15 +404,23 @@ impl ManualMonotonicClock {
         observer_id: u64,
         context: &Context<'_>,
     ) -> Poll<()> {
-        let mut state = self.lock_state();
-        let count = state.waiter_count();
-        state.waiters.poll_observer(observer_id, count, context)
+        let (poll_result, replaced_waker) = {
+            let mut state = self.lock_state();
+            let count = state.waiter_count();
+            state.waiters.poll_observer(observer_id, count, context)
+        };
+        drop(replaced_waker);
+        poll_result
     }
 
     /// Removes an incomplete asynchronous waiter-count observer.
     #[inline(always)]
     pub(crate) fn unregister_waiter_observer(&self, observer_id: u64) {
-        self.lock_state().waiters.unregister_observer(observer_id);
+        let removed_waker = {
+            let mut state = self.lock_state();
+            state.waiters.unregister_observer(observer_id)
+        };
+        drop(removed_waker);
     }
 
     /// Polls a registered async waiter against current manual time.
@@ -428,11 +443,13 @@ impl ManualMonotonicClock {
         waiter_id: u64,
         context: &Context<'_>,
     ) -> Poll<Result<(), TimeError>> {
-        let mut state = self.lock_state();
-        let elapsed = state.elapsed;
-        let poll_result = state.waiters.poll_async(waiter_id, elapsed, context);
+        let (poll_result, replaced_waker) = {
+            let mut state = self.lock_state();
+            let elapsed = state.elapsed;
+            state.waiters.poll_async(waiter_id, elapsed, context)
+        };
+        drop(replaced_waker);
         if poll_result.is_ready() {
-            drop(state);
             self.waiters_changed.notify_all();
             return Poll::Ready(Ok(()));
         }
@@ -442,8 +459,13 @@ impl ManualMonotonicClock {
     /// Removes an async waiter after completion or future cancellation.
     #[inline]
     pub(crate) fn unregister_async_waiter(&self, waiter_id: u64) {
-        let removed = self.lock_state().waiters.unregister_async(waiter_id);
-        if removed {
+        let removed_waiter = {
+            let mut state = self.lock_state();
+            state.waiters.unregister_async(waiter_id)
+        };
+        let was_registered = removed_waiter.is_some();
+        drop(removed_waiter);
+        if was_registered {
             self.waiters_changed.notify_all();
         }
     }

@@ -43,10 +43,13 @@ impl ManualAdvanceRegistry {
         subscriber_id
     }
 
-    /// Removes the callback identified by subscriber_id.
+    /// Removes and returns the callback identified by `subscriber_id`.
     #[inline(always)]
-    pub(crate) fn unregister(&mut self, subscriber_id: u64) {
-        self.subscribers.remove(&subscriber_id);
+    pub(crate) fn unregister(
+        &mut self,
+        subscriber_id: u64,
+    ) -> Option<AdvanceCallback> {
+        self.subscribers.remove(&subscriber_id)
     }
 
     /// Clones callbacks for invocation after the clock releases its mutex.

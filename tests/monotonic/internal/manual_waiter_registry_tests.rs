@@ -21,7 +21,7 @@ fn test_manual_registry_latches_reached_observer_after_waiter_unregisters() {
     let waiter_id = registry.register_async(Duration::from_secs(1));
 
     assert!(registry.reached_observer_wakers().is_empty());
-    assert!(registry.unregister_async(waiter_id));
+    assert!(registry.unregister_async(waiter_id).is_some());
 
     assert!(!registry.contains_observer(observer_id));
     assert_eq!(0, registry.count());
@@ -49,7 +49,7 @@ fn test_manual_registry_identifier_allocates_maximum_before_exhaustion() {
 fn test_manual_registry_poll_async_panics_for_missing_waiter() {
     let mut registry = ManualWaiterRegistry::new();
     let waiter_id = registry.register_async(Duration::from_secs(1));
-    assert!(registry.unregister_async(waiter_id));
+    assert!(registry.unregister_async(waiter_id).is_some());
     let context = Context::from_waker(Waker::noop());
 
     let _ = registry.poll_async(waiter_id, Duration::ZERO, &context);
