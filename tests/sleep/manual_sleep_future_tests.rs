@@ -4,24 +4,12 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::{
-    AsyncSleeper,
-    ManualAsyncSleeper,
-    ManualMonotonicClock,
-};
+use qubit_clock::{AsyncSleeper, ManualAsyncSleeper, ManualMonotonicClock};
 use std::sync::{
     Arc,
-    atomic::{
-        AtomicUsize,
-        Ordering,
-    },
+    atomic::{AtomicUsize, Ordering},
 };
-use std::task::{
-    Context,
-    Poll,
-    Wake,
-    Waker,
-};
+use std::task::{Context, Poll, Wake, Waker};
 use std::time::Duration;
 
 /// Counts task wake requests issued by the manual clock.

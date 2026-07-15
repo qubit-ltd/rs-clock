@@ -7,12 +7,7 @@
 
 use crate::sleep::async_sleeper::ready_sleep_result;
 use crate::{
-    AsyncSleeper,
-    MonotonicClock,
-    MonotonicInstant,
-    SleepFuture,
-    TimeError,
-    TokioMonotonicClock,
+    AsyncSleeper, MonotonicClock, MonotonicInstant, SleepFuture, TimeError, TokioMonotonicClock,
 };
 use std::sync::Arc;
 use tokio::time::Instant;
@@ -43,10 +38,7 @@ impl TokioAsyncSleeper {
     ///
     /// Returns a domain mismatch or overflow error when conversion is not
     /// possible.
-    fn native_deadline(
-        &self,
-        deadline: MonotonicInstant,
-    ) -> Result<Instant, TimeError> {
+    fn native_deadline(&self, deadline: MonotonicInstant) -> Result<Instant, TimeError> {
         deadline.ensure_domain(self.clock.domain())?;
         self.clock
             .origin()

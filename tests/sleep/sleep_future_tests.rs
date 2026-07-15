@@ -4,12 +4,7 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::{
-    AsyncSleeper,
-    ManualAsyncSleeper,
-    ManualMonotonicClock,
-    SleepFuture,
-};
+use qubit_clock::{AsyncSleeper, ManualAsyncSleeper, ManualMonotonicClock, SleepFuture};
 use std::sync::Arc;
 use std::time::Duration;
 

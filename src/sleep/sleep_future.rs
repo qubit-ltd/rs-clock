@@ -10,5 +10,4 @@ use std::future::Future;
 use std::pin::Pin;
 
 /// A sendable future resolving when a monotonic sleep completes.
-pub type SleepFuture =
-    Pin<Box<dyn Future<Output = Result<(), TimeError>> + Send + 'static>>;
+pub type SleepFuture = Pin<Box<dyn Future<Output = Result<(), TimeError>> + Send + 'static>>;

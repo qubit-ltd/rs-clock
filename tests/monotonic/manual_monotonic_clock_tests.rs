@@ -5,13 +5,8 @@
 // =============================================================================
 
 use qubit_clock::{
-    AsyncSleeper,
-    BlockingSleeper,
-    ManualAsyncSleeper,
-    ManualBlockingSleeper,
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimeError,
+    AsyncSleeper, BlockingSleeper, ManualAsyncSleeper, ManualBlockingSleeper, ManualMonotonicClock,
+    MonotonicClock, TimeError,
 };
 use std::sync::Arc;
 use std::thread;
@@ -125,8 +120,7 @@ fn test_manual_monotonic_clock_advance_to_current_is_noop() {
 async fn test_manual_monotonic_clock_drives_mixed_waiters_in_deadline_order() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let async_sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    let blocking_sleeper =
-        Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
+    let blocking_sleeper = Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
     let async_wait = async_sleeper.sleep_for_async(Duration::from_secs(2));
     let worker_sleeper = Arc::clone(&blocking_sleeper);
     let worker = thread::spawn(move || {
