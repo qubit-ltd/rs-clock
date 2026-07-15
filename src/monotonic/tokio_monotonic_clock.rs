@@ -49,6 +49,11 @@ impl TokioMonotonicClock {
     pub(crate) const fn origin(&self) -> Instant {
         self.origin
     }
+
+    /// Returns this concrete clock's domain without sampling Tokio time.
+    pub(crate) const fn domain(&self) -> ClockDomain {
+        self.domain
+    }
 }
 
 impl Default for TokioMonotonicClock {
