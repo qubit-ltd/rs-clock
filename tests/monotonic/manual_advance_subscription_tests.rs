@@ -61,21 +61,6 @@ impl Wake for WakeCounter {
     }
 }
 
-/// Production source containing the subscription's public API declaration.
-const SUBSCRIPTION_SOURCE: &str =
-    include_str!("../../src/monotonic/manual_advance_subscription.rs");
-
-#[test]
-fn test_manual_advance_subscription_is_must_use() {
-    assert!(
-        SUBSCRIPTION_SOURCE.contains(
-            "#[must_use = \"dropping the subscription unregisters the callback\"]\n\
-             pub struct ManualAdvanceSubscription",
-        ),
-        "the RAII subscription handle must warn when its return value is ignored",
-    );
-}
-
 #[test]
 fn test_manual_advance_subscription_observes_time_changes() {
     let clock = Arc::new(ManualMonotonicClock::new());

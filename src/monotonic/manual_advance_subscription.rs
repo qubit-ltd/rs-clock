@@ -22,6 +22,18 @@ use std::sync::Weak;
 /// advance that already captured the callback may still invoke it once.
 /// The handle must therefore be retained for as long as notifications are
 /// required.
+///
+/// Ignoring the returned subscription is rejected when `unused_must_use` is
+/// denied:
+///
+/// ```compile_fail
+/// #![deny(unused_must_use)]
+/// use qubit_clock::ManualMonotonicClock;
+/// use std::sync::Arc;
+///
+/// let clock = Arc::new(ManualMonotonicClock::new());
+/// clock.subscribe_advances(|| {});
+/// ```
 #[must_use = "dropping the subscription unregisters the callback"]
 pub struct ManualAdvanceSubscription {
     /// The weak reference to the manual clock.

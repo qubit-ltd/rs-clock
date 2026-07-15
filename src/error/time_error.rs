@@ -28,6 +28,22 @@ use thiserror::Error;
 ///
 /// assert_eq!("overflow", message(TimeError::InstantOverflow));
 /// ```
+///
+/// An exhaustive match is rejected outside this crate because additional
+/// variants may be introduced in a compatible release:
+///
+/// ```compile_fail
+/// use qubit_clock::TimeError;
+///
+/// fn exhaustive_message(error: TimeError) -> &'static str {
+///     match error {
+///         TimeError::ClockDomainMismatch { .. } => "domain mismatch",
+///         TimeError::InstantOverflow => "overflow",
+///         TimeError::CannotMoveBackward => "backward move",
+///         TimeError::InvalidInstantOrder => "invalid order",
+///     }
+/// }
+/// ```
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum TimeError {
