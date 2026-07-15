@@ -92,10 +92,18 @@ impl ManualWaiterRegistry {
         waiter_id
     }
 
-    /// Removes an async waiter and returns whether a registration existed.
+    /// Removes an async waiter and returns its optional registered waker.
+    ///
+    /// The outer option reports whether the waiter existed. The inner option
+    /// contains the waker most recently registered by polling its future.
     #[inline(always)]
-    pub(crate) fn unregister_async(&mut self, waiter_id: u64) -> bool {
-        self.async_waiters.remove(&waiter_id).is_some()
+    pub(crate) fn unregister_async(
+        &mut self,
+        waiter_id: u64,
+    ) -> Option<Option<Waker>> {
+        self.async_waiters
+            .remove(&waiter_id)
+            .map(|(_, waker)| waker)
     }
 
     /// Returns the earliest deadline strictly after elapsed.
@@ -158,29 +166,39 @@ impl ManualWaiterRegistry {
         observer_id: u64,
         count: usize,
         context: &Context<'_>,
-    ) -> Poll<()> {
+    ) -> (Poll<()>, Option<Waker>) {
         let Some((expected_count, _)) = self.observers.get(&observer_id) else {
-            return Poll::Ready(());
+            return (Poll::Ready(()), None);
         };
         if count >= *expected_count {
-            self.observers.remove(&observer_id);
-            return Poll::Ready(());
+            let removed_waker = self
+                .observers
+                .remove(&observer_id)
+                .and_then(|(_, waker)| waker);
+            return (Poll::Ready(()), removed_waker);
         }
-        if let Some((_, registered_waker)) =
+        let replaced_waker = if let Some((_, registered_waker)) =
             self.observers.get_mut(&observer_id)
             && registered_waker
                 .as_ref()
                 .is_none_or(|waker| !waker.will_wake(context.waker()))
         {
-            *registered_waker = Some(context.waker().clone());
-        }
-        Poll::Pending
+            registered_waker.replace(context.waker().clone())
+        } else {
+            None
+        };
+        (Poll::Pending, replaced_waker)
     }
 
-    /// Removes an incomplete waiter-count observer.
+    /// Removes an incomplete waiter-count observer and returns its task waker.
     #[inline(always)]
-    pub(crate) fn unregister_observer(&mut self, observer_id: u64) {
-        self.observers.remove(&observer_id);
+    pub(crate) fn unregister_observer(
+        &mut self,
+        observer_id: u64,
+    ) -> Option<Waker> {
+        self.observers
+            .remove(&observer_id)
+            .and_then(|(_, waker)| waker)
     }
 
     /// Returns whether an observer is still waiting for its target count.
@@ -212,23 +230,28 @@ impl ManualWaiterRegistry {
         waiter_id: u64,
         elapsed: Duration,
         context: &Context<'_>,
-    ) -> Poll<()> {
+    ) -> (Poll<()>, Option<Waker>) {
         let Some((deadline, registered_waker)) =
             self.async_waiters.get_mut(&waiter_id)
         else {
             panic!("manual async waiter {waiter_id} is not registered");
         };
         if elapsed < *deadline {
-            if registered_waker
+            let replaced_waker = if registered_waker
                 .as_ref()
                 .is_none_or(|waker| !waker.will_wake(context.waker()))
             {
-                *registered_waker = Some(context.waker().clone());
-            }
-            return Poll::Pending;
+                registered_waker.replace(context.waker().clone())
+            } else {
+                None
+            };
+            return (Poll::Pending, replaced_waker);
         }
-        self.async_waiters.remove(&waiter_id);
-        Poll::Ready(())
+        let removed_waker = self
+            .async_waiters
+            .remove(&waiter_id)
+            .and_then(|(_, waker)| waker);
+        (Poll::Ready(()), removed_waker)
     }
 
     /// Removes reached observers and returns their registered task wakers.
