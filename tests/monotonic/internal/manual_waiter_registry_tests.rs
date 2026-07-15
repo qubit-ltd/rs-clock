@@ -6,6 +6,10 @@
 
 use crate::support::manual_waiter_registry::ManualWaiterRegistry;
 use crate::support::manual_waiter_registry::allocate_identifier;
+use std::task::{
+    Context,
+    Waker,
+};
 use std::time::Duration;
 
 #[test]
@@ -37,4 +41,16 @@ fn test_manual_registry_identifier_allocates_maximum_before_exhaustion() {
         allocate_identifier(&mut next_identifier, "identifiers exhausted")
     }));
     assert!(result.is_err());
+}
+
+/// Verifies that a lost async registration fails instead of hanging forever.
+#[test]
+#[should_panic(expected = "manual async waiter 1 is not registered")]
+fn test_manual_registry_poll_async_panics_for_missing_waiter() {
+    let mut registry = ManualWaiterRegistry::new();
+    let waiter_id = registry.register_async(Duration::from_secs(1));
+    assert!(registry.unregister_async(waiter_id));
+    let context = Context::from_waker(Waker::noop());
+
+    let _ = registry.poll_async(waiter_id, Duration::ZERO, &context);
 }

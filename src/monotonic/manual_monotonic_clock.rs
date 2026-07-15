@@ -409,20 +409,28 @@ impl ManualMonotonicClock {
     }
 
     /// Polls a registered async waiter against current manual time.
+    ///
+    /// # Arguments
+    ///
+    /// * `waiter_id` - Identifier returned when the waiter was registered.
+    /// * `context` - Task context used to update the registered waker.
+    ///
+    /// # Returns
+    ///
+    /// [`Poll::Ready`] after the registered deadline is reached, or
+    /// [`Poll::Pending`] while manual time remains before that deadline.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `waiter_id` no longer identifies a registered async waiter.
     pub(crate) fn poll_async_waiter(
         &self,
         waiter_id: u64,
-        deadline: MonotonicInstant,
         context: &Context<'_>,
     ) -> Poll<Result<(), TimeError>> {
         let mut state = self.lock_state();
         let elapsed = state.elapsed;
-        let poll_result = state.waiters.poll_async(
-            waiter_id,
-            deadline.elapsed_since_origin(),
-            elapsed,
-            context,
-        );
+        let poll_result = state.waiters.poll_async(waiter_id, elapsed, context);
         if poll_result.is_ready() {
             drop(state);
             self.waiters_changed.notify_all();
