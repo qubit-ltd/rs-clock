@@ -497,6 +497,20 @@ impl ManualMonotonicClock {
 }
 
 impl std::fmt::Debug for ManualMonotonicClock {
+    /// Formats this clock's domain without locking its mutable time state.
+    ///
+    /// # Arguments
+    ///
+    /// * `formatter` - The destination formatter.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` when formatting succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::fmt::Error`] when the formatter cannot accept the
+    /// generated output.
     #[inline]
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
