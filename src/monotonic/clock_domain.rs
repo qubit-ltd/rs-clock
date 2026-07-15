@@ -23,6 +23,7 @@ static NEXT_CLOCK_DOMAIN: AtomicU64 = AtomicU64::new(1);
 ///
 /// The maximum identifier transitions to zero so it remains allocatable once
 /// without wrapping into a reused nonzero identifier.
+#[inline(always)]
 pub(crate) fn next_identifier_state(identifier: u64) -> Option<u64> {
     NonZeroU64::new(identifier)
         .map(|identifier| identifier.get().wrapping_add(1))
@@ -32,6 +33,7 @@ pub(crate) fn next_identifier_state(identifier: u64) -> Option<u64> {
 ///
 /// The maximum `u64` value is returned once and atomically changes `next` to
 /// the terminal zero state. Calls made after that transition panic.
+#[inline(always)]
 fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
     next.fetch_update(
         Ordering::Relaxed,
@@ -75,6 +77,7 @@ impl ClockDomain {
 
 impl Display for ClockDomain {
     /// Formats this domain for diagnostics.
+    #[inline(always)]
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(formatter)
     }
