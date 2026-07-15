@@ -49,6 +49,14 @@ pub struct ManualMonotonicClock {
 
 impl ManualMonotonicClock {
     /// Creates a new manual clock at its zero-duration origin.
+    ///
+    /// # Returns
+    ///
+    /// A manual monotonic clock with a newly allocated domain.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[must_use]
     #[inline]
     pub fn new() -> Self {
@@ -65,6 +73,19 @@ impl ManualMonotonicClock {
     /// Returns [`TimeError::InstantOverflow`] when the resulting elapsed time
     /// cannot be represented. A zero duration succeeds as a no-op and does not
     /// notify observers.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Logical duration to add to the current clock reading.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after the advance or zero-duration no-op completes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::InstantOverflow`] when the resulting elapsed time
+    /// cannot be represented.
     ///
     /// # Panics
     ///
@@ -93,6 +114,19 @@ impl ManualMonotonicClock {
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign instant and
     /// [`TimeError::CannotMoveBackward`] when `target` precedes the current
     /// instant.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` - Same-domain instant that becomes the new clock reading.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after reaching `target`, including a no-op at the current time.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign target and
+    /// [`TimeError::CannotMoveBackward`] for an earlier target.
     ///
     /// # Panics
     ///
@@ -141,6 +175,14 @@ impl ManualMonotonicClock {
     /// The `self: &Arc<Self>` receiver makes shared-clock identity explicit and
     /// lets the returned subscription keep only a weak reference to the clock.
     ///
+    /// # Parameters
+    ///
+    /// * `callback` - Thread-safe notification callback invoked after advances.
+    ///
+    /// # Returns
+    ///
+    /// A handle that unregisters the callback when dropped.
+    ///
     /// # Panics
     ///
     /// Panics if the advance-subscriber identifier space is exhausted.
@@ -158,7 +200,16 @@ impl ManualMonotonicClock {
         ManualAdvanceSubscription::new(Arc::downgrade(self), subscriber_id)
     }
 
-    /// Returns the number of blocking and asynchronous deadline waiters.
+    /// Returns the number of registered blocking and async deadline waiters.
+    ///
+    /// A reached async waiter remains registered and continues contributing to
+    /// this count until its future is polled again or dropped. Use
+    /// [`next_deadline()`](Self::next_deadline) when only future deadlines are
+    /// relevant.
+    ///
+    /// # Returns
+    ///
+    /// The total number of waiter registrations awaiting cleanup or completion.
     #[must_use]
     #[inline(always)]
     pub fn pending_waiters(&self) -> usize {
@@ -166,6 +217,11 @@ impl ManualMonotonicClock {
     }
 
     /// Returns the earliest registered deadline that has not yet been reached.
+    ///
+    /// # Returns
+    ///
+    /// The earliest future deadline, or `None` when every registration is due
+    /// or no waiter is registered.
     #[must_use]
     #[inline]
     pub fn next_deadline(&self) -> Option<MonotonicInstant> {
@@ -180,7 +236,7 @@ impl ManualMonotonicClock {
     /// repeated operation even while the previous waiter is still cleaning up.
     /// `real_timeout` is only a test guard and never advances logical time.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `real_timeout` - Maximum real time spent waiting for a future
     ///   deadline.
@@ -221,6 +277,11 @@ impl ManualMonotonicClock {
     /// Returns `Some` with the reached instant, or `None` when no future
     /// deadline is registered. Due registrations awaiting cleanup are ignored.
     ///
+    /// # Returns
+    ///
+    /// The reached same-domain instant, or `None` when no future deadline is
+    /// registered.
+    ///
     /// # Panics
     ///
     /// Panics if waking a registered task or invoking an advance subscriber
@@ -247,6 +308,18 @@ impl ManualMonotonicClock {
     /// the returned future is polled again. The `self: &Arc<Self>` receiver
     /// ensures the future keeps this exact clock instance alive. The observer
     /// is registered before this method returns, rather than on the first poll.
+    /// Reached async waiters remain counted until their futures are polled or
+    /// dropped, so a due registration can satisfy `expected_count`. Use
+    /// [`wait_for_next_deadline()`](Self::wait_for_next_deadline) to coordinate
+    /// a later stage that specifically requires a future deadline.
+    ///
+    /// # Parameters
+    ///
+    /// * `expected_count` - Registration count that completes the future.
+    ///
+    /// # Returns
+    ///
+    /// A future with its waiter-count observer already registered.
     ///
     /// # Panics
     ///
@@ -268,6 +341,18 @@ impl ManualMonotonicClock {
     /// is only a test guard and never advances logical time. Returns `true`
     /// when the count is reached and `false` when the real-time guard expires
     /// first or cannot be represented.
+    /// Reached async waiters remain counted until their futures are polled or
+    /// dropped, so a due registration can satisfy `expected_count`.
+    ///
+    /// # Parameters
+    ///
+    /// * `expected_count` - Registration count that completes the wait.
+    /// * `real_timeout` - Maximum real time spent waiting for that count.
+    ///
+    /// # Returns
+    ///
+    /// `true` when the count is reached and `false` when the real-time guard
+    /// expires or cannot be represented.
     ///
     /// # Panics
     ///
@@ -311,7 +396,16 @@ impl ManualMonotonicClock {
     }
 
     /// Unregisters an advance subscriber when its registration is dropped.
-    #[inline(always)]
+    ///
+    /// # Parameters
+    ///
+    /// * `subscriber_id` - Identifier of the callback to unregister.
+    ///
+    /// # Panics
+    ///
+    /// Panics after releasing the clock state lock if destroying the callback
+    /// or one of its captured values panics.
+    #[inline]
     pub(crate) fn unregister_advance_subscriber(&self, subscriber_id: u64) {
         let removed_callback = {
             let mut state = self.lock_state();
@@ -326,6 +420,22 @@ impl ManualMonotonicClock {
     /// reached waiter-count observer waker panics, all reached wakers are
     /// attempted before the first panic is resumed and this registration is
     /// removed during unwinding.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Domain-scoped instant to wait for.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after manual time reaches `deadline`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline.
+    ///
+    /// # Panics
+    ///
+    /// Panics after attempting every reached observer waker if one panics.
     pub(crate) fn wait_until_blocking(
         &self,
         deadline: MonotonicInstant,
@@ -362,6 +472,24 @@ impl ManualMonotonicClock {
     /// registration ID otherwise. A foreign deadline returns a domain error.
     /// If a reached observer waker panics, all reached wakers are attempted
     /// before the first panic is resumed and the new registration is removed.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Domain-scoped instant to register.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(id))` for a new waiter or `Ok(None)` when the deadline has
+    /// already been reached.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline.
+    ///
+    /// # Panics
+    ///
+    /// Panics when waiter identifiers are exhausted or, after attempting all
+    /// reached observer wakers, if one of those wakers panics.
     pub(crate) fn register_async_waiter(
         &self,
         deadline: MonotonicInstant,
@@ -387,6 +515,19 @@ impl ManualMonotonicClock {
     /// Registers an asynchronous observer of the total waiter count.
     ///
     /// Panics if the observer identifier space is exhausted.
+    ///
+    /// # Parameters
+    ///
+    /// * `expected_count` - Registration count that satisfies the observer.
+    ///
+    /// # Returns
+    ///
+    /// A new observer identifier, or `None` when the count is already
+    /// satisfied.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the observer identifier space is exhausted.
     #[inline]
     pub(crate) fn register_waiter_observer(
         &self,
@@ -398,6 +539,20 @@ impl ManualMonotonicClock {
     }
 
     /// Polls an asynchronous observer of the total waiter count.
+    ///
+    /// # Parameters
+    ///
+    /// * `observer_id` - Identifier of the observer to poll.
+    /// * `context` - Task context whose waker is retained while pending.
+    ///
+    /// # Returns
+    ///
+    /// [`Poll::Ready`] after the count is reached, otherwise [`Poll::Pending`].
+    ///
+    /// # Panics
+    ///
+    /// Panics after releasing the clock state lock if destroying a replaced
+    /// custom task waker panics.
     #[inline]
     pub(crate) fn poll_waiter_observer(
         &self,
@@ -414,7 +569,16 @@ impl ManualMonotonicClock {
     }
 
     /// Removes an incomplete asynchronous waiter-count observer.
-    #[inline(always)]
+    ///
+    /// # Parameters
+    ///
+    /// * `observer_id` - Identifier of the observer to remove.
+    ///
+    /// # Panics
+    ///
+    /// Panics after releasing the clock state lock if destroying the
+    /// observer's custom task waker panics.
+    #[inline]
     pub(crate) fn unregister_waiter_observer(&self, observer_id: u64) {
         let removed_waker = {
             let mut state = self.lock_state();
@@ -425,7 +589,7 @@ impl ManualMonotonicClock {
 
     /// Polls a registered async waiter against current manual time.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `waiter_id` - Identifier returned when the waiter was registered.
     /// * `context` - Task context used to update the registered waker.
@@ -435,9 +599,15 @@ impl ManualMonotonicClock {
     /// [`Poll::Ready`] after the registered deadline is reached, or
     /// [`Poll::Pending`] while manual time remains before that deadline.
     ///
+    /// # Errors
+    ///
+    /// The ready result is currently always `Ok(())`; registration errors are
+    /// resolved before a waiter identifier is returned.
+    ///
     /// # Panics
     ///
-    /// Panics if `waiter_id` no longer identifies a registered async waiter.
+    /// Panics if `waiter_id` no longer identifies a registered async waiter or
+    /// if destroying a replaced custom task waker panics after unlocking.
     pub(crate) fn poll_async_waiter(
         &self,
         waiter_id: u64,
@@ -457,6 +627,15 @@ impl ManualMonotonicClock {
     }
 
     /// Removes an async waiter after completion or future cancellation.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter_id` - Identifier of the async waiter to remove.
+    ///
+    /// # Panics
+    ///
+    /// Panics after releasing the clock state lock if destroying the waiter's
+    /// custom task waker panics.
     #[inline]
     pub(crate) fn unregister_async_waiter(&self, waiter_id: u64) {
         let removed_waiter = {
@@ -471,6 +650,10 @@ impl ManualMonotonicClock {
     }
 
     /// Removes a blocking waiter after completion or unwinding.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter_id` - Identifier of the blocking waiter to remove.
     #[inline]
     pub(super) fn unregister_blocking_waiter(&self, waiter_id: u64) {
         self.lock_state().waiters.unregister_blocking(waiter_id);
@@ -478,6 +661,14 @@ impl ManualMonotonicClock {
     }
 
     /// Returns the earliest future deadline represented in this clock domain.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Locked manual-clock state to inspect.
+    ///
+    /// # Returns
+    ///
+    /// The earliest future deadline in this clock's domain, or `None`.
     #[inline]
     fn next_future_deadline(
         &self,
@@ -490,6 +681,10 @@ impl ManualMonotonicClock {
     }
 
     /// Locks mutable state, recovering the inner value after poisoning.
+    ///
+    /// # Returns
+    ///
+    /// A guard granting mutable access to the manual clock state.
     #[inline]
     fn lock_state(&self) -> MutexGuard<'_, ManualMonotonicState> {
         self.state
@@ -498,6 +693,14 @@ impl ManualMonotonicClock {
     }
 
     /// Collects due task wakers and current advance callbacks under the lock.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Locked manual-clock state from which effects are collected.
+    ///
+    /// # Returns
+    ///
+    /// Owned notification effects that can be processed after unlocking.
     #[inline]
     fn collect_advance_effects(
         state: &mut ManualMonotonicState,
@@ -513,6 +716,15 @@ impl ManualMonotonicClock {
 
     /// Wakes time observers and invokes every collected subscriber outside the
     /// state lock, resuming the first panic after the full fanout completes.
+    ///
+    /// # Parameters
+    ///
+    /// * `effects` - Due task wakers and advance callbacks to notify.
+    ///
+    /// # Panics
+    ///
+    /// Resumes the first panic raised by a waker, callback, or their
+    /// destructors after every collected target has been attempted.
     fn notify_time_changed(&self, effects: AdvanceEffects) {
         let AdvanceEffects {
             due_wakers,
@@ -529,7 +741,7 @@ impl ManualMonotonicClock {
 impl std::fmt::Debug for ManualMonotonicClock {
     /// Formats this clock's domain without locking its mutable time state.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `formatter` - The destination formatter.
     ///
@@ -552,6 +764,14 @@ impl std::fmt::Debug for ManualMonotonicClock {
 
 impl Default for ManualMonotonicClock {
     /// Creates a new independent manual clock domain.
+    ///
+    /// # Returns
+    ///
+    /// A manual monotonic clock at elapsed duration zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline(always)]
     fn default() -> Self {
         Self::new()
@@ -560,6 +780,10 @@ impl Default for ManualMonotonicClock {
 
 impl MonotonicClock for ManualMonotonicClock {
     /// Returns the current instant in this clock's domain.
+    ///
+    /// # Returns
+    ///
+    /// The current logical elapsed duration represented in this clock's domain.
     #[inline]
     fn now(&self) -> MonotonicInstant {
         MonotonicInstant::new(self.domain, self.lock_state().elapsed)
