@@ -35,6 +35,12 @@ impl BlockingSleeper for ManualBlockingSleeper {
     }
 
     /// Blocks until explicit manual time reaches `deadline`.
+    ///
+    /// # Panics
+    ///
+    /// Panics after attempting every reached waiter-observer waker if one of
+    /// those custom wakers panics. The blocking waiter is unregistered while
+    /// the panic unwinds.
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         self.clock.wait_until_blocking(deadline)
     }

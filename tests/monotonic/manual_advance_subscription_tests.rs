@@ -5,6 +5,8 @@
 // =============================================================================
 
 use qubit_clock::{
+    AsyncSleeper,
+    ManualAsyncSleeper,
     ManualMonotonicClock,
     MonotonicClock,
 };
@@ -13,7 +15,51 @@ use std::sync::atomic::{
     AtomicUsize,
     Ordering,
 };
+use std::task::{
+    Context,
+    Poll,
+    Wake,
+    Waker,
+};
 use std::time::Duration;
+
+/// Panics whenever the manual clock attempts to wake its task.
+struct PanicWaker;
+
+impl Wake for PanicWaker {
+    /// Simulates a task whose custom waker panics.
+    fn wake(self: Arc<Self>) {
+        panic!("deadline waker panic");
+    }
+}
+
+impl Drop for PanicWaker {
+    /// Simulates a custom waker whose backing value also panics on destruction.
+    fn drop(&mut self) {
+        panic!("deadline waker drop panic");
+    }
+}
+
+/// Panic payload that also panics if notification fanout tries to drop it.
+struct PanicOnDropPayload;
+
+impl Drop for PanicOnDropPayload {
+    /// Simulates a hostile secondary panic payload destructor.
+    fn drop(&mut self) {
+        panic!("secondary panic payload drop panic");
+    }
+}
+
+/// Counts task wake requests issued by the manual clock.
+#[derive(Default)]
+struct WakeCounter(AtomicUsize);
+
+impl Wake for WakeCounter {
+    /// Records one wake request.
+    fn wake(self: Arc<Self>) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
+}
 
 /// Production source containing the subscription's public API declaration.
 const SUBSCRIPTION_SOURCE: &str =
@@ -134,6 +180,48 @@ fn test_manual_advance_subscription_runs_all_callbacks_before_resuming_panic() {
 
     assert!(result.is_err());
     assert_eq!(2, attempted_callbacks.load(Ordering::SeqCst));
+}
+
+#[test]
+fn test_manual_advance_runs_all_wakers_and_callbacks_before_resuming_panic() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let callback_count = Arc::new(AtomicUsize::new(0));
+    let observed_callback_count = Arc::clone(&callback_count);
+    let _counting_subscription = clock.subscribe_advances(move || {
+        observed_callback_count.fetch_add(1, Ordering::SeqCst);
+    });
+    let _panicking_subscription = clock.subscribe_advances(|| {
+        std::panic::panic_any(PanicOnDropPayload);
+    });
+    let mut panicking_sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let mut counting_sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let panic_waker = Waker::from(Arc::new(PanicWaker));
+    let wake_counter = Arc::new(WakeCounter::default());
+    let counting_waker = Waker::from(Arc::clone(&wake_counter));
+    let mut panic_context = Context::from_waker(&panic_waker);
+    let mut counting_context = Context::from_waker(&counting_waker);
+    assert_eq!(
+        Poll::Pending,
+        panicking_sleep.as_mut().poll(&mut panic_context),
+    );
+    assert_eq!(
+        Poll::Pending,
+        counting_sleep.as_mut().poll(&mut counting_context),
+    );
+    drop(panic_waker);
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        clock.advance(Duration::from_secs(1))
+    }));
+
+    let panic_payload = result.expect_err("the first waker panic must resume");
+    assert_eq!(
+        Some("deadline waker panic"),
+        panic_payload.downcast_ref::<&str>().copied(),
+    );
+    assert_eq!(1, wake_counter.0.load(Ordering::SeqCst));
+    assert_eq!(1, callback_count.load(Ordering::SeqCst));
 }
 
 #[test]

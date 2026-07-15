@@ -48,6 +48,12 @@ impl AsyncSleeper for ManualAsyncSleeper {
     /// implementation calls this method. Dropping an incomplete future
     /// unregisters its waiter; a foreign deadline is returned through an
     /// immediately ready error future.
+    ///
+    /// # Panics
+    ///
+    /// Panics after attempting every reached waiter-observer waker if one of
+    /// those custom wakers panics. The new waiter is unregistered while the
+    /// panic unwinds.
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         Box::pin(ManualSleepFuture::new(Arc::clone(&self.clock), deadline))
     }
