@@ -35,6 +35,7 @@ default = []
 tokio = ["dep:tokio"]
 
 [dependencies]
+thiserror = "2.0"
 tokio = { version = "1.52", optional = true, features = ["time"] }
 
 [dev-dependencies]
