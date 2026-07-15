@@ -67,7 +67,8 @@ impl ManualAdvanceRegistry {
     ///
     /// # Returns
     ///
-    /// The removed callback, or `None` when no registration has that identifier.
+    /// The removed callback, or `None` when no registration has that
+    /// identifier.
     #[inline(always)]
     pub(crate) fn unregister(
         &mut self,
