@@ -5,6 +5,7 @@
 // =============================================================================
 //! Stores deadline waiters and waiter-count observers for a manual clock.
 
+use crate::monotonic::clock_domain::next_identifier_state;
 use std::collections::HashMap;
 use std::task::{
     Context,
@@ -12,6 +13,20 @@ use std::task::{
     Waker,
 };
 use std::time::Duration;
+
+/// Allocates the current nonzero registry identifier and advances its state.
+///
+/// The maximum identifier is returned while changing `next_identifier` to the
+/// terminal zero state. Later calls panic with `exhausted_message`.
+pub(crate) fn allocate_identifier(
+    next_identifier: &mut u64,
+    exhausted_message: &str,
+) -> u64 {
+    let identifier = *next_identifier;
+    *next_identifier =
+        next_identifier_state(identifier).expect(exhausted_message);
+    identifier
+}
 
 /// Waiters registered against one manual monotonic timeline.
 pub(crate) struct ManualWaiterRegistry {
@@ -47,7 +62,7 @@ impl ManualWaiterRegistry {
     ///
     /// Panics when the registry cannot allocate another identifier.
     pub(crate) fn register_blocking(&mut self, deadline: Duration) -> u64 {
-        let waiter_id = Self::allocate_identifier(
+        let waiter_id = allocate_identifier(
             &mut self.next_blocking_waiter_id,
             "manual blocking waiter identifiers exhausted",
         );
@@ -64,7 +79,7 @@ impl ManualWaiterRegistry {
     ///
     /// Panics when the registry cannot allocate another identifier.
     pub(crate) fn register_async(&mut self, deadline: Duration) -> u64 {
-        let waiter_id = Self::allocate_identifier(
+        let waiter_id = allocate_identifier(
             &mut self.next_async_waiter_id,
             "manual async waiter identifiers exhausted",
         );
@@ -119,7 +134,7 @@ impl ManualWaiterRegistry {
         if count >= expected_count {
             return None;
         }
-        let observer_id = Self::allocate_identifier(
+        let observer_id = allocate_identifier(
             &mut self.next_observer_id,
             "manual waiter observer identifiers exhausted",
         );
@@ -158,6 +173,11 @@ impl ManualWaiterRegistry {
     /// Removes an incomplete waiter-count observer.
     pub(crate) fn unregister_observer(&mut self, observer_id: u64) {
         self.observers.remove(&observer_id);
+    }
+
+    /// Returns whether an observer is still waiting for its target count.
+    pub(crate) fn contains_observer(&self, observer_id: u64) -> bool {
+        self.observers.contains_key(&observer_id)
     }
 
     /// Updates the async waiter waker or reports that its deadline is due.
@@ -205,18 +225,5 @@ impl ManualWaiterRegistry {
     /// Returns the number of registered deadline waiters.
     pub(crate) fn count(&self) -> usize {
         self.blocking_waiters.len() + self.async_waiters.len()
-    }
-
-    /// Allocates the next monotonic registry identifier.
-    ///
-    /// Panics with exhausted_message when the identifier space is exhausted.
-    fn allocate_identifier(
-        next_identifier: &mut u64,
-        exhausted_message: &str,
-    ) -> u64 {
-        let identifier = *next_identifier;
-        *next_identifier =
-            next_identifier.checked_add(1).expect(exhausted_message);
-        identifier
     }
 }
