@@ -5,13 +5,25 @@
 // =============================================================================
 
 use qubit_clock::{
-    AsyncSleeper, BlockingSleeper, ManualAsyncSleeper, ManualBlockingSleeper, ManualMonotonicClock,
+    AsyncSleeper,
+    BlockingSleeper,
+    ManualAsyncSleeper,
+    ManualBlockingSleeper,
+    ManualMonotonicClock,
 };
 use std::future::Future;
 use std::pin::pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::task::{Context, Poll, Wake, Waker};
+use std::sync::atomic::{
+    AtomicUsize,
+    Ordering,
+};
+use std::task::{
+    Context,
+    Poll,
+    Wake,
+    Waker,
+};
 use std::thread;
 use std::time::Duration;
 

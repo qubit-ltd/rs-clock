@@ -5,7 +5,11 @@
 // =============================================================================
 //! Defines the standard-library monotonic clock implementation.
 
-use crate::{ClockDomain, MonotonicClock, MonotonicInstant};
+use crate::{
+    ClockDomain,
+    MonotonicClock,
+    MonotonicInstant,
+};
 use std::time::Instant;
 
 /// A real monotonic clock backed by [`std::time::Instant`].

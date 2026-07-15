@@ -4,8 +4,14 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::{FixedWallClock, WallClock};
-use std::time::{Duration, UNIX_EPOCH};
+use qubit_clock::{
+    FixedWallClock,
+    WallClock,
+};
+use std::time::{
+    Duration,
+    UNIX_EPOCH,
+};
 
 #[test]
 fn test_fixed_wall_clock_always_returns_fixed_time() {

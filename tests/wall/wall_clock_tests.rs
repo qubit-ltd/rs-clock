@@ -4,7 +4,10 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::{FixedWallClock, WallClock};
+use qubit_clock::{
+    FixedWallClock,
+    WallClock,
+};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 

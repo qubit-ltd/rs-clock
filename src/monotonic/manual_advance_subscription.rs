@@ -6,7 +6,10 @@
 //! Defines a cancellation-safe subscription to manual time advances.
 
 use crate::ManualMonotonicClock;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{
+    Debug,
+    Formatter,
+};
 use std::sync::Weak;
 
 /// A registration that observes successful manual time advances.
@@ -27,7 +30,10 @@ pub struct ManualAdvanceSubscription {
 
 impl ManualAdvanceSubscription {
     /// Creates a subscription for `subscriber_id` without retaining the clock.
-    pub(crate) const fn new(clock: Weak<ManualMonotonicClock>, subscriber_id: u64) -> Self {
+    pub(crate) const fn new(
+        clock: Weak<ManualMonotonicClock>,
+        subscriber_id: u64,
+    ) -> Self {
         Self {
             clock,
             subscriber_id,

@@ -4,7 +4,11 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::{ManualMonotonicClock, MonotonicClock, TimeError};
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+    TimeError,
+};
 use std::time::Duration;
 
 #[test]

@@ -8,13 +8,30 @@
 use crate::monotonic::manual_advance_registry::AdvanceCallback;
 use crate::monotonic::manual_monotonic_state::ManualMonotonicState;
 use crate::{
-    ClockDomain, ManualAdvanceSubscription, ManualWaiterFuture, MonotonicClock, MonotonicInstant,
+    ClockDomain,
+    ManualAdvanceSubscription,
+    ManualWaiterFuture,
+    MonotonicClock,
+    MonotonicInstant,
     TimeError,
 };
 use std::any::Any;
-use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
-use std::task::{Context, Poll, Waker};
+use std::panic::{
+    AssertUnwindSafe,
+    catch_unwind,
+    resume_unwind,
+};
+use std::sync::{
+    Arc,
+    Condvar,
+    Mutex,
+    MutexGuard,
+};
+use std::task::{
+    Context,
+    Poll,
+    Waker,
+};
 use std::time::Duration;
 use std::time::Instant;
 
@@ -118,7 +135,8 @@ impl<'a> WaiterRegistrationGuard<'a> {
 
     /// Transfers an async registration to the returned future.
     fn into_async_waiter_id(mut self) -> u64 {
-        let Some(RegisteredWaiter::Async(waiter_id)) = self.waiter.take() else {
+        let Some(RegisteredWaiter::Async(waiter_id)) = self.waiter.take()
+        else {
             unreachable!("only async registration guards can be transferred");
         };
         waiter_id
@@ -201,7 +219,10 @@ impl ManualMonotonicClock {
     /// Panics if waking a registered task or invoking an advance subscriber
     /// panics. Every waker and subscriber collected for this advance is
     /// attempted before the first panic is resumed.
-    pub fn advance_to(&self, target: MonotonicInstant) -> Result<(), TimeError> {
+    pub fn advance_to(
+        &self,
+        target: MonotonicInstant,
+    ) -> Result<(), TimeError> {
         target.ensure_domain(self.domain)?;
         let target_elapsed = target.elapsed_since_origin();
         let notifications = {
@@ -242,7 +263,10 @@ impl ManualMonotonicClock {
     /// # Panics
     ///
     /// Panics if the advance-subscriber identifier space is exhausted.
-    pub fn subscribe_advances<F>(self: &Arc<Self>, callback: F) -> ManualAdvanceSubscription
+    pub fn subscribe_advances<F>(
+        self: &Arc<Self>,
+        callback: F,
+    ) -> ManualAdvanceSubscription
     where
         F: Fn() + Send + Sync + 'static,
     {
@@ -287,7 +311,8 @@ impl ManualMonotonicClock {
     pub fn advance_to_next_deadline(&self) -> Option<MonotonicInstant> {
         let (target, notifications) = {
             let mut state = self.lock_state();
-            let target_elapsed = state.waiters.next_future_deadline(state.elapsed)?;
+            let target_elapsed =
+                state.waiters.next_future_deadline(state.elapsed)?;
             state.elapsed = target_elapsed;
             let target = MonotonicInstant::new(self.domain, target_elapsed);
             (target, Self::collect_advance_effects(&mut state))
@@ -308,7 +333,10 @@ impl ManualMonotonicClock {
     ///
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
-    pub fn wait_for_waiters_async(self: &Arc<Self>, expected_count: usize) -> ManualWaiterFuture {
+    pub fn wait_for_waiters_async(
+        self: &Arc<Self>,
+        expected_count: usize,
+    ) -> ManualWaiterFuture {
         ManualWaiterFuture::new(Arc::clone(self), expected_count)
     }
 
@@ -325,17 +353,25 @@ impl ManualMonotonicClock {
     ///
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
-    pub fn wait_for_waiters(&self, expected_count: usize, real_timeout: Duration) -> bool {
-        let Some(real_deadline) = Instant::now().checked_add(real_timeout) else {
+    pub fn wait_for_waiters(
+        &self,
+        expected_count: usize,
+        real_timeout: Duration,
+    ) -> bool {
+        let Some(real_deadline) = Instant::now().checked_add(real_timeout)
+        else {
             return false;
         };
         let mut state = self.lock_state();
         let count = state.waiter_count();
-        let Some(observer_id) = state.waiters.register_observer(expected_count, count) else {
+        let Some(observer_id) =
+            state.waiters.register_observer(expected_count, count)
+        else {
             return true;
         };
         loop {
-            let remaining = real_deadline.saturating_duration_since(Instant::now());
+            let remaining =
+                real_deadline.saturating_duration_since(Instant::now());
             let (next_state, wait_result) = self
                 .waiters_changed
                 .wait_timeout(state, remaining)
@@ -357,7 +393,10 @@ impl ManualMonotonicClock {
     /// reached waiter-count observer waker panics, all reached wakers are
     /// attempted before the first panic is resumed and this registration is
     /// removed during unwinding.
-    pub(crate) fn wait_until_blocking(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
+    pub(crate) fn wait_until_blocking(
+        &self,
+        deadline: MonotonicInstant,
+    ) -> Result<(), TimeError> {
         deadline.ensure_domain(self.domain)?;
         let deadline_elapsed = deadline.elapsed_since_origin();
         let mut state = self.lock_state();
@@ -401,7 +440,8 @@ impl ManualMonotonicClock {
             return Ok(None);
         }
         let waiter_id = state.waiters.register_async(deadline_elapsed);
-        let registration = WaiterRegistrationGuard::asynchronous(self, waiter_id);
+        let registration =
+            WaiterRegistrationGuard::asynchronous(self, waiter_id);
         let observer_wakers = state.waiters.reached_observer_wakers();
         drop(state);
         self.waiters_changed.notify_all();
@@ -414,14 +454,21 @@ impl ManualMonotonicClock {
     /// Registers an asynchronous observer of the total waiter count.
     ///
     /// Panics if the observer identifier space is exhausted.
-    pub(crate) fn register_waiter_observer(&self, expected_count: usize) -> Option<u64> {
+    pub(crate) fn register_waiter_observer(
+        &self,
+        expected_count: usize,
+    ) -> Option<u64> {
         let mut state = self.lock_state();
         let count = state.waiter_count();
         state.waiters.register_observer(expected_count, count)
     }
 
     /// Polls an asynchronous observer of the total waiter count.
-    pub(crate) fn poll_waiter_observer(&self, observer_id: u64, context: &Context<'_>) -> Poll<()> {
+    pub(crate) fn poll_waiter_observer(
+        &self,
+        observer_id: u64,
+        context: &Context<'_>,
+    ) -> Poll<()> {
         let mut state = self.lock_state();
         let count = state.waiter_count();
         state.waiters.poll_observer(observer_id, count, context)
@@ -441,10 +488,12 @@ impl ManualMonotonicClock {
     ) -> Poll<Result<(), TimeError>> {
         let mut state = self.lock_state();
         let elapsed = state.elapsed;
-        let poll_result =
-            state
-                .waiters
-                .poll_async(waiter_id, deadline.elapsed_since_origin(), elapsed, context);
+        let poll_result = state.waiters.poll_async(
+            waiter_id,
+            deadline.elapsed_since_origin(),
+            elapsed,
+            context,
+        );
         if poll_result.is_ready() {
             drop(state);
             self.waiters_changed.notify_all();
@@ -475,7 +524,9 @@ impl ManualMonotonicClock {
     }
 
     /// Collects due task wakers and current advance callbacks under the lock.
-    fn collect_advance_effects(state: &mut ManualMonotonicState) -> AdvanceEffects {
+    fn collect_advance_effects(
+        state: &mut ManualMonotonicState,
+    ) -> AdvanceEffects {
         let elapsed = state.elapsed;
         let due_wakers = state.waiters.take_due_async_wakers(elapsed);
         let advance_callbacks = state.advances.callbacks();

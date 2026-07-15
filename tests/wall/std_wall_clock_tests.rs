@@ -4,7 +4,10 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::{StdWallClock, WallClock};
+use qubit_clock::{
+    StdWallClock,
+    WallClock,
+};
 use std::time::SystemTime;
 
 #[test]

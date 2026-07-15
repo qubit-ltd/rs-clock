@@ -5,7 +5,12 @@
 // =============================================================================
 //! Defines asynchronous monotonic sleep operations.
 
-use crate::{MonotonicClock, MonotonicInstant, SleepFuture, TimeError};
+use crate::{
+    MonotonicClock,
+    MonotonicInstant,
+    SleepFuture,
+    TimeError,
+};
 use std::time::Duration;
 
 /// Provides asynchronous waits in the implementor's monotonic clock domain.

@@ -5,9 +5,15 @@
 // =============================================================================
 //! Defines unique monotonic clock domains.
 
-use std::fmt::{Display, Formatter};
+use std::fmt::{
+    Display,
+    Formatter,
+};
 use std::num::NonZeroU64;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{
+    AtomicU64,
+    Ordering,
+};
 
 /// Next unallocated clock domain identifier; zero marks exhaustion.
 static NEXT_CLOCK_DOMAIN: AtomicU64 = AtomicU64::new(1);
@@ -29,8 +35,12 @@ pub(crate) const fn next_identifier_state(identifier: u64) -> Option<u64> {
 /// The maximum `u64` value is returned once and atomically changes `next` to
 /// the terminal zero state. Calls made after that transition panic.
 fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
-    next.fetch_update(Ordering::Relaxed, Ordering::Relaxed, next_identifier_state)
-        .expect("monotonic clock domain identifiers exhausted")
+    next.fetch_update(
+        Ordering::Relaxed,
+        Ordering::Relaxed,
+        next_identifier_state,
+    )
+    .expect("monotonic clock domain identifiers exhausted")
 }
 
 /// Identifies one monotonic clock timeline within this process.

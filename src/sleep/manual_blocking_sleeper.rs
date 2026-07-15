@@ -5,7 +5,13 @@
 // =============================================================================
 //! Defines a blocking sleeper driven by manual monotonic time.
 
-use crate::{BlockingSleeper, ManualMonotonicClock, MonotonicClock, MonotonicInstant, TimeError};
+use crate::{
+    BlockingSleeper,
+    ManualMonotonicClock,
+    MonotonicClock,
+    MonotonicInstant,
+    TimeError,
+};
 use std::sync::Arc;
 
 /// A blocking sleeper paired with one explicit manual monotonic clock.

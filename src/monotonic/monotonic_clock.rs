@@ -23,13 +23,13 @@ use crate::MonotonicInstant;
 ///
 /// - [`StdMonotonicClock`](crate::StdMonotonicClock) — production clock backed
 ///   by [`std::time::Instant`]
-/// - [`ManualMonotonicClock`](crate::ManualMonotonicClock) — explicitly advanced
-///   clock for deterministic tests
+/// - [`ManualMonotonicClock`](crate::ManualMonotonicClock) — explicitly
+///   advanced clock for deterministic tests
 /// - `TokioMonotonicClock` — Tokio time-driver clock (requires the `tokio`
 ///   feature)
 ///
-/// `Arc<T>` and `Box<T>` implement this trait when `T: MonotonicClock + ?Sized`,
-/// so a shared or owned trait object needs no extra adapter.
+/// `Arc<T>` and `Box<T>` implement this trait when `T: MonotonicClock +
+/// ?Sized`, so a shared or owned trait object needs no extra adapter.
 ///
 /// # Examples
 ///

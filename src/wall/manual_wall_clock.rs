@@ -5,8 +5,17 @@
 // =============================================================================
 //! Defines a manually re-anchorable wall-clock projection.
 
-use crate::{ManualMonotonicClock, MonotonicClock, MonotonicInstant, WallClock};
-use std::sync::{Arc, Mutex, MutexGuard};
+use crate::{
+    ManualMonotonicClock,
+    MonotonicClock,
+    MonotonicInstant,
+    WallClock,
+};
+use std::sync::{
+    Arc,
+    Mutex,
+    MutexGuard,
+};
 use std::time::SystemTime;
 
 /// A wall clock projected from a shared [`ManualMonotonicClock`].
@@ -25,7 +34,10 @@ impl ManualWallClock {
     ///
     /// Future readings advance according to the explicitly shared `clock`.
     #[must_use]
-    pub fn from_clock(wall_time: SystemTime, clock: Arc<ManualMonotonicClock>) -> Self {
+    pub fn from_clock(
+        wall_time: SystemTime,
+        clock: Arc<ManualMonotonicClock>,
+    ) -> Self {
         let monotonic_anchor = clock.now();
         Self {
             clock,

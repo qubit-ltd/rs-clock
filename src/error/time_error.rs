@@ -7,7 +7,10 @@
 
 use crate::ClockDomain;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{
+    Display,
+    Formatter,
+};
 
 /// Describes an invalid monotonic-time operation.
 ///
@@ -55,13 +58,14 @@ impl Display for TimeError {
                 formatter,
                 "monotonic clock domain mismatch: expected {expected}, actual {actual}",
             ),
-            Self::InstantOverflow => formatter.write_str("monotonic instant overflow"),
-            Self::CannotMoveBackward => {
-                formatter.write_str("manual monotonic time cannot move backward")
+            Self::InstantOverflow => {
+                formatter.write_str("monotonic instant overflow")
             }
-            Self::InvalidInstantOrder => {
-                formatter.write_str("earlier monotonic instant is later than the current instant")
-            }
+            Self::CannotMoveBackward => formatter
+                .write_str("manual monotonic time cannot move backward"),
+            Self::InvalidInstantOrder => formatter.write_str(
+                "earlier monotonic instant is later than the current instant",
+            ),
         }
     }
 }

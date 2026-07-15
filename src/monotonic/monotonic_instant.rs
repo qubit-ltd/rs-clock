@@ -5,7 +5,10 @@
 // =============================================================================
 //! Defines a monotonic instant scoped to one clock domain.
 
-use crate::{ClockDomain, TimeError};
+use crate::{
+    ClockDomain,
+    TimeError,
+};
 use std::cmp::Ordering;
 use std::time::Duration;
 
@@ -71,7 +74,10 @@ impl MonotonicInstant {
     /// Verifies that an external instant belongs to expected_domain.
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign instant.
-    pub(crate) fn ensure_domain(self, expected_domain: ClockDomain) -> Result<(), TimeError> {
+    pub(crate) fn ensure_domain(
+        self,
+        expected_domain: ClockDomain,
+    ) -> Result<(), TimeError> {
         if self.domain == expected_domain {
             Ok(())
         } else {

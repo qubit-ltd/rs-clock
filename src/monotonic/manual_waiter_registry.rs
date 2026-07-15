@@ -7,16 +7,24 @@
 
 use crate::monotonic::clock_domain::next_identifier_state;
 use std::collections::HashMap;
-use std::task::{Context, Poll, Waker};
+use std::task::{
+    Context,
+    Poll,
+    Waker,
+};
 use std::time::Duration;
 
 /// Allocates the current nonzero registry identifier and advances its state.
 ///
 /// The maximum identifier is returned while changing `next_identifier` to the
 /// terminal zero state. Later calls panic with `exhausted_message`.
-pub(crate) fn allocate_identifier(next_identifier: &mut u64, exhausted_message: &str) -> u64 {
+pub(crate) fn allocate_identifier(
+    next_identifier: &mut u64,
+    exhausted_message: &str,
+) -> u64 {
     let identifier = *next_identifier;
-    *next_identifier = next_identifier_state(identifier).expect(exhausted_message);
+    *next_identifier =
+        next_identifier_state(identifier).expect(exhausted_message);
     identifier
 }
 
@@ -85,7 +93,10 @@ impl ManualWaiterRegistry {
     }
 
     /// Returns the earliest deadline strictly after elapsed.
-    pub(crate) fn next_future_deadline(&self, elapsed: Duration) -> Option<Duration> {
+    pub(crate) fn next_future_deadline(
+        &self,
+        elapsed: Duration,
+    ) -> Option<Duration> {
         self.blocking_waiters
             .values()
             .chain(self.async_waiters.values().map(|(deadline, _)| deadline))
@@ -99,7 +110,10 @@ impl ManualWaiterRegistry {
     /// Waiter registrations remain present until their futures are polled or
     /// dropped, but subsequent advances cannot wake the same stored waker
     /// again.
-    pub(crate) fn take_due_async_wakers(&mut self, elapsed: Duration) -> Vec<Waker> {
+    pub(crate) fn take_due_async_wakers(
+        &mut self,
+        elapsed: Duration,
+    ) -> Vec<Waker> {
         self.async_waiters
             .values_mut()
             .filter(|(deadline, _)| *deadline <= elapsed)
@@ -112,7 +126,11 @@ impl ManualWaiterRegistry {
     /// Returns None when the requested count is already satisfied.
     ///
     /// Panics when the registry cannot allocate another identifier.
-    pub(crate) fn register_observer(&mut self, expected_count: usize, count: usize) -> Option<u64> {
+    pub(crate) fn register_observer(
+        &mut self,
+        expected_count: usize,
+        count: usize,
+    ) -> Option<u64> {
         if count >= expected_count {
             return None;
         }
@@ -141,7 +159,8 @@ impl ManualWaiterRegistry {
             self.observers.remove(&observer_id);
             return Poll::Ready(());
         }
-        if let Some((_, registered_waker)) = self.observers.get_mut(&observer_id)
+        if let Some((_, registered_waker)) =
+            self.observers.get_mut(&observer_id)
             && registered_waker
                 .as_ref()
                 .is_none_or(|waker| !waker.will_wake(context.waker()))
@@ -175,7 +194,8 @@ impl ManualWaiterRegistry {
             self.async_waiters.remove(&waiter_id);
             return Poll::Ready(());
         }
-        if let Some((_, registered_waker)) = self.async_waiters.get_mut(&waiter_id)
+        if let Some((_, registered_waker)) =
+            self.async_waiters.get_mut(&waiter_id)
             && registered_waker
                 .as_ref()
                 .is_none_or(|waker| !waker.will_wake(context.waker()))

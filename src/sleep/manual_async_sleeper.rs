@@ -6,7 +6,13 @@
 //! Defines an async sleeper driven by manual monotonic time.
 
 use crate::sleep::manual_sleep_future::ManualSleepFuture;
-use crate::{AsyncSleeper, ManualMonotonicClock, MonotonicClock, MonotonicInstant, SleepFuture};
+use crate::{
+    AsyncSleeper,
+    ManualMonotonicClock,
+    MonotonicClock,
+    MonotonicInstant,
+    SleepFuture,
+};
 use std::sync::Arc;
 
 /// An async sleeper paired with one explicit manual monotonic clock.
