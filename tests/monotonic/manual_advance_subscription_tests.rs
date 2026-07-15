@@ -10,7 +10,14 @@ use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
 };
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    Weak,
+    mpsc::{
+        SyncSender,
+        sync_channel,
+    },
+};
 use std::sync::atomic::{
     AtomicUsize,
     Ordering,
@@ -61,6 +68,24 @@ impl Wake for WakeCounter {
     }
 }
 
+/// Re-enters its manual clock when a callback capture is dropped.
+struct ReentrantDropCapture {
+    /// Clock whose state lock must already have been released.
+    clock: Weak<ManualMonotonicClock>,
+    /// Signals that the re-entrant destructor completed.
+    drop_completed: SyncSender<()>,
+}
+
+impl Drop for ReentrantDropCapture {
+    /// Reads the clock during destruction and then signals completion.
+    fn drop(&mut self) {
+        if let Some(clock) = self.clock.upgrade() {
+            let _ = clock.pending_waiters();
+        }
+        let _ = self.drop_completed.send(());
+    }
+}
+
 #[test]
 fn test_manual_advance_subscription_observes_time_changes() {
     let clock = Arc::new(ManualMonotonicClock::new());
@@ -102,6 +127,29 @@ fn test_manual_advance_subscription_unregisters_on_drop() {
         .expect("manual time should advance");
 
     assert_eq!(0, notifications.load(Ordering::SeqCst));
+}
+
+/// Verifies subscription cancellation drops callback captures outside the
+/// clock state lock.
+#[test]
+fn test_manual_advance_subscription_drops_callback_outside_clock_lock() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let (drop_completed, drop_observer) = sync_channel(1);
+    let capture = ReentrantDropCapture {
+        clock: Arc::downgrade(&clock),
+        drop_completed,
+    };
+    let subscription = clock.subscribe_advances(move || {
+        let _ = &capture;
+    });
+
+    let cancellation = std::thread::spawn(move || drop(subscription));
+    drop_observer
+        .recv_timeout(Duration::from_secs(1))
+        .expect("callback drop should re-enter the unlocked clock");
+    cancellation
+        .join()
+        .expect("subscription cancellation should finish");
 }
 
 #[test]
