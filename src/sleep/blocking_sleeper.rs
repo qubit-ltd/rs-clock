@@ -5,11 +5,7 @@
 // =============================================================================
 //! Defines blocking monotonic sleep operations.
 
-use crate::{
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-};
+use crate::{MonotonicClock, MonotonicInstant, TimeError};
 use std::time::Duration;
 
 /// Provides blocking waits in the implementor's monotonic clock domain.

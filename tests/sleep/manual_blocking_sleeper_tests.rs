@@ -5,11 +5,7 @@
 // =============================================================================
 
 use qubit_clock::{
-    BlockingSleeper,
-    ManualBlockingSleeper,
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimeError,
+    BlockingSleeper, ManualBlockingSleeper, ManualMonotonicClock, MonotonicClock, TimeError,
 };
 use std::sync::Arc;
 use std::thread;
@@ -52,8 +48,7 @@ fn test_manual_blocking_sleeper_reached_deadline_returns_immediately() {
 #[test]
 fn test_manual_blocking_sleeper_blocks_until_clock_advances() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper =
-        Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
+    let sleeper = Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
     let worker_sleeper = Arc::clone(&sleeper);
     let worker = thread::spawn(move || {
         worker_sleeper

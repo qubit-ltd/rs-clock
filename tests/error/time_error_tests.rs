@@ -4,10 +4,7 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::{
-    ClockDomain,
-    TimeError,
-};
+use qubit_clock::{ClockDomain, TimeError};
 
 /// Production source containing the error enum's public API declaration.
 const TIME_ERROR_SOURCE: &str = include_str!("../../src/error/time_error.rs");

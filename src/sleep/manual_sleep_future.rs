@@ -5,18 +5,11 @@
 // =============================================================================
 //! Defines the cancellation-safe future used by manual async sleepers.
 
-use crate::{
-    ManualMonotonicClock,
-    MonotonicInstant,
-    TimeError,
-};
+use crate::{ManualMonotonicClock, MonotonicInstant, TimeError};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-};
+use std::task::{Context, Poll};
 
 /// A future registered with one manual monotonic clock.
 ///
@@ -32,10 +25,7 @@ pub(crate) struct ManualSleepFuture {
 
 impl ManualSleepFuture {
     /// Creates and immediately registers a manual async wait.
-    pub(crate) fn new(
-        clock: Arc<ManualMonotonicClock>,
-        deadline: MonotonicInstant,
-    ) -> Self {
+    pub(crate) fn new(clock: Arc<ManualMonotonicClock>, deadline: MonotonicInstant) -> Self {
         match clock.register_async_waiter(deadline) {
             Ok(waiter_id) => Self {
                 clock,
@@ -57,10 +47,7 @@ impl Future for ManualSleepFuture {
     type Output = Result<(), TimeError>;
 
     /// Checks manual time and registers the current task waker when pending.
-    fn poll(
-        self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
         if let Some(error) = this.error.take() {
             return Poll::Ready(Err(error));

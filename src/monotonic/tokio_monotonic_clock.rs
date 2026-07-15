@@ -5,11 +5,7 @@
 // =============================================================================
 //! Defines the Tokio monotonic clock implementation.
 
-use crate::{
-    ClockDomain,
-    MonotonicClock,
-    MonotonicInstant,
-};
+use crate::{ClockDomain, MonotonicClock, MonotonicInstant};
 use tokio::time::Instant;
 
 /// A monotonic clock backed by Tokio's time driver.

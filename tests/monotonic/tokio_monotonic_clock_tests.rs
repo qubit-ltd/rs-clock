@@ -4,10 +4,7 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::{
-    MonotonicClock,
-    TokioMonotonicClock,
-};
+use qubit_clock::{MonotonicClock, TokioMonotonicClock};
 use std::time::Duration;
 
 #[tokio::test(start_paused = true)]

@@ -4,12 +4,7 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 
-use qubit_clock::{
-    ClockDomain,
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-};
+use qubit_clock::{ClockDomain, ManualMonotonicClock, MonotonicClock, MonotonicInstant};
 use std::sync::Arc;
 use std::time::Duration;
 
