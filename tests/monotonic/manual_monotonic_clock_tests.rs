@@ -201,6 +201,20 @@ fn test_manual_monotonic_clock_wait_for_waiters_times_out() {
     assert!(!clock.wait_for_waiters(1, Duration::from_millis(1)));
 }
 
+/// Verifies that an already satisfied waiter count needs no real-time wait.
+#[test]
+fn test_manual_monotonic_clock_wait_for_waiters_is_already_satisfied() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let pending_sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+
+    assert_eq!(1, clock.pending_waiters());
+    assert!(clock.wait_for_waiters(1, Duration::ZERO));
+
+    drop(pending_sleep);
+    assert_eq!(0, clock.pending_waiters());
+}
+
 /// Verifies that deadline coordination waits for a later registration after
 /// the previous blocking waiter becomes due.
 #[test]

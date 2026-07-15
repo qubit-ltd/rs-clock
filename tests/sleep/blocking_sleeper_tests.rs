@@ -9,6 +9,7 @@ use qubit_clock::{
     ManualBlockingSleeper,
     ManualMonotonicClock,
     MonotonicClock,
+    TimeError,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,4 +36,20 @@ fn test_blocking_sleeper_box_delegates_to_inner_sleeper() {
     sleeper
         .sleep_until(clock.now())
         .expect("reached deadline should complete immediately");
+}
+
+/// Verifies that a relative wait reports an unrepresentable deadline.
+#[test]
+fn test_blocking_sleeper_sleep_for_reports_deadline_overflow() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    clock
+        .advance(Duration::MAX)
+        .expect("maximum elapsed duration should fit from zero");
+    let sleeper = ManualBlockingSleeper::from_clock(Arc::clone(&clock));
+
+    assert_eq!(
+        Err(TimeError::InstantOverflow),
+        sleeper.sleep_for(Duration::from_nanos(1)),
+    );
+    assert_eq!(0, clock.pending_waiters());
 }

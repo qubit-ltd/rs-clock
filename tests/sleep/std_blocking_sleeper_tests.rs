@@ -40,6 +40,19 @@ fn test_std_blocking_sleeper_waits_until_deadline() {
     );
 }
 
+/// Verifies that a standard sleeper accepts an already reached deadline.
+#[test]
+fn test_std_blocking_sleeper_reached_deadline_returns_immediately() {
+    let clock = Arc::new(StdMonotonicClock::new());
+    let sleeper = StdBlockingSleeper::from_clock(Arc::clone(&clock));
+    let deadline = clock.now();
+    std::thread::sleep(Duration::from_millis(1));
+
+    sleeper
+        .sleep_until(deadline)
+        .expect("a reached deadline should complete immediately");
+}
+
 #[test]
 fn test_std_blocking_sleeper_rejects_foreign_deadline() {
     let clock = Arc::new(StdMonotonicClock::new());
