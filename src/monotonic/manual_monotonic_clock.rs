@@ -191,7 +191,8 @@ impl ManualMonotonicClock {
     ///
     /// Panics if waking a registered task or invoking an advance subscriber
     /// panics. Every waker and subscriber collected for this advance is
-    /// attempted before the first panic is resumed.
+    /// attempted before the first panic is resumed. The logical-time update is
+    /// already committed and is not rolled back during unwinding.
     pub fn advance(&self, duration: Duration) -> Result<(), TimeError> {
         if duration.is_zero() {
             return Ok(());
@@ -218,7 +219,8 @@ impl ManualMonotonicClock {
     ///
     /// Panics if waking a registered task or invoking an advance subscriber
     /// panics. Every waker and subscriber collected for this advance is
-    /// attempted before the first panic is resumed.
+    /// attempted before the first panic is resumed. The logical-time update is
+    /// already committed and is not rolled back during unwinding.
     pub fn advance_to(
         &self,
         target: MonotonicInstant,
@@ -307,7 +309,8 @@ impl ManualMonotonicClock {
     ///
     /// Panics if waking a registered task or invoking an advance subscriber
     /// panics. Every waker and subscriber collected for this advance is
-    /// attempted before the first panic is resumed.
+    /// attempted before the first panic is resumed. The logical-time update is
+    /// already committed and is not rolled back during unwinding.
     pub fn advance_to_next_deadline(&self) -> Option<MonotonicInstant> {
         let (target, notifications) = {
             let mut state = self.lock_state();
