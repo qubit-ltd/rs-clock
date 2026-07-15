@@ -25,6 +25,14 @@ pub struct StdBlockingSleeper {
 
 impl StdBlockingSleeper {
     /// Creates a sleeper in the supplied clock's monotonic domain.
+    ///
+    /// # Parameters
+    ///
+    /// * `clock` - Shared standard monotonic clock paired with the sleeper.
+    ///
+    /// # Returns
+    ///
+    /// A blocking sleeper using the exact supplied clock.
     #[must_use]
     #[inline(always)]
     pub const fn from_clock(clock: Arc<StdMonotonicClock>) -> Self {
@@ -35,6 +43,20 @@ impl StdBlockingSleeper {
     ///
     /// Returns a domain mismatch or overflow error when conversion is not
     /// possible.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Domain-scoped deadline to convert.
+    ///
+    /// # Returns
+    ///
+    /// The corresponding standard-library instant.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline and
+    /// [`TimeError::InstantOverflow`] when the native instant cannot represent
+    /// it.
     #[inline]
     fn native_deadline(
         &self,
@@ -50,12 +72,30 @@ impl StdBlockingSleeper {
 
 impl BlockingSleeper for StdBlockingSleeper {
     /// Returns the standard monotonic clock driving this sleeper.
+    ///
+    /// # Returns
+    ///
+    /// The paired standard clock as a monotonic-clock trait object.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
     }
 
     /// Blocks the current thread until the native deadline is reached.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Instant to wait for in the paired clock domain.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after the deadline is reached.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline and
+    /// [`TimeError::InstantOverflow`] when its native instant is not
+    /// representable.
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         let deadline = self.native_deadline(deadline)?;
         let now = Instant::now();

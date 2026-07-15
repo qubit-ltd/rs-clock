@@ -82,6 +82,10 @@ pub trait MonotonicClock: Send + Sync {
     /// Successive calls on the same clock never return an earlier instant.
     /// Instants from different clock instances belong to different
     /// [`ClockDomain`](crate::ClockDomain)s and must not be mixed.
+    ///
+    /// # Returns
+    ///
+    /// The current domain-scoped monotonic instant.
     fn now(&self) -> MonotonicInstant;
 }
 
@@ -90,6 +94,10 @@ where
     T: MonotonicClock + ?Sized,
 {
     /// Delegates the current instant to the shared clock object.
+    ///
+    /// # Returns
+    ///
+    /// The current instant returned by the wrapped clock.
     #[inline(always)]
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()
@@ -101,6 +109,10 @@ where
     T: MonotonicClock + ?Sized,
 {
     /// Delegates the current instant to the boxed clock object.
+    ///
+    /// # Returns
+    ///
+    /// The current instant returned by the wrapped clock.
     #[inline(always)]
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()

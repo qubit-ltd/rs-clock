@@ -29,6 +29,19 @@ pub struct ManualWaiterFuture {
 
 impl ManualWaiterFuture {
     /// Creates a waiter-count observer for `clock`.
+    ///
+    /// # Parameters
+    ///
+    /// * `clock` - Manual clock whose waiter count is observed.
+    /// * `expected_count` - Registration count that completes the future.
+    ///
+    /// # Returns
+    ///
+    /// A future whose observer is registered before this method returns.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the observer identifier space is exhausted.
     #[inline]
     pub(crate) fn new(
         clock: Arc<ManualMonotonicClock>,
@@ -43,6 +56,19 @@ impl Future for ManualWaiterFuture {
     type Output = ();
 
     /// Polls whether the requested waiter count has been reached.
+    ///
+    /// # Parameters
+    ///
+    /// * `context` - Task context whose waker replaces any prior registration.
+    ///
+    /// # Returns
+    ///
+    /// [`Poll::Ready`] after the requested count is reached, otherwise
+    /// [`Poll::Pending`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if destroying a replaced custom task waker panics.
     fn poll(
         mut self: Pin<&mut Self>,
         context: &mut Context<'_>,
@@ -60,6 +86,10 @@ impl Future for ManualWaiterFuture {
 
 impl Drop for ManualWaiterFuture {
     /// Unregisters an incomplete waiter-count observer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if destroying the observer's custom task waker panics.
     #[inline]
     fn drop(&mut self) {
         if let Some(observer_id) = self.observer_id.take() {

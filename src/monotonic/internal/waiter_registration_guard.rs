@@ -19,6 +19,15 @@ pub(crate) struct WaiterRegistrationGuard<'a> {
 
 impl<'a> WaiterRegistrationGuard<'a> {
     /// Guards a newly registered blocking waiter.
+    ///
+    /// # Parameters
+    ///
+    /// * `clock` - Manual clock that owns the waiter.
+    /// * `waiter_id` - Identifier of the blocking registration.
+    ///
+    /// # Returns
+    ///
+    /// A guard that unregisters the waiter unless ownership is completed.
     #[inline(always)]
     pub(crate) fn blocking(
         clock: &'a ManualMonotonicClock,
@@ -31,6 +40,15 @@ impl<'a> WaiterRegistrationGuard<'a> {
     }
 
     /// Guards a newly registered async waiter.
+    ///
+    /// # Parameters
+    ///
+    /// * `clock` - Manual clock that owns the waiter.
+    /// * `waiter_id` - Identifier of the asynchronous registration.
+    ///
+    /// # Returns
+    ///
+    /// A guard that unregisters the waiter unless ownership is transferred.
     #[inline(always)]
     pub(crate) fn asynchronous(
         clock: &'a ManualMonotonicClock,
@@ -43,6 +61,14 @@ impl<'a> WaiterRegistrationGuard<'a> {
     }
 
     /// Transfers an async registration to the returned future.
+    ///
+    /// # Returns
+    ///
+    /// The identifier of the transferred asynchronous waiter.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this guard owns a blocking waiter instead of an async waiter.
     #[inline]
     pub(crate) fn into_async_waiter_id(mut self) -> u64 {
         let Some(RegisteredWaiter::Async(waiter_id)) = self.waiter.take()

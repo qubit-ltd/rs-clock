@@ -30,7 +30,7 @@ pub trait BlockingSleeper: Send + Sync {
     ///
     /// A reached deadline completes immediately.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `deadline` - The instant to wait for. It must belong to the stable
     ///   domain exposed by [`Self::clock`].
@@ -50,7 +50,7 @@ pub trait BlockingSleeper: Send + Sync {
     ///
     /// The deadline is calculated when this method is called.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `duration` - The amount of monotonic time to wait.
     ///
@@ -75,12 +75,28 @@ where
     T: BlockingSleeper + ?Sized,
 {
     /// Delegates the paired clock to the shared sleeper object.
+    ///
+    /// # Returns
+    ///
+    /// The monotonic clock exposed by the wrapped sleeper.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates the blocking wait to the shared sleeper object.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Domain-scoped deadline forwarded to the wrapped sleeper.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after the wrapped sleeper reaches the deadline.
+    ///
+    /// # Errors
+    ///
+    /// Returns any [`TimeError`] produced by the wrapped sleeper.
     #[inline(always)]
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         self.as_ref().sleep_until(deadline)
@@ -92,12 +108,28 @@ where
     T: BlockingSleeper + ?Sized,
 {
     /// Delegates the paired clock to the boxed sleeper object.
+    ///
+    /// # Returns
+    ///
+    /// The monotonic clock exposed by the wrapped sleeper.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates the blocking wait to the boxed sleeper object.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Domain-scoped deadline forwarded to the wrapped sleeper.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after the wrapped sleeper reaches the deadline.
+    ///
+    /// # Errors
+    ///
+    /// Returns any [`TimeError`] produced by the wrapped sleeper.
     #[inline(always)]
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         self.as_ref().sleep_until(deadline)

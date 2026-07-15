@@ -18,6 +18,19 @@ use std::time::Duration;
 ///
 /// The maximum identifier is returned while changing `next_identifier` to the
 /// terminal zero state. Later calls panic with `exhausted_message`.
+///
+/// # Parameters
+///
+/// * `next_identifier` - Mutable allocator state to read and advance.
+/// * `exhausted_message` - Panic message used after identifier exhaustion.
+///
+/// # Returns
+///
+/// The current nonzero identifier before advancing the allocator.
+///
+/// # Panics
+///
+/// Panics with `exhausted_message` when the allocator is already exhausted.
 #[inline(always)]
 pub(crate) fn allocate_identifier(
     next_identifier: &mut u64,
@@ -48,6 +61,10 @@ pub(crate) struct ManualWaiterRegistry {
 
 impl ManualWaiterRegistry {
     /// Creates an empty registry.
+    ///
+    /// # Returns
+    ///
+    /// A registry with no waiters or observers.
     #[inline]
     pub(crate) fn new() -> Self {
         Self {
@@ -63,6 +80,18 @@ impl ManualWaiterRegistry {
     /// Registers a blocking deadline and returns its registration identifier.
     ///
     /// Panics when the registry cannot allocate another identifier.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Elapsed clock duration at which the waiter becomes ready.
+    ///
+    /// # Returns
+    ///
+    /// The nonzero identifier assigned to the blocking waiter.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the blocking-waiter identifier space is exhausted.
     #[inline]
     pub(crate) fn register_blocking(&mut self, deadline: Duration) -> u64 {
         let waiter_id = allocate_identifier(
@@ -74,6 +103,10 @@ impl ManualWaiterRegistry {
     }
 
     /// Removes the blocking waiter identified by waiter_id.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter_id` - Identifier of the blocking waiter to remove.
     #[inline(always)]
     pub(crate) fn unregister_blocking(&mut self, waiter_id: u64) {
         self.blocking_waiters.remove(&waiter_id);
@@ -82,6 +115,18 @@ impl ManualWaiterRegistry {
     /// Registers an async deadline and returns its registration identifier.
     ///
     /// Panics when the registry cannot allocate another identifier.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Elapsed clock duration at which the waiter becomes ready.
+    ///
+    /// # Returns
+    ///
+    /// The nonzero identifier assigned to the async waiter.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the async-waiter identifier space is exhausted.
     #[inline]
     pub(crate) fn register_async(&mut self, deadline: Duration) -> u64 {
         let waiter_id = allocate_identifier(
@@ -96,6 +141,15 @@ impl ManualWaiterRegistry {
     ///
     /// The outer option reports whether the waiter existed. The inner option
     /// contains the waker most recently registered by polling its future.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter_id` - Identifier of the async waiter to remove.
+    ///
+    /// # Returns
+    ///
+    /// `None` when the waiter was absent, `Some(None)` for an unpolled waiter,
+    /// or `Some(Some(waker))` for a waiter with a registered task waker.
     #[inline(always)]
     pub(crate) fn unregister_async(
         &mut self,
@@ -107,6 +161,14 @@ impl ManualWaiterRegistry {
     }
 
     /// Returns the earliest deadline strictly after elapsed.
+    ///
+    /// # Parameters
+    ///
+    /// * `elapsed` - Current elapsed duration used to exclude reached waiters.
+    ///
+    /// # Returns
+    ///
+    /// The earliest future deadline, or `None` when none is registered.
     pub(crate) fn next_future_deadline(
         &self,
         elapsed: Duration,
@@ -124,6 +186,14 @@ impl ManualWaiterRegistry {
     /// Waiter registrations remain present until their futures are polled or
     /// dropped, but subsequent advances cannot wake the same stored waker
     /// again.
+    ///
+    /// # Parameters
+    ///
+    /// * `elapsed` - Current elapsed duration defining which waiters are due.
+    ///
+    /// # Returns
+    ///
+    /// Every stored waker whose deadline is at or before `elapsed`.
     pub(crate) fn take_due_async_wakers(
         &mut self,
         elapsed: Duration,
@@ -140,6 +210,20 @@ impl ManualWaiterRegistry {
     /// Returns None when the requested count is already satisfied.
     ///
     /// Panics when the registry cannot allocate another identifier.
+    ///
+    /// # Parameters
+    ///
+    /// * `expected_count` - Waiter count at which the observer becomes ready.
+    /// * `count` - Current registered waiter count.
+    ///
+    /// # Returns
+    ///
+    /// A new observer identifier, or `None` when `count` already satisfies the
+    /// requested threshold.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the observer identifier space is exhausted.
     #[inline]
     pub(crate) fn register_observer(
         &mut self,
@@ -161,6 +245,17 @@ impl ManualWaiterRegistry {
     ///
     /// A missing observer is ready because reaching the count removes and
     /// latches the observer before waking its task.
+    ///
+    /// # Parameters
+    ///
+    /// * `observer_id` - Identifier of the observer to poll.
+    /// * `count` - Current registered waiter count.
+    /// * `context` - Task context whose waker is retained while pending.
+    ///
+    /// # Returns
+    ///
+    /// The observer poll state and any replaced or removed waker that the
+    /// caller must destroy after releasing the clock state lock.
     pub(crate) fn poll_observer(
         &mut self,
         observer_id: u64,
@@ -191,6 +286,14 @@ impl ManualWaiterRegistry {
     }
 
     /// Removes an incomplete waiter-count observer and returns its task waker.
+    ///
+    /// # Parameters
+    ///
+    /// * `observer_id` - Identifier of the observer to remove.
+    ///
+    /// # Returns
+    ///
+    /// Its stored task waker, or `None` when absent or not yet polled.
     #[inline(always)]
     pub(crate) fn unregister_observer(
         &mut self,
@@ -202,6 +305,14 @@ impl ManualWaiterRegistry {
     }
 
     /// Returns whether an observer is still waiting for its target count.
+    ///
+    /// # Parameters
+    ///
+    /// * `observer_id` - Identifier of the observer to inspect.
+    ///
+    /// # Returns
+    ///
+    /// `true` when the observer remains registered.
     #[inline(always)]
     pub(crate) fn contains_observer(&self, observer_id: u64) -> bool {
         self.observers.contains_key(&observer_id)
@@ -211,7 +322,7 @@ impl ManualWaiterRegistry {
     ///
     /// The returned ready state removes the waiter registration.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `waiter_id` - Identifier of the registered async waiter.
     /// * `elapsed` - Current elapsed duration of the manual clock.
@@ -219,8 +330,8 @@ impl ManualWaiterRegistry {
     ///
     /// # Returns
     ///
-    /// [`Poll::Ready`] when the registered deadline has been reached, or
-    /// [`Poll::Pending`] after recording the current task waker.
+    /// The waiter poll state and any replaced or removed waker that the caller
+    /// must destroy after releasing the clock state lock.
     ///
     /// # Panics
     ///
@@ -255,6 +366,10 @@ impl ManualWaiterRegistry {
     }
 
     /// Removes reached observers and returns their registered task wakers.
+    ///
+    /// # Returns
+    ///
+    /// Stored task wakers for every observer whose threshold has been reached.
     pub(crate) fn reached_observer_wakers(&mut self) -> Vec<Waker> {
         let count = self.count();
         let mut wakers = Vec::new();
@@ -272,6 +387,10 @@ impl ManualWaiterRegistry {
     }
 
     /// Returns the number of registered deadline waiters.
+    ///
+    /// # Returns
+    ///
+    /// The combined number of blocking and asynchronous waiter registrations.
     #[inline(always)]
     pub(crate) fn count(&self) -> usize {
         self.blocking_waiters.len() + self.async_waiters.len()

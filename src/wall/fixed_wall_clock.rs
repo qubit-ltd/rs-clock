@@ -17,6 +17,14 @@ pub struct FixedWallClock {
 
 impl FixedWallClock {
     /// Creates a clock that always returns `fixed_time`.
+    ///
+    /// # Parameters
+    ///
+    /// * `fixed_time` - Wall-clock value returned by every sample.
+    ///
+    /// # Returns
+    ///
+    /// A wall clock fixed at `fixed_time`.
     #[must_use]
     #[inline(always)]
     pub const fn new(fixed_time: SystemTime) -> Self {
@@ -24,6 +32,10 @@ impl FixedWallClock {
     }
 
     /// Returns the immutable time held by this clock.
+    ///
+    /// # Returns
+    ///
+    /// The configured fixed wall-clock value.
     #[must_use]
     #[inline(always)]
     pub const fn fixed_time(&self) -> SystemTime {
@@ -33,6 +45,10 @@ impl FixedWallClock {
 
 impl WallClock for FixedWallClock {
     /// Returns the configured fixed wall time.
+    ///
+    /// # Returns
+    ///
+    /// The same fixed value for every call.
     #[inline(always)]
     fn now(&self) -> SystemTime {
         self.fixed_time

@@ -23,6 +23,14 @@ pub struct ManualBlockingSleeper {
 
 impl ManualBlockingSleeper {
     /// Creates a blocking sleeper in the supplied manual clock domain.
+    ///
+    /// # Parameters
+    ///
+    /// * `clock` - Shared manual clock that owns this sleeper's waiters.
+    ///
+    /// # Returns
+    ///
+    /// A blocking sleeper paired with the exact supplied clock.
     #[must_use]
     #[inline(always)]
     pub const fn from_clock(clock: Arc<ManualMonotonicClock>) -> Self {
@@ -32,12 +40,29 @@ impl ManualBlockingSleeper {
 
 impl BlockingSleeper for ManualBlockingSleeper {
     /// Returns the manual clock driving this sleeper.
+    ///
+    /// # Returns
+    ///
+    /// The paired manual clock as a monotonic-clock trait object.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
     }
 
     /// Blocks until explicit manual time reaches `deadline`.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Instant to wait for in the paired manual clock domain.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after manual time reaches the deadline.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::ClockDomainMismatch`] for a deadline from another
+    /// clock domain.
     ///
     /// # Panics
     ///

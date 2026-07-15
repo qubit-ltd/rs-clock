@@ -22,6 +22,10 @@ pub(crate) struct ManualAdvanceRegistry {
 
 impl ManualAdvanceRegistry {
     /// Creates an empty registry.
+    ///
+    /// # Returns
+    ///
+    /// A registry with no advance subscribers.
     #[inline]
     pub(crate) fn new() -> Self {
         Self {
@@ -33,6 +37,18 @@ impl ManualAdvanceRegistry {
     /// Registers callback and returns its subscription identifier.
     ///
     /// Panics when the registry cannot allocate another identifier.
+    ///
+    /// # Parameters
+    ///
+    /// * `callback` - Shared callback to invoke after successful advances.
+    ///
+    /// # Returns
+    ///
+    /// The nonzero identifier assigned to the subscription.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the subscriber identifier space is exhausted.
     #[inline]
     pub(crate) fn register(&mut self, callback: AdvanceCallback) -> u64 {
         let subscriber_id = allocate_identifier(
@@ -44,6 +60,14 @@ impl ManualAdvanceRegistry {
     }
 
     /// Removes and returns the callback identified by `subscriber_id`.
+    ///
+    /// # Parameters
+    ///
+    /// * `subscriber_id` - Identifier of the callback to remove.
+    ///
+    /// # Returns
+    ///
+    /// The removed callback, or `None` when no registration has that identifier.
     #[inline(always)]
     pub(crate) fn unregister(
         &mut self,
@@ -53,6 +77,10 @@ impl ManualAdvanceRegistry {
     }
 
     /// Clones callbacks for invocation after the clock releases its mutex.
+    ///
+    /// # Returns
+    ///
+    /// Shared handles to every currently registered callback.
     pub(crate) fn callbacks(&self) -> Vec<AdvanceCallback> {
         self.subscribers.values().cloned().collect()
     }

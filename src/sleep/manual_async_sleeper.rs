@@ -29,6 +29,14 @@ pub struct ManualAsyncSleeper {
 
 impl ManualAsyncSleeper {
     /// Creates an async sleeper in the supplied manual clock domain.
+    ///
+    /// # Parameters
+    ///
+    /// * `clock` - Shared manual clock that owns this sleeper's waiters.
+    ///
+    /// # Returns
+    ///
+    /// An async sleeper paired with the exact supplied clock.
     #[must_use]
     #[inline(always)]
     pub const fn from_clock(clock: Arc<ManualMonotonicClock>) -> Self {
@@ -38,6 +46,10 @@ impl ManualAsyncSleeper {
 
 impl AsyncSleeper for ManualAsyncSleeper {
     /// Returns the manual clock driving this sleeper.
+    ///
+    /// # Returns
+    ///
+    /// The paired manual clock as a monotonic-clock trait object.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
@@ -51,6 +63,19 @@ impl AsyncSleeper for ManualAsyncSleeper {
     /// implementation calls this method. Dropping an incomplete future
     /// unregisters its waiter; a foreign deadline is returned through an
     /// immediately ready error future.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Instant to await in the paired manual clock domain.
+    ///
+    /// # Returns
+    ///
+    /// A cancellation-safe future registered before this method returns.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`crate::TimeError::ClockDomainMismatch`] for a
+    /// deadline from another clock domain.
     ///
     /// # Panics
     ///
