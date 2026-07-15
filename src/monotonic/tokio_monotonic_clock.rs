@@ -26,7 +26,9 @@ use tokio::time::Instant;
 /// identity that this crate can validate.
 #[derive(Debug)]
 pub struct TokioMonotonicClock {
+    /// Domain carried by instants sampled from this clock.
     domain: ClockDomain,
+    /// Native Tokio instant mapped to elapsed duration zero.
     origin: Instant,
 }
 

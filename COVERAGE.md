@@ -65,21 +65,20 @@ Generated reports are saved in the following locations by default:
 - **JSON Report**: `target/llvm-cov/coverage.json`
 - **Cobertura Report**: `target/llvm-cov/cobertura.xml`
 
-## Testing Specific Modules Only
+## Scope and Thresholds
 
-If you only want to test specific modules, you can use:
+The repository wrapper measures all features by default and enforces thresholds
+for every Rust source file below `src/`:
 
-```bash
-# Test only lang module
-cargo llvm-cov --html --open -- lang::
+- functions: at least 100%
+- lines: greater than 95%
+- regions: greater than 95%
 
-# Test only specific test files
-cargo llvm-cov --html --open --test lang_tests -- lang::argument
-```
+Override variables such as `MIN_FUNCTION_COVERAGE`, `MIN_LINE_COVERAGE`, and
+`MIN_REGION_COVERAGE` only when intentionally diagnosing a local report. CI uses
+the defaults from `.rs-ci/coverage.sh`.
 
-## Exclude Specific Files
-
-In the `.llvm-cov.toml` configuration file, we have excluded the following files:
+The `.llvm-cov.toml` configuration excludes non-production report inputs:
 
 - `tests/*` - Test files
 - `benches/*` - Benchmark files
@@ -87,45 +86,16 @@ In the `.llvm-cov.toml` configuration file, we have excluded the following files
 
 If you need to modify exclusion rules, please edit the `.llvm-cov.toml` file.
 
-## CI/CD Integration
+## CI Integration
 
-### GitHub Actions Example
+Run the repository CI wrapper for the complete check sequence:
 
-```yaml
-name: Code Coverage
-
-on:
-  push:
-    branches: [ main, dev ]
-  pull_request:
-    branches: [ main, dev ]
-
-jobs:
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-
-      - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov
-
-      - name: Generate coverage
-        run: |
-          cd rs-clock
-          cargo llvm-cov --package qubit-clock --lcov --output-path lcov.info
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: rs-clock/lcov.info
-          flags: qubit-clock
+```bash
+./ci-check.sh
 ```
+
+For a coverage-only diagnostic, run `./coverage.sh json`. The JSON mode applies
+the same per-source thresholds used by CI.
 
 ## Common Issues
 
@@ -152,14 +122,11 @@ cargo llvm-cov clean
 - Use coverage reports to identify untested code paths
 - Write tests for complex logic branches
 
-## Coverage Goals
+## Coverage Requirements
 
-Our recommended coverage goals:
-
-- **Minimum requirement**: 60%
-- **Good**: 75%
-- **Excellent**: 85%+
-- **Core modules**: 90%+
+The enforced defaults are 100% function coverage and greater than 95% line and
+region coverage for each production source file. Aggregate percentages do not
+override a source file that falls below one of these thresholds.
 
 ## References
 

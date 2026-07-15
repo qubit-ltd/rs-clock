@@ -26,6 +26,7 @@ use tokio::time::Instant;
 /// contract is not checked at runtime.
 #[derive(Debug)]
 pub struct TokioAsyncSleeper {
+    /// Shared Tokio clock used for deadline conversion and elapsed time.
     clock: Arc<TokioMonotonicClock>,
 }
 
