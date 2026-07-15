@@ -13,20 +13,56 @@ use crate::{
 use std::time::Duration;
 
 /// Provides blocking waits in the implementor's monotonic clock domain.
+///
+/// The clock returned by [`Self::clock`] defines the domain accepted by every
+/// deadline operation. Repeated calls to [`Self::clock`] must expose clocks
+/// whose instants belong to the same domain for this sleeper's lifetime.
 pub trait BlockingSleeper: Send + Sync {
     /// Returns the monotonic clock paired with this sleeper.
+    ///
+    /// # Returns
+    ///
+    /// The paired clock. Its domain remains stable for this sleeper's entire
+    /// lifetime.
     fn clock(&self) -> &dyn MonotonicClock;
 
     /// Blocks the current thread until `deadline` is reached.
     ///
-    /// A reached deadline completes immediately. Returns
-    /// [`TimeError::ClockDomainMismatch`] for a foreign deadline.
+    /// A reached deadline completes immediately.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The instant to wait for. It must belong to the stable
+    ///   domain exposed by [`Self::clock`].
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after `deadline` is reached.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline. An
+    /// implementation may return [`TimeError::InstantOverflow`] when its
+    /// native timer cannot represent `deadline`.
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError>;
 
     /// Blocks the current thread for `duration` in this sleeper's domain.
     ///
+    /// The deadline is calculated when this method is called.
+    ///
+    /// # Arguments
+    ///
+    /// * `duration` - The amount of monotonic time to wait.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after `duration` has elapsed.
+    ///
+    /// # Errors
+    ///
     /// Returns [`TimeError::InstantOverflow`] when the computed deadline is
-    /// not representable.
+    /// not representable. Errors from [`Self::sleep_until`] are otherwise
+    /// propagated.
     #[inline]
     fn sleep_for(&self, duration: Duration) -> Result<(), TimeError> {
         let deadline = self.clock().now().checked_add(duration)?;

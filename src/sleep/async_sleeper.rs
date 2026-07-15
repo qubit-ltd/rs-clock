@@ -14,15 +14,45 @@ use crate::{
 use std::time::Duration;
 
 /// Provides asynchronous waits in the implementor's monotonic clock domain.
+///
+/// The clock returned by [`Self::clock`] defines the domain accepted by every
+/// deadline operation. Repeated calls to [`Self::clock`] must expose clocks
+/// whose instants belong to the same domain for this sleeper's lifetime.
 pub trait AsyncSleeper: Send + Sync {
     /// Returns the monotonic clock paired with this sleeper.
+    ///
+    /// # Returns
+    ///
+    /// The paired clock. Its domain remains stable for this sleeper's entire
+    /// lifetime.
     fn clock(&self) -> &dyn MonotonicClock;
 
     /// Returns a future completing when `deadline` is reached.
     ///
-    /// A reached deadline completes immediately. A foreign deadline resolves
-    /// to [`TimeError::ClockDomainMismatch`]. The returned future owns its
-    /// waiting state and does not borrow this sleeper.
+    /// The returned future owns its waiting state and does not borrow this
+    /// sleeper. A reached deadline completes immediately.
+    ///
+    /// # Arguments
+    ///
+    /// * `deadline` - The instant to wait for. It must belong to the stable
+    ///   domain exposed by [`Self::clock`].
+    ///
+    /// # Returns
+    ///
+    /// A `'static` future that resolves successfully when `deadline` is
+    /// reached.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`TimeError::ClockDomainMismatch`] for a foreign
+    /// deadline. An implementation may return [`TimeError::InstantOverflow`]
+    /// when its native timer cannot represent `deadline`.
+    ///
+    /// # Cancellation
+    ///
+    /// Dropping an incomplete future cancels the wait. Implementations must
+    /// release waiter registrations and other resources owned solely by that
+    /// future without requiring another poll.
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture;
 
     /// Returns a future completing after `duration` in this sleeper's domain.
@@ -30,6 +60,25 @@ pub trait AsyncSleeper: Send + Sync {
     /// The deadline is calculated when this method is called, before the
     /// returned future is first polled. The future owns its waiting state and
     /// has a `'static` lifetime.
+    ///
+    /// # Arguments
+    ///
+    /// * `duration` - The amount of monotonic time to wait.
+    ///
+    /// # Returns
+    ///
+    /// A future that resolves successfully after `duration` has elapsed.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`TimeError::InstantOverflow`] when the computed
+    /// deadline is not representable. Errors from [`Self::sleep_until_async`]
+    /// are otherwise propagated.
+    ///
+    /// # Cancellation
+    ///
+    /// Dropping an incomplete future has the cancellation semantics specified
+    /// by [`Self::sleep_until_async`].
     #[inline]
     fn sleep_for_async(&self, duration: Duration) -> SleepFuture {
         match self.clock().now().checked_add(duration) {
