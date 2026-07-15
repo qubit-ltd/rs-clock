@@ -47,7 +47,7 @@ impl TokioAsyncSleeper {
         &self,
         deadline: MonotonicInstant,
     ) -> Result<Instant, TimeError> {
-        deadline.ensure_domain(self.clock.now().domain())?;
+        deadline.ensure_domain(self.clock.domain())?;
         self.clock
             .origin()
             .checked_add(deadline.elapsed_since_origin())
