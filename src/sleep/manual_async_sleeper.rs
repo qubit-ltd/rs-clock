@@ -5,7 +5,7 @@
 // =============================================================================
 //! Defines an async sleeper driven by manual monotonic time.
 
-use crate::sleep::manual_sleep_future::ManualSleepFuture;
+use crate::sleep::internal::manual_sleep_future::ManualSleepFuture;
 use crate::{
     AsyncSleeper,
     ManualMonotonicClock,
@@ -23,6 +23,7 @@ use std::sync::Arc;
 /// Dropping an incomplete future unregisters its waiter.
 #[derive(Debug)]
 pub struct ManualAsyncSleeper {
+    /// Shared manual clock that owns this sleeper's deadline waiters.
     clock: Arc<ManualMonotonicClock>,
 }
 

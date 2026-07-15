@@ -24,9 +24,13 @@ use std::task::{
 /// future removes its waiter registration.
 #[derive(Debug)]
 pub(crate) struct ManualSleepFuture {
+    /// Manual clock that owns the waiter registration.
     clock: Arc<ManualMonotonicClock>,
+    /// Domain-checked deadline assigned when the future was created.
     deadline: MonotonicInstant,
+    /// Active async waiter identifier, or `None` after completion.
     waiter_id: Option<u64>,
+    /// Registration error returned on the first poll when present.
     error: Option<TimeError>,
 }
 

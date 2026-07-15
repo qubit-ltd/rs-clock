@@ -9,9 +9,9 @@
 
 mod async_sleeper_tests;
 mod blocking_sleeper_tests;
+mod internal;
 mod manual_async_sleeper_tests;
 mod manual_blocking_sleeper_tests;
-mod manual_sleep_future_tests;
 mod sleep_future_tests;
 mod std_blocking_sleeper_tests;
 #[cfg(feature = "tokio")]
