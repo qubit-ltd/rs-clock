@@ -19,6 +19,7 @@ use std::time::Instant;
 /// A blocking sleeper paired with one explicit [`StdMonotonicClock`].
 #[derive(Debug)]
 pub struct StdBlockingSleeper {
+    /// Shared standard clock used for deadline conversion and elapsed time.
     clock: Arc<StdMonotonicClock>,
 }
 

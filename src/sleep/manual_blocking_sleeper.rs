@@ -17,6 +17,7 @@ use std::sync::Arc;
 /// A blocking sleeper paired with one explicit manual monotonic clock.
 #[derive(Debug)]
 pub struct ManualBlockingSleeper {
+    /// Shared manual clock that owns this sleeper's deadline waiters.
     clock: Arc<ManualMonotonicClock>,
 }
 

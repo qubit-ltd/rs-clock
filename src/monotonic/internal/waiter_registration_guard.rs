@@ -20,7 +20,10 @@ pub(crate) struct WaiterRegistrationGuard<'a> {
 impl<'a> WaiterRegistrationGuard<'a> {
     /// Guards a newly registered blocking waiter.
     #[inline(always)]
-    pub(crate) fn blocking(clock: &'a ManualMonotonicClock, waiter_id: u64) -> Self {
+    pub(crate) fn blocking(
+        clock: &'a ManualMonotonicClock,
+        waiter_id: u64,
+    ) -> Self {
         Self {
             clock,
             waiter: Some(RegisteredWaiter::Blocking(waiter_id)),
@@ -29,7 +32,10 @@ impl<'a> WaiterRegistrationGuard<'a> {
 
     /// Guards a newly registered async waiter.
     #[inline(always)]
-    pub(crate) fn asynchronous(clock: &'a ManualMonotonicClock, waiter_id: u64) -> Self {
+    pub(crate) fn asynchronous(
+        clock: &'a ManualMonotonicClock,
+        waiter_id: u64,
+    ) -> Self {
         Self {
             clock,
             waiter: Some(RegisteredWaiter::Async(waiter_id)),

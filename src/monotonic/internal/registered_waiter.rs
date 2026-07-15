@@ -8,7 +8,13 @@
 /// Kind and identifier of one waiter whose registration needs cleanup.
 pub(crate) enum RegisteredWaiter {
     /// Blocking waiter registration.
-    Blocking(u64),
+    Blocking(
+        /// Identifier allocated by the blocking waiter registry.
+        u64,
+    ),
     /// Async waiter registration.
-    Async(u64),
+    Async(
+        /// Identifier allocated by the async waiter registry.
+        u64,
+    ),
 }

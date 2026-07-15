@@ -25,7 +25,9 @@ use std::time::SystemTime;
 /// mapping and never changes the underlying monotonic clock.
 #[derive(Debug)]
 pub struct ManualWallClock {
+    /// Shared monotonic timeline used to project elapsed wall time.
     clock: Arc<ManualMonotonicClock>,
+    /// Wall time and monotonic instant that define the current projection.
     anchor: Mutex<(SystemTime, MonotonicInstant)>,
 }
 

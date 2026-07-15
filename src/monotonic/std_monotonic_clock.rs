@@ -18,7 +18,9 @@ use std::time::Instant;
 /// expressed explicitly with `Arc<StdMonotonicClock>`.
 #[derive(Debug)]
 pub struct StdMonotonicClock {
+    /// Domain carried by instants sampled from this clock.
     domain: ClockDomain,
+    /// Native standard-library instant mapped to elapsed duration zero.
     origin: Instant,
 }
 

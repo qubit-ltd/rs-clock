@@ -11,6 +11,7 @@ use std::time::SystemTime;
 /// A wall clock that always returns one fixed time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedWallClock {
+    /// Immutable wall-clock value returned by every sample.
     fixed_time: SystemTime,
 }
 

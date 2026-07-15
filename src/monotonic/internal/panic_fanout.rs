@@ -49,6 +49,14 @@ impl PanicFanout {
         }
     }
 
+    /// Resumes the first retained panic after every target was attempted.
+    #[inline]
+    pub(crate) fn resume_first_panic(self) {
+        if let Some(payload) = self.first_panic {
+            resume_unwind(payload);
+        }
+    }
+
     /// Records `result` when it is the first panic in this fanout.
     #[inline]
     fn record(&mut self, result: Result<(), PanicPayload>) {
@@ -61,14 +69,6 @@ impl PanicFanout {
                 // that the remaining notification targets are attempted.
                 std::mem::forget(payload);
             }
-        }
-    }
-
-    /// Resumes the first retained panic after every target was attempted.
-    #[inline]
-    pub(crate) fn resume_first_panic(self) {
-        if let Some(payload) = self.first_panic {
-            resume_unwind(payload);
         }
     }
 }

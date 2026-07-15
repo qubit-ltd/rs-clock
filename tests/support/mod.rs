@@ -3,7 +3,14 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
-//! Exposes internal source modules to focused integration behavior tests.
+//! Exposes two pure internal state machines to focused integration tests.
+//!
+//! The project keeps tests outside `src/`, while identifier exhaustion cannot
+//! be reached through the process-global public APIs in a practical test. These
+//! path modules are therefore a narrow exception used only for terminal
+//! identifier transitions and waiter-observer latching. Production behavior is
+//! otherwise exercised through the public `qubit_clock` API; do not add general
+//! implementation tests to this support module.
 
 #[allow(dead_code)]
 #[path = "../../src/monotonic/clock_domain.rs"]

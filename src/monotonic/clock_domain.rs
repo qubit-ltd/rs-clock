@@ -56,7 +56,10 @@ fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
 /// let domain = ClockDomain::default();
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ClockDomain(u64);
+pub struct ClockDomain(
+    /// Process-unique nonzero domain identifier.
+    u64,
+);
 
 impl ClockDomain {
     /// Allocates a domain that is not reused within this process.
