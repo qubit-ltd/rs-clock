@@ -38,6 +38,16 @@ impl Wake for WakeCounter {
     }
 }
 
+/// Panics whenever the manual clock attempts to wake its task.
+struct PanicWaker;
+
+impl Wake for PanicWaker {
+    /// Simulates a task whose custom waker panics.
+    fn wake(self: Arc<Self>) {
+        panic!("observer waker panic");
+    }
+}
+
 #[test]
 fn test_manual_waiter_future_is_ready_for_zero_expected_count() {
     let clock = Arc::new(ManualMonotonicClock::new());
@@ -172,4 +182,78 @@ fn test_manual_waiter_future_latches_reached_count_before_waiter_drops() {
 
     assert_eq!(1, wake_counter.wakes.load(Ordering::SeqCst));
     assert_eq!(Poll::Ready(()), waiter.as_mut().poll(&mut context));
+}
+
+#[test]
+fn test_async_waiter_registration_cleans_up_after_observer_waker_panics() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let panic_waker = Waker::from(Arc::new(PanicWaker));
+    let wake_counter = Arc::new(WakeCounter::default());
+    let counting_waker = Waker::from(Arc::clone(&wake_counter));
+    let mut panic_context = Context::from_waker(&panic_waker);
+    let mut counting_context = Context::from_waker(&counting_waker);
+    let mut panic_observer = Box::pin(clock.wait_for_waiters_async(1));
+    let mut counting_observer = Box::pin(clock.wait_for_waiters_async(1));
+    assert_eq!(
+        Poll::Pending,
+        panic_observer.as_mut().poll(&mut panic_context),
+    );
+    assert_eq!(
+        Poll::Pending,
+        counting_observer.as_mut().poll(&mut counting_context),
+    );
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        sleeper.sleep_for_async(Duration::from_secs(1))
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(1, wake_counter.wakes.load(Ordering::SeqCst));
+    assert_eq!(0, clock.pending_waiters());
+    assert_eq!(
+        Poll::Ready(()),
+        panic_observer.as_mut().poll(&mut panic_context),
+    );
+    assert_eq!(
+        Poll::Ready(()),
+        counting_observer.as_mut().poll(&mut counting_context),
+    );
+}
+
+#[test]
+fn test_blocking_waiter_registration_cleans_up_after_observer_waker_panics() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualBlockingSleeper::from_clock(Arc::clone(&clock));
+    let panic_waker = Waker::from(Arc::new(PanicWaker));
+    let wake_counter = Arc::new(WakeCounter::default());
+    let counting_waker = Waker::from(Arc::clone(&wake_counter));
+    let mut panic_context = Context::from_waker(&panic_waker);
+    let mut counting_context = Context::from_waker(&counting_waker);
+    let mut panic_observer = Box::pin(clock.wait_for_waiters_async(1));
+    let mut counting_observer = Box::pin(clock.wait_for_waiters_async(1));
+    assert_eq!(
+        Poll::Pending,
+        panic_observer.as_mut().poll(&mut panic_context),
+    );
+    assert_eq!(
+        Poll::Pending,
+        counting_observer.as_mut().poll(&mut counting_context),
+    );
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        sleeper.sleep_for(Duration::from_secs(1))
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(1, wake_counter.wakes.load(Ordering::SeqCst));
+    assert_eq!(0, clock.pending_waiters());
+    assert_eq!(
+        Poll::Ready(()),
+        panic_observer.as_mut().poll(&mut panic_context),
+    );
+    assert_eq!(
+        Poll::Ready(()),
+        counting_observer.as_mut().poll(&mut counting_context),
+    );
 }
