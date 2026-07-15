@@ -5,8 +5,8 @@
 // =============================================================================
 //! Stores mutable state for a manual monotonic clock.
 
-use crate::monotonic::manual_advance_registry::ManualAdvanceRegistry;
-use crate::monotonic::manual_waiter_registry::ManualWaiterRegistry;
+use super::manual_advance_registry::ManualAdvanceRegistry;
+use super::manual_waiter_registry::ManualWaiterRegistry;
 use std::time::Duration;
 
 /// Mutable time and waiter registrations protected by the owning clock.
@@ -21,6 +21,7 @@ pub(crate) struct ManualMonotonicState {
 
 impl ManualMonotonicState {
     /// Creates state at the clock domain origin.
+    #[inline]
     pub(crate) fn new() -> Self {
         Self {
             elapsed: Duration::ZERO,
@@ -30,6 +31,7 @@ impl ManualMonotonicState {
     }
 
     /// Returns the number of blocking and asynchronous deadline waiters.
+    #[inline(always)]
     pub(crate) fn waiter_count(&self) -> usize {
         self.waiters.count()
     }

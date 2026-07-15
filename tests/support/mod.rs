@@ -10,5 +10,5 @@
 pub(crate) mod clock_domain;
 
 #[allow(dead_code)]
-#[path = "../../src/monotonic/manual_waiter_registry.rs"]
+#[path = "../../src/monotonic/internal/manual_waiter_registry.rs"]
 pub(crate) mod manual_waiter_registry;

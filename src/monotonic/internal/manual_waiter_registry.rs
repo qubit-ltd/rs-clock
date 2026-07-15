@@ -18,6 +18,7 @@ use std::time::Duration;
 ///
 /// The maximum identifier is returned while changing `next_identifier` to the
 /// terminal zero state. Later calls panic with `exhausted_message`.
+#[inline(always)]
 pub(crate) fn allocate_identifier(
     next_identifier: &mut u64,
     exhausted_message: &str,
@@ -47,6 +48,7 @@ pub(crate) struct ManualWaiterRegistry {
 
 impl ManualWaiterRegistry {
     /// Creates an empty registry.
+    #[inline]
     pub(crate) fn new() -> Self {
         Self {
             next_blocking_waiter_id: 1,
@@ -61,6 +63,7 @@ impl ManualWaiterRegistry {
     /// Registers a blocking deadline and returns its registration identifier.
     ///
     /// Panics when the registry cannot allocate another identifier.
+    #[inline]
     pub(crate) fn register_blocking(&mut self, deadline: Duration) -> u64 {
         let waiter_id = allocate_identifier(
             &mut self.next_blocking_waiter_id,
@@ -71,6 +74,7 @@ impl ManualWaiterRegistry {
     }
 
     /// Removes the blocking waiter identified by waiter_id.
+    #[inline(always)]
     pub(crate) fn unregister_blocking(&mut self, waiter_id: u64) {
         self.blocking_waiters.remove(&waiter_id);
     }
@@ -78,6 +82,7 @@ impl ManualWaiterRegistry {
     /// Registers an async deadline and returns its registration identifier.
     ///
     /// Panics when the registry cannot allocate another identifier.
+    #[inline]
     pub(crate) fn register_async(&mut self, deadline: Duration) -> u64 {
         let waiter_id = allocate_identifier(
             &mut self.next_async_waiter_id,
@@ -88,6 +93,7 @@ impl ManualWaiterRegistry {
     }
 
     /// Removes an async waiter and returns whether a registration existed.
+    #[inline(always)]
     pub(crate) fn unregister_async(&mut self, waiter_id: u64) -> bool {
         self.async_waiters.remove(&waiter_id).is_some()
     }
@@ -126,6 +132,7 @@ impl ManualWaiterRegistry {
     /// Returns None when the requested count is already satisfied.
     ///
     /// Panics when the registry cannot allocate another identifier.
+    #[inline]
     pub(crate) fn register_observer(
         &mut self,
         expected_count: usize,
@@ -171,11 +178,13 @@ impl ManualWaiterRegistry {
     }
 
     /// Removes an incomplete waiter-count observer.
+    #[inline(always)]
     pub(crate) fn unregister_observer(&mut self, observer_id: u64) {
         self.observers.remove(&observer_id);
     }
 
     /// Returns whether an observer is still waiting for its target count.
+    #[inline(always)]
     pub(crate) fn contains_observer(&self, observer_id: u64) -> bool {
         self.observers.contains_key(&observer_id)
     }
@@ -223,6 +232,7 @@ impl ManualWaiterRegistry {
     }
 
     /// Returns the number of registered deadline waiters.
+    #[inline(always)]
     pub(crate) fn count(&self) -> usize {
         self.blocking_waiters.len() + self.async_waiters.len()
     }
