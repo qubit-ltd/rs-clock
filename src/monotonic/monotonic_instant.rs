@@ -19,7 +19,9 @@ use std::time::Duration;
 /// [`Duration`] without claiming any particular hardware timer resolution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MonotonicInstant {
+    /// The identifier of the originating monotonic clock domain.
     domain: ClockDomain,
+    /// The elapsed duration from the originating clock domain's origin.
     elapsed: Duration,
 }
 
@@ -28,12 +30,14 @@ impl MonotonicInstant {
     ///
     /// domain identifies the originating clock and elapsed is measured
     /// from that clock's private origin.
+    #[inline(always)]
     pub const fn new(domain: ClockDomain, elapsed: Duration) -> Self {
         Self { domain, elapsed }
     }
 
     /// Returns the identifier of the originating monotonic clock domain.
     #[must_use]
+    #[inline(always)]
     pub const fn domain(self) -> ClockDomain {
         self.domain
     }
@@ -43,6 +47,7 @@ impl MonotonicInstant {
     /// The value is meaningful only inside the domain identified by
     /// [`domain()`](Self::domain).
     #[must_use]
+    #[inline(always)]
     pub const fn elapsed_since_origin(self) -> Duration {
         self.elapsed
     }
@@ -74,6 +79,7 @@ impl MonotonicInstant {
     /// Verifies that an external instant belongs to expected_domain.
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign instant.
+    #[inline]
     pub(crate) fn ensure_domain(
         self,
         expected_domain: ClockDomain,
@@ -91,6 +97,7 @@ impl MonotonicInstant {
 
 impl PartialOrd for MonotonicInstant {
     /// Orders two instants only when they belong to the same clock domain.
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         (self.domain == other.domain).then(|| self.elapsed.cmp(&other.elapsed))
     }

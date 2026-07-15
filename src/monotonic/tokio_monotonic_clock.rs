@@ -38,6 +38,7 @@ impl TokioMonotonicClock {
     /// runtime whose time driver will read this clock and poll its paired
     /// sleeper.
     #[must_use]
+    #[inline]
     pub fn new() -> Self {
         Self {
             domain: ClockDomain::new(),
@@ -46,11 +47,13 @@ impl TokioMonotonicClock {
     }
 
     /// Returns the Tokio origin used by the paired async sleeper.
+    #[inline(always)]
     pub(crate) const fn origin(&self) -> Instant {
         self.origin
     }
 
     /// Returns this concrete clock's domain without sampling Tokio time.
+    #[inline(always)]
     pub(crate) const fn domain(&self) -> ClockDomain {
         self.domain
     }
@@ -58,6 +61,7 @@ impl TokioMonotonicClock {
 
 impl Default for TokioMonotonicClock {
     /// Creates a new independent Tokio monotonic clock domain.
+    #[inline(always)]
     fn default() -> Self {
         Self::new()
     }
@@ -65,6 +69,7 @@ impl Default for TokioMonotonicClock {
 
 impl MonotonicClock for TokioMonotonicClock {
     /// Returns the current instant in this clock's domain.
+    #[inline]
     fn now(&self) -> MonotonicInstant {
         MonotonicInstant::new(self.domain, self.origin.elapsed())
     }
