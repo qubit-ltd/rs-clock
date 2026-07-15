@@ -13,6 +13,10 @@ use qubit_clock::{
 };
 use std::future::Future;
 use std::pin::pin;
+use std::sync::atomic::{
+    AtomicUsize,
+    Ordering,
+};
 use std::sync::{
     Arc,
     Weak,
@@ -20,10 +24,6 @@ use std::sync::{
         SyncSender,
         sync_channel,
     },
-};
-use std::sync::atomic::{
-    AtomicUsize,
-    Ordering,
 };
 use std::task::{
     Context,
@@ -53,6 +53,7 @@ struct ReentrantDropWaker {
     drop_completed: SyncSender<()>,
 }
 
+#[allow(clippy::manual_noop_waker)]
 impl Wake for ReentrantDropWaker {
     /// Ignores wake requests because these tests exercise only destruction.
     fn wake(self: Arc<Self>) {}

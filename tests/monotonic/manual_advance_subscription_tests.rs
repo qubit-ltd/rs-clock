@@ -10,6 +10,10 @@ use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
 };
+use std::sync::atomic::{
+    AtomicUsize,
+    Ordering,
+};
 use std::sync::{
     Arc,
     Weak,
@@ -17,10 +21,6 @@ use std::sync::{
         SyncSender,
         sync_channel,
     },
-};
-use std::sync::atomic::{
-    AtomicUsize,
-    Ordering,
 };
 use std::task::{
     Context,

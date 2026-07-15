@@ -37,6 +37,7 @@ struct ReentrantDropWaker {
     drop_completed: SyncSender<()>,
 }
 
+#[allow(clippy::manual_noop_waker)]
 impl Wake for ReentrantDropWaker {
     /// Ignores wake requests because these tests exercise only destruction.
     fn wake(self: Arc<Self>) {}
@@ -88,10 +89,7 @@ fn test_manual_sleep_future_cancellation_drops_waker_outside_clock_lock() {
             drop_completed,
         }));
         let mut context = Context::from_waker(&waker);
-        assert!(matches!(
-            future.as_mut().poll(&mut context),
-            Poll::Pending,
-        ));
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending,));
     }
 
     let cancellation = std::thread::spawn(move || drop(future));
@@ -118,27 +116,19 @@ fn test_manual_sleep_future_replacement_drops_waker_outside_clock_lock() {
             drop_completed,
         }));
         let mut context = Context::from_waker(&waker);
-        assert!(matches!(
-            future.as_mut().poll(&mut context),
-            Poll::Pending,
-        ));
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending,));
     }
 
     let replacement = std::thread::spawn(move || {
         let waker = Waker::noop();
         let mut context = Context::from_waker(waker);
-        assert!(matches!(
-            future.as_mut().poll(&mut context),
-            Poll::Pending,
-        ));
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending,));
         future
     });
     drop_observer
         .recv_timeout(Duration::from_secs(1))
         .expect("replaced waker drop should re-enter the unlocked clock");
-    let future = replacement
-        .join()
-        .expect("replacement poll should finish");
+    let future = replacement.join().expect("replacement poll should finish");
     drop(future);
     assert_eq!(0, clock.pending_waiters());
 }
