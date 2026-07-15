@@ -19,10 +19,7 @@ use std::sync::atomic::{
     Ordering,
 };
 use std::thread;
-use std::time::{
-    Duration,
-    Instant,
-};
+use std::time::Duration;
 
 #[test]
 fn test_retry_exponential_backoff_uses_no_real_delay() {
@@ -60,18 +57,25 @@ fn test_retry_exponential_backoff_uses_no_real_delay() {
 }
 
 /// Waits until the retry worker registers the expected blocking deadline.
+///
+/// # Arguments
+///
+/// * `clock` - Manual clock shared with the retry worker.
+/// * `expected_deadline` - Deadline the worker is expected to register.
+///
+/// # Panics
+///
+/// Panics if the expected deadline is not registered before the real-time
+/// coordination guard expires.
 fn wait_for_blocking_deadline(
     clock: &ManualMonotonicClock,
     expected_deadline: qubit_clock::MonotonicInstant,
 ) {
-    let real_deadline = Instant::now() + Duration::from_secs(1);
-    while Instant::now() < real_deadline {
-        if clock.next_deadline() == Some(expected_deadline) {
-            return;
-        }
-        thread::yield_now();
-    }
-    panic!("retry worker did not register the expected deadline");
+    assert_eq!(
+        Some(expected_deadline),
+        clock.wait_for_next_deadline(Duration::from_secs(1)),
+        "retry worker did not register the expected deadline",
+    );
 }
 
 #[tokio::test]

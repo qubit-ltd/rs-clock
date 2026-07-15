@@ -147,7 +147,9 @@ assert_eq!(UNIX_EPOCH, wall_clock.now());
 
 同一个 `ManualMonotonicClock` 可以同时驱动 blocking 和 async sleeper。
 `pending_waiters()` 汇总两类 waiter，`next_deadline()` 查看最早的未来
-deadline，`advance_to_next_deadline()` 原子地推进到该 deadline。异步测试可用
+deadline，`advance_to_next_deadline()` 原子地推进到该 deadline。阻塞测试驱动可用
+`wait_for_next_deadline(real_timeout)` 等待后续重试或超时阶段，无需轮询，也不会被
+上一阶段尚在清理的已到期 waiter 误满足。异步测试可用
 `clock.wait_for_waiters_async(expected_count)` 等待注册，无需轮询，也不绑定特定
 runtime。数量一旦达到目标便会被锁存，即使 waiter 随即注销，等待 future 仍会完成。
 `ManualAsyncSleeper` 会在创建 sleep future 时注册 waiter，因此尚未 poll 的
@@ -171,16 +173,6 @@ let subscription = clock.subscribe_advances(|| {
 ```
 
 callback 在 clock mutex 外同步执行。它应可重复调用，并且只负责唤醒另一个等待原语。并发 advance 可能无序、并发地执行 callback。如果 callback panic，本次 advance 已捕获的所有 callback 仍会执行，随后在推进线程恢复第一个 panic。需要通知期间必须保留 `subscription`；丢弃它会注销后续 advance 通知，但已被某次进行中的 advance 捕获的 callback 仍可能执行一次。
-
-## 设计文档
-
-- [重构设计](doc/clock_refactoring_design.zh_CN.md)
-- [实施计划](doc/clock_refactoring_implementation_plan.zh_CN.md)
-- [API 简化设计](doc/clock_api_simplification_design.zh_CN.md)
-- [API 简化实施计划](doc/clock_api_simplification_implementation_plan.zh_CN.md)
-- [下游接入计划](doc/downstream_integration_implementation_plan.zh_CN.md)
-- [质量收口设计](doc/clock_quality_followup_design.zh_CN.md)
-- [质量收口实施计划](doc/clock_quality_followup_implementation_plan.zh_CN.md)
 
 ## 许可证
 

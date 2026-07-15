@@ -150,6 +150,9 @@ exceeds the platform's representable `SystemTime` range.
 One `ManualMonotonicClock` can drive blocking and async sleepers together.
 `pending_waiters()` counts both kinds, `next_deadline()` inspects their earliest
 future deadline, and `advance_to_next_deadline()` advances atomically to it.
+Blocking test drivers can call `wait_for_next_deadline(real_timeout)` to wait
+for a later retry or timeout stage without polling or confusing it with a due
+waiter from the previous stage.
 Async test coordination can await `clock.wait_for_waiters_async(expected_count)`
 without polling or depending on a particular runtime. Once the requested count
 is reached, completion remains latched even if a waiter is immediately dropped.
@@ -182,16 +185,6 @@ callbacks captured for that advance are attempted before the first panic is
 resumed. Retain `subscription` for as long as notifications are needed. Dropping
 it unregisters future notifications, but one callback already captured by an
 in-flight advance may still run.
-
-## Documentation
-
-- [Refactoring design](doc/clock_refactoring_design.zh_CN.md)
-- [Implementation plan](doc/clock_refactoring_implementation_plan.zh_CN.md)
-- [API simplification design](doc/clock_api_simplification_design.zh_CN.md)
-- [API simplification implementation plan](doc/clock_api_simplification_implementation_plan.zh_CN.md)
-- [Downstream integration plan](doc/downstream_integration_implementation_plan.zh_CN.md)
-- [Quality follow-up design](doc/clock_quality_followup_design.zh_CN.md)
-- [Quality follow-up plan](doc/clock_quality_followup_implementation_plan.zh_CN.md)
 
 ## License
 

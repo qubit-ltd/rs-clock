@@ -37,7 +37,7 @@ use std::time::Instant;
 /// The type intentionally does not implement [`Clone`]. Components that must
 /// observe one shared manual clock use `Arc<ManualMonotonicClock>` explicitly.
 pub struct ManualMonotonicClock {
-    /// The identifier of the originating monotonic clock domain.   
+    /// The identifier of the originating monotonic clock domain.
     domain: ClockDomain,
     /// The mutable state of the manual clock.
     state: Mutex<ManualMonotonicState>,
@@ -158,12 +158,6 @@ impl ManualMonotonicClock {
         ManualAdvanceSubscription::new(Arc::downgrade(self), subscriber_id)
     }
 
-    /// Unregisters an advance subscriber when its registration is dropped.
-    #[inline(always)]
-    pub(crate) fn unregister_advance_subscriber(&self, subscriber_id: u64) {
-        self.lock_state().advances.unregister(subscriber_id);
-    }
-
     /// Returns the number of blocking and asynchronous deadline waiters.
     #[must_use]
     #[inline(always)]
@@ -176,10 +170,50 @@ impl ManualMonotonicClock {
     #[inline]
     pub fn next_deadline(&self) -> Option<MonotonicInstant> {
         let state = self.lock_state();
-        state
-            .waiters
-            .next_future_deadline(state.elapsed)
-            .map(|elapsed| MonotonicInstant::new(self.domain, elapsed))
+        self.next_future_deadline(&state)
+    }
+
+    /// Blocks in real time until a future deadline is registered.
+    ///
+    /// Existing registrations whose deadlines have already been reached are
+    /// ignored. This allows a test driver to wait for the next stage of a
+    /// repeated operation even while the previous waiter is still cleaning up.
+    /// `real_timeout` is only a test guard and never advances logical time.
+    ///
+    /// # Arguments
+    ///
+    /// * `real_timeout` - Maximum real time spent waiting for a future
+    ///   deadline.
+    ///
+    /// # Returns
+    ///
+    /// The earliest registered future deadline, or `None` when the real-time
+    /// guard expires or cannot be represented.
+    #[must_use]
+    pub fn wait_for_next_deadline(
+        &self,
+        real_timeout: Duration,
+    ) -> Option<MonotonicInstant> {
+        let real_deadline = Instant::now().checked_add(real_timeout)?;
+        let mut state = self.lock_state();
+        loop {
+            if let Some(deadline) = self.next_future_deadline(&state) {
+                return Some(deadline);
+            }
+            let remaining =
+                real_deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return None;
+            }
+            let (next_state, wait_result) = self
+                .waiters_changed
+                .wait_timeout(state, remaining)
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            state = next_state;
+            if wait_result.timed_out() {
+                return self.next_future_deadline(&state);
+            }
+        }
     }
 
     /// Advances to the earliest registered future deadline.
@@ -271,6 +305,12 @@ impl ManualMonotonicClock {
                 return false;
             }
         }
+    }
+
+    /// Unregisters an advance subscriber when its registration is dropped.
+    #[inline(always)]
+    pub(crate) fn unregister_advance_subscriber(&self, subscriber_id: u64) {
+        self.lock_state().advances.unregister(subscriber_id);
     }
 
     /// Blocks until manual time reaches `deadline`.
@@ -405,6 +445,18 @@ impl ManualMonotonicClock {
     pub(super) fn unregister_blocking_waiter(&self, waiter_id: u64) {
         self.lock_state().waiters.unregister_blocking(waiter_id);
         self.waiters_changed.notify_all();
+    }
+
+    /// Returns the earliest future deadline represented in this clock domain.
+    #[inline]
+    fn next_future_deadline(
+        &self,
+        state: &ManualMonotonicState,
+    ) -> Option<MonotonicInstant> {
+        state
+            .waiters
+            .next_future_deadline(state.elapsed)
+            .map(|elapsed| MonotonicInstant::new(self.domain, elapsed))
     }
 
     /// Locks mutable state, recovering the inner value after poisoning.
