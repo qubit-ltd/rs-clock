@@ -44,6 +44,15 @@ pub struct ManualAdvanceSubscription {
 
 impl ManualAdvanceSubscription {
     /// Creates a subscription for `subscriber_id` without retaining the clock.
+    ///
+    /// # Parameters
+    ///
+    /// * `clock` - Weak reference to the clock owning the registration.
+    /// * `subscriber_id` - Identifier of the registered callback.
+    ///
+    /// # Returns
+    ///
+    /// A cancellation handle for the registered callback.
     #[inline(always)]
     pub(crate) const fn new(
         clock: Weak<ManualMonotonicClock>,
@@ -58,6 +67,18 @@ impl ManualAdvanceSubscription {
 
 impl Debug for ManualAdvanceSubscription {
     /// Formats the subscriber identifier without locking the clock.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` - Destination formatter.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after the subscription is formatted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::fmt::Error`] when the formatter rejects the output.
     #[inline]
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -69,6 +90,10 @@ impl Debug for ManualAdvanceSubscription {
 
 impl Drop for ManualAdvanceSubscription {
     /// Unregisters this subscriber if its manual clock still exists.
+    ///
+    /// # Panics
+    ///
+    /// Panics if destroying the callback or one of its captured values panics.
     #[inline]
     fn drop(&mut self) {
         if let Some(clock) = self.clock.upgrade() {

@@ -21,6 +21,10 @@ pub(crate) struct ManualMonotonicState {
 
 impl ManualMonotonicState {
     /// Creates state at the clock domain origin.
+    ///
+    /// # Returns
+    ///
+    /// Empty manual-clock state at elapsed duration zero.
     #[inline]
     pub(crate) fn new() -> Self {
         Self {
@@ -31,6 +35,10 @@ impl ManualMonotonicState {
     }
 
     /// Returns the number of blocking and asynchronous deadline waiters.
+    ///
+    /// # Returns
+    ///
+    /// The total number of registered deadline waiters.
     #[inline(always)]
     pub(crate) fn waiter_count(&self) -> usize {
         self.waiters.count()

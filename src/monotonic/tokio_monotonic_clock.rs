@@ -40,6 +40,14 @@ impl TokioMonotonicClock {
     /// paused or explicitly advanced Tokio time, call it after entering the
     /// runtime whose time driver will read this clock and poll its paired
     /// sleeper.
+    ///
+    /// # Returns
+    ///
+    /// A Tokio monotonic clock with a newly allocated domain.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[must_use]
     #[inline]
     pub fn new() -> Self {
@@ -50,12 +58,20 @@ impl TokioMonotonicClock {
     }
 
     /// Returns the Tokio origin used by the paired async sleeper.
+    ///
+    /// # Returns
+    ///
+    /// The Tokio instant mapped to elapsed duration zero.
     #[inline(always)]
     pub(crate) const fn origin(&self) -> Instant {
         self.origin
     }
 
     /// Returns this concrete clock's domain without sampling Tokio time.
+    ///
+    /// # Returns
+    ///
+    /// This clock's process-unique domain.
     #[inline(always)]
     pub(crate) const fn domain(&self) -> ClockDomain {
         self.domain
@@ -64,6 +80,14 @@ impl TokioMonotonicClock {
 
 impl Default for TokioMonotonicClock {
     /// Creates a new independent Tokio monotonic clock domain.
+    ///
+    /// # Returns
+    ///
+    /// A Tokio monotonic clock with a newly allocated domain.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline(always)]
     fn default() -> Self {
         Self::new()
@@ -72,6 +96,10 @@ impl Default for TokioMonotonicClock {
 
 impl MonotonicClock for TokioMonotonicClock {
     /// Returns the current instant in this clock's domain.
+    ///
+    /// # Returns
+    ///
+    /// The current elapsed duration represented in this clock's domain.
     #[inline]
     fn now(&self) -> MonotonicInstant {
         MonotonicInstant::new(self.domain, self.origin.elapsed())

@@ -14,6 +14,10 @@ pub struct StdWallClock;
 
 impl StdWallClock {
     /// Creates a standard system wall clock.
+    ///
+    /// # Returns
+    ///
+    /// A zero-sized wall clock backed by [`SystemTime::now`].
     #[must_use]
     #[inline(always)]
     pub const fn new() -> Self {
@@ -23,7 +27,11 @@ impl StdWallClock {
 
 impl WallClock for StdWallClock {
     /// Returns the current system wall time.
-    #[inline]
+    ///
+    /// # Returns
+    ///
+    /// The value produced by [`SystemTime::now`].
+    #[inline(always)]
     fn now(&self) -> SystemTime {
         SystemTime::now()
     }

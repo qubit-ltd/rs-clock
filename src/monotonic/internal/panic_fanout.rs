@@ -25,12 +25,20 @@ pub(crate) struct PanicFanout {
 
 impl PanicFanout {
     /// Creates a fanout with no retained panic.
+    ///
+    /// # Returns
+    ///
+    /// An empty panic accumulator.
     #[inline(always)]
     pub(crate) fn new() -> Self {
         Self { first_panic: None }
     }
 
     /// Attempts every task wake and retains only the first panic payload.
+    ///
+    /// # Parameters
+    ///
+    /// * `wakers` - Task wakers to invoke and destroy in iteration order.
     pub(crate) fn wake_all(&mut self, wakers: Vec<Waker>) {
         for waker in wakers {
             // Borrowing for the wake keeps the waker's destructor out of the
@@ -42,6 +50,11 @@ impl PanicFanout {
 
     /// Attempts every advance callback and retains only the first panic
     /// payload across both waker and callback phases.
+    ///
+    /// # Parameters
+    ///
+    /// * `callbacks` - Advance callbacks to invoke and destroy in iteration
+    ///   order.
     pub(crate) fn call_all(&mut self, callbacks: Vec<AdvanceCallback>) {
         for callback in callbacks {
             self.record(catch_unwind(AssertUnwindSafe(|| callback())));
@@ -50,6 +63,10 @@ impl PanicFanout {
     }
 
     /// Resumes the first retained panic after every target was attempted.
+    ///
+    /// # Panics
+    ///
+    /// Resumes the first retained panic when a prior fanout target panicked.
     #[inline]
     pub(crate) fn resume_first_panic(self) {
         if let Some(payload) = self.first_panic {
@@ -58,6 +75,10 @@ impl PanicFanout {
     }
 
     /// Records `result` when it is the first panic in this fanout.
+    ///
+    /// # Parameters
+    ///
+    /// * `result` - Caught result from a waker, callback, or destructor.
     #[inline]
     fn record(&mut self, result: Result<(), PanicPayload>) {
         if let Err(payload) = result {

@@ -35,6 +35,15 @@ impl ManualWallClock {
     /// Creates a wall clock whose current reading is `wall_time`.
     ///
     /// Future readings advance according to the explicitly shared `clock`.
+    ///
+    /// # Parameters
+    ///
+    /// * `wall_time` - Wall-clock value assigned to the current manual instant.
+    /// * `clock` - Shared manual monotonic timeline driving future readings.
+    ///
+    /// # Returns
+    ///
+    /// A wall clock anchored to the supplied wall and monotonic times.
     #[must_use]
     #[inline]
     pub fn from_clock(
@@ -55,6 +64,10 @@ impl ManualWallClock {
     /// anchor mutex remains held while the monotonic clock is sampled, so
     /// concurrent calls to [`now()`](WallClock::now) observe either the old or
     /// the new mapping without combining both snapshots.
+    ///
+    /// # Parameters
+    ///
+    /// * `wall_time` - Replacement wall time for the current monotonic instant.
     #[inline]
     pub fn reanchor(&self, wall_time: SystemTime) {
         let mut anchor = self.lock_anchor();
@@ -63,6 +76,10 @@ impl ManualWallClock {
     }
 
     /// Locks the wall and monotonic anchor pair, recovering after poisoning.
+    ///
+    /// # Returns
+    ///
+    /// A guard granting mutable access to the anchor pair.
     #[inline]
     fn lock_anchor(&self) -> MutexGuard<'_, (SystemTime, MonotonicInstant)> {
         self.anchor
@@ -73,6 +90,10 @@ impl ManualWallClock {
 
 impl WallClock for ManualWallClock {
     /// Returns wall time derived from the anchor and current monotonic time.
+    ///
+    /// # Returns
+    ///
+    /// The anchored wall time plus elapsed manual monotonic time.
     ///
     /// # Panics
     ///

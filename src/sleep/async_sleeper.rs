@@ -32,7 +32,7 @@ pub trait AsyncSleeper: Send + Sync {
     /// The returned future owns its waiting state and does not borrow this
     /// sleeper. A reached deadline completes immediately.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `deadline` - The instant to wait for. It must belong to the stable
     ///   domain exposed by [`Self::clock`].
@@ -61,7 +61,7 @@ pub trait AsyncSleeper: Send + Sync {
     /// returned future is first polled. The future owns its waiting state and
     /// has a `'static` lifetime.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `duration` - The amount of monotonic time to wait.
     ///
@@ -93,12 +93,28 @@ where
     T: AsyncSleeper + ?Sized,
 {
     /// Delegates the paired clock to the shared sleeper object.
+    ///
+    /// # Returns
+    ///
+    /// The monotonic clock exposed by the wrapped sleeper.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates asynchronous waiting to the shared sleeper object.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Domain-scoped deadline forwarded to the wrapped sleeper.
+    ///
+    /// # Returns
+    ///
+    /// The owned sleep future returned by the wrapped sleeper.
+    ///
+    /// # Errors
+    ///
+    /// The future propagates any [`TimeError`] produced by the wrapped sleeper.
     #[inline(always)]
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         self.as_ref().sleep_until_async(deadline)
@@ -110,12 +126,28 @@ where
     T: AsyncSleeper + ?Sized,
 {
     /// Delegates the paired clock to the boxed sleeper object.
+    ///
+    /// # Returns
+    ///
+    /// The monotonic clock exposed by the wrapped sleeper.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates asynchronous waiting to the boxed sleeper object.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Domain-scoped deadline forwarded to the wrapped sleeper.
+    ///
+    /// # Returns
+    ///
+    /// The owned sleep future returned by the wrapped sleeper.
+    ///
+    /// # Errors
+    ///
+    /// The future propagates any [`TimeError`] produced by the wrapped sleeper.
     #[inline(always)]
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         self.as_ref().sleep_until_async(deadline)
@@ -123,6 +155,18 @@ where
 }
 
 /// Creates an immediately ready sleep future for a precomputed result.
+///
+/// # Parameters
+///
+/// * `result` - Completion result returned by the future.
+///
+/// # Returns
+///
+/// An owned future that resolves immediately to `result`.
+///
+/// # Errors
+///
+/// The future returns the supplied [`TimeError`] when `result` is `Err`.
 #[inline]
 pub(crate) fn ready_sleep_result(result: Result<(), TimeError>) -> SleepFuture {
     Box::pin(async move { result })

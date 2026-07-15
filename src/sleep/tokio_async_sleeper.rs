@@ -36,6 +36,14 @@ impl TokioAsyncSleeper {
     ///
     /// The caller must preserve the clock's Tokio time-driver affinity while
     /// using the returned sleeper.
+    ///
+    /// # Parameters
+    ///
+    /// * `clock` - Shared Tokio monotonic clock paired with the sleeper.
+    ///
+    /// # Returns
+    ///
+    /// An async sleeper using the exact supplied clock.
     #[must_use]
     #[inline(always)]
     pub const fn from_clock(clock: Arc<TokioMonotonicClock>) -> Self {
@@ -46,6 +54,20 @@ impl TokioAsyncSleeper {
     ///
     /// Returns a domain mismatch or overflow error when conversion is not
     /// possible.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Domain-scoped deadline to convert.
+    ///
+    /// # Returns
+    ///
+    /// The corresponding Tokio instant.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline and
+    /// [`TimeError::InstantOverflow`] when the Tokio instant cannot represent
+    /// it.
     #[inline]
     fn native_deadline(
         &self,
@@ -61,6 +83,10 @@ impl TokioAsyncSleeper {
 
 impl AsyncSleeper for TokioAsyncSleeper {
     /// Returns the Tokio monotonic clock driving this sleeper.
+    ///
+    /// # Returns
+    ///
+    /// The paired Tokio clock as a monotonic-clock trait object.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
@@ -73,6 +99,19 @@ impl AsyncSleeper for TokioAsyncSleeper {
     /// The first poll must occur under a Tokio runtime with time enabled. When
     /// using paused or explicitly advanced time, that runtime must be the same
     /// one used to create and read the paired clock.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Instant to await in the paired Tokio clock domain.
+    ///
+    /// # Returns
+    ///
+    /// An owned future driven by Tokio's time driver.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to [`TimeError::ClockDomainMismatch`] for a foreign
+    /// deadline or [`TimeError::InstantOverflow`] when conversion fails.
     ///
     /// # Panics
     ///

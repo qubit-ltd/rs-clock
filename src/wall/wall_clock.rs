@@ -13,6 +13,10 @@ use std::time::SystemTime;
 /// adjustment and must not be used to measure elapsed durations.
 pub trait WallClock: Send + Sync {
     /// Returns the current wall-clock time.
+    ///
+    /// # Returns
+    ///
+    /// The implementor's current civil-time reading.
     fn now(&self) -> SystemTime;
 }
 
@@ -21,6 +25,10 @@ where
     T: WallClock + ?Sized,
 {
     /// Delegates to the shared wall clock object.
+    ///
+    /// # Returns
+    ///
+    /// The current wall time returned by the wrapped clock.
     #[inline(always)]
     fn now(&self) -> SystemTime {
         self.as_ref().now()
@@ -32,6 +40,10 @@ where
     T: WallClock + ?Sized,
 {
     /// Delegates to the boxed wall clock object.
+    ///
+    /// # Returns
+    ///
+    /// The current wall time returned by the wrapped clock.
     #[inline(always)]
     fn now(&self) -> SystemTime {
         self.as_ref().now()

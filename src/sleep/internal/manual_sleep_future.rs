@@ -34,6 +34,21 @@ pub(crate) struct ManualSleepFuture {
 
 impl ManualSleepFuture {
     /// Creates and immediately registers a manual async wait.
+    ///
+    /// # Parameters
+    ///
+    /// * `clock` - Manual clock that owns the waiter registration.
+    /// * `deadline` - Domain-scoped deadline for the wait.
+    ///
+    /// # Returns
+    ///
+    /// A future containing either an active waiter or a deferred registration
+    /// error.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the waiter identifier space is exhausted or when a reached
+    /// waiter-count observer waker panics during registration.
     #[inline]
     pub(crate) fn new(
         clock: Arc<ManualMonotonicClock>,
@@ -58,6 +73,25 @@ impl Future for ManualSleepFuture {
     type Output = Result<(), TimeError>;
 
     /// Checks manual time and registers the current task waker when pending.
+    ///
+    /// # Parameters
+    ///
+    /// * `context` - Task context whose waker replaces any prior registration.
+    ///
+    /// # Returns
+    ///
+    /// [`Poll::Ready`] with the completion result when the deadline is reached
+    /// or registration failed, otherwise [`Poll::Pending`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the registration [`TimeError`], including a clock-domain
+    /// mismatch, on the first poll after failed registration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal waiter registration is missing or destroying a
+    /// replaced custom task waker panics.
     fn poll(
         self: Pin<&mut Self>,
         context: &mut Context<'_>,
@@ -81,6 +115,10 @@ impl Future for ManualSleepFuture {
 
 impl Drop for ManualSleepFuture {
     /// Removes an incomplete waiter registration during cancellation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if destroying the waiter's custom task waker panics.
     #[inline]
     fn drop(&mut self) {
         if let Some(waiter_id) = self.waiter_id.take() {
