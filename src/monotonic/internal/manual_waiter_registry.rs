@@ -192,26 +192,43 @@ impl ManualWaiterRegistry {
     /// Updates the async waiter waker or reports that its deadline is due.
     ///
     /// The returned ready state removes the waiter registration.
+    ///
+    /// # Arguments
+    ///
+    /// * `waiter_id` - Identifier of the registered async waiter.
+    /// * `elapsed` - Current elapsed duration of the manual clock.
+    /// * `context` - Task context whose waker is stored while pending.
+    ///
+    /// # Returns
+    ///
+    /// [`Poll::Ready`] when the registered deadline has been reached, or
+    /// [`Poll::Pending`] after recording the current task waker.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `waiter_id` no longer identifies a registered async waiter.
     pub(crate) fn poll_async(
         &mut self,
         waiter_id: u64,
-        deadline: Duration,
         elapsed: Duration,
         context: &Context<'_>,
     ) -> Poll<()> {
-        if elapsed >= deadline {
-            self.async_waiters.remove(&waiter_id);
-            return Poll::Ready(());
-        }
-        if let Some((_, registered_waker)) =
+        let Some((deadline, registered_waker)) =
             self.async_waiters.get_mut(&waiter_id)
-            && registered_waker
+        else {
+            panic!("manual async waiter {waiter_id} is not registered");
+        };
+        if elapsed < *deadline {
+            if registered_waker
                 .as_ref()
                 .is_none_or(|waker| !waker.will_wake(context.waker()))
-        {
-            *registered_waker = Some(context.waker().clone());
+            {
+                *registered_waker = Some(context.waker().clone());
+            }
+            return Poll::Pending;
         }
-        Poll::Pending
+        self.async_waiters.remove(&waiter_id);
+        Poll::Ready(())
     }
 
     /// Removes reached observers and returns their registered task wakers.

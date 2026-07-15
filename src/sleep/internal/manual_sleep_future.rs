@@ -26,8 +26,6 @@ use std::task::{
 pub(crate) struct ManualSleepFuture {
     /// Manual clock that owns the waiter registration.
     clock: Arc<ManualMonotonicClock>,
-    /// Domain-checked deadline assigned when the future was created.
-    deadline: MonotonicInstant,
     /// Active async waiter identifier, or `None` after completion.
     waiter_id: Option<u64>,
     /// Registration error returned on the first poll when present.
@@ -44,13 +42,11 @@ impl ManualSleepFuture {
         match clock.register_async_waiter(deadline) {
             Ok(waiter_id) => Self {
                 clock,
-                deadline,
                 waiter_id,
                 error: None,
             },
             Err(error) => Self {
                 clock,
-                deadline,
                 waiter_id: None,
                 error: Some(error),
             },
@@ -73,10 +69,7 @@ impl Future for ManualSleepFuture {
         let Some(waiter_id) = this.waiter_id else {
             return Poll::Ready(Ok(()));
         };
-        match this
-            .clock
-            .poll_async_waiter(waiter_id, this.deadline, context)
-        {
+        match this.clock.poll_async_waiter(waiter_id, context) {
             Poll::Ready(result) => {
                 this.waiter_id = None;
                 Poll::Ready(result)
