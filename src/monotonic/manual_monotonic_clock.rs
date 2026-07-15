@@ -5,8 +5,12 @@
 // =============================================================================
 //! Defines an explicitly advanced monotonic clock for deterministic tests.
 
-use crate::monotonic::manual_advance_registry::AdvanceCallback;
-use crate::monotonic::manual_monotonic_state::ManualMonotonicState;
+use crate::monotonic::internal::{
+    AdvanceEffects,
+    ManualMonotonicState,
+    PanicFanout,
+    WaiterRegistrationGuard,
+};
 use crate::{
     ClockDomain,
     ManualAdvanceSubscription,
@@ -14,12 +18,6 @@ use crate::{
     MonotonicClock,
     MonotonicInstant,
     TimeError,
-};
-use std::any::Any;
-use std::panic::{
-    AssertUnwindSafe,
-    catch_unwind,
-    resume_unwind,
 };
 use std::sync::{
     Arc,
@@ -30,148 +28,29 @@ use std::sync::{
 use std::task::{
     Context,
     Poll,
-    Waker,
 };
 use std::time::Duration;
 use std::time::Instant;
-
-/// Panic payload retained while a notification fanout attempts every target.
-type PanicPayload = Box<dyn Any + Send + 'static>;
-
-/// Side effects collected while committing one manual time advance.
-struct AdvanceEffects {
-    /// Task wakers whose deadlines were reached by the advance.
-    due_wakers: Vec<Waker>,
-    /// Persistent subscriber callbacks captured for this advance.
-    advance_callbacks: Vec<AdvanceCallback>,
-}
-
-/// Attempts every waker and callback before resuming the first panic.
-struct PanicFanout {
-    /// First panic observed in notification order.
-    first_panic: Option<PanicPayload>,
-}
-
-impl PanicFanout {
-    /// Creates a fanout with no retained panic.
-    fn new() -> Self {
-        Self { first_panic: None }
-    }
-
-    /// Attempts every task wake and retains only the first panic payload.
-    fn wake_all(&mut self, wakers: Vec<Waker>) {
-        for waker in wakers {
-            // Borrowing for the wake keeps the waker's destructor out of the
-            // wake panic's unwind path, preventing a double-panic abort.
-            self.record(catch_unwind(AssertUnwindSafe(|| waker.wake_by_ref())));
-            self.record(catch_unwind(AssertUnwindSafe(|| drop(waker))));
-        }
-    }
-
-    /// Attempts every advance callback and retains only the first panic
-    /// payload across both waker and callback phases.
-    fn call_all(&mut self, callbacks: Vec<AdvanceCallback>) {
-        for callback in callbacks {
-            self.record(catch_unwind(AssertUnwindSafe(|| callback())));
-            self.record(catch_unwind(AssertUnwindSafe(|| drop(callback))));
-        }
-    }
-
-    /// Records `result` when it is the first panic in this fanout.
-    fn record(&mut self, result: Result<(), PanicPayload>) {
-        if let Err(payload) = result {
-            if self.first_panic.is_none() {
-                self.first_panic = Some(payload);
-            } else {
-                // A panic payload may itself panic when dropped. Leaking only
-                // secondary payloads preserves the first panic and guarantees
-                // that the remaining notification targets are attempted.
-                std::mem::forget(payload);
-            }
-        }
-    }
-
-    /// Resumes the first retained panic after every target was attempted.
-    fn resume_first_panic(self) {
-        if let Some(payload) = self.first_panic {
-            resume_unwind(payload);
-        }
-    }
-}
-
-/// Kind and identifier of one waiter whose registration needs cleanup.
-enum RegisteredWaiter {
-    /// Blocking waiter registration.
-    Blocking(u64),
-    /// Async waiter registration.
-    Async(u64),
-}
-
-/// Removes a waiter registration if control unwinds before ownership is
-/// transferred to its normal blocking or async lifetime.
-struct WaiterRegistrationGuard<'a> {
-    /// Clock that owns the registration.
-    clock: &'a ManualMonotonicClock,
-    /// Registration still owned by this guard.
-    waiter: Option<RegisteredWaiter>,
-}
-
-impl<'a> WaiterRegistrationGuard<'a> {
-    /// Guards a newly registered blocking waiter.
-    fn blocking(clock: &'a ManualMonotonicClock, waiter_id: u64) -> Self {
-        Self {
-            clock,
-            waiter: Some(RegisteredWaiter::Blocking(waiter_id)),
-        }
-    }
-
-    /// Guards a newly registered async waiter.
-    fn asynchronous(clock: &'a ManualMonotonicClock, waiter_id: u64) -> Self {
-        Self {
-            clock,
-            waiter: Some(RegisteredWaiter::Async(waiter_id)),
-        }
-    }
-
-    /// Transfers an async registration to the returned future.
-    fn into_async_waiter_id(mut self) -> u64 {
-        let Some(RegisteredWaiter::Async(waiter_id)) = self.waiter.take()
-        else {
-            unreachable!("only async registration guards can be transferred");
-        };
-        waiter_id
-    }
-}
-
-impl Drop for WaiterRegistrationGuard<'_> {
-    /// Removes a registration still owned by this guard.
-    fn drop(&mut self) {
-        match self.waiter.take() {
-            Some(RegisteredWaiter::Blocking(waiter_id)) => {
-                self.clock.unregister_blocking_waiter(waiter_id);
-            }
-            Some(RegisteredWaiter::Async(waiter_id)) => {
-                self.clock.unregister_async_waiter(waiter_id);
-            }
-            None => {}
-        }
-    }
-}
 
 /// A monotonic clock that advances only when explicitly instructed.
 ///
 /// The type intentionally does not implement [`Clone`]. Components that must
 /// observe one shared manual clock use `Arc<ManualMonotonicClock>` explicitly.
 pub struct ManualMonotonicClock {
+    /// The identifier of the originating monotonic clock domain.   
     domain: ClockDomain,
+    /// The mutable state of the manual clock.
     state: Mutex<ManualMonotonicState>,
+    /// The condition variable used to notify time changes.
     changed: Condvar,
+    /// The condition variable used to notify waiter changes.
     waiters_changed: Condvar,
 }
 
 impl ManualMonotonicClock {
     /// Creates a new manual clock at its zero-duration origin.
     #[must_use]
+    #[inline]
     pub fn new() -> Self {
         Self {
             domain: ClockDomain::new(),
@@ -280,18 +159,21 @@ impl ManualMonotonicClock {
     }
 
     /// Unregisters an advance subscriber when its registration is dropped.
+    #[inline(always)]
     pub(crate) fn unregister_advance_subscriber(&self, subscriber_id: u64) {
         self.lock_state().advances.unregister(subscriber_id);
     }
 
     /// Returns the number of blocking and asynchronous deadline waiters.
     #[must_use]
+    #[inline(always)]
     pub fn pending_waiters(&self) -> usize {
         self.lock_state().waiter_count()
     }
 
     /// Returns the earliest registered deadline that has not yet been reached.
     #[must_use]
+    #[inline]
     pub fn next_deadline(&self) -> Option<MonotonicInstant> {
         let state = self.lock_state();
         state
@@ -336,6 +218,7 @@ impl ManualMonotonicClock {
     ///
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
+    #[inline(always)]
     pub fn wait_for_waiters_async(
         self: &Arc<Self>,
         expected_count: usize,
@@ -457,6 +340,7 @@ impl ManualMonotonicClock {
     /// Registers an asynchronous observer of the total waiter count.
     ///
     /// Panics if the observer identifier space is exhausted.
+    #[inline]
     pub(crate) fn register_waiter_observer(
         &self,
         expected_count: usize,
@@ -467,6 +351,7 @@ impl ManualMonotonicClock {
     }
 
     /// Polls an asynchronous observer of the total waiter count.
+    #[inline]
     pub(crate) fn poll_waiter_observer(
         &self,
         observer_id: u64,
@@ -478,6 +363,7 @@ impl ManualMonotonicClock {
     }
 
     /// Removes an incomplete asynchronous waiter-count observer.
+    #[inline(always)]
     pub(crate) fn unregister_waiter_observer(&self, observer_id: u64) {
         self.lock_state().waiters.unregister_observer(observer_id);
     }
@@ -506,6 +392,7 @@ impl ManualMonotonicClock {
     }
 
     /// Removes an async waiter after completion or future cancellation.
+    #[inline]
     pub(crate) fn unregister_async_waiter(&self, waiter_id: u64) {
         let removed = self.lock_state().waiters.unregister_async(waiter_id);
         if removed {
@@ -514,12 +401,14 @@ impl ManualMonotonicClock {
     }
 
     /// Removes a blocking waiter after completion or unwinding.
-    fn unregister_blocking_waiter(&self, waiter_id: u64) {
+    #[inline]
+    pub(super) fn unregister_blocking_waiter(&self, waiter_id: u64) {
         self.lock_state().waiters.unregister_blocking(waiter_id);
         self.waiters_changed.notify_all();
     }
 
     /// Locks mutable state, recovering the inner value after poisoning.
+    #[inline]
     fn lock_state(&self) -> MutexGuard<'_, ManualMonotonicState> {
         self.state
             .lock()
@@ -527,6 +416,7 @@ impl ManualMonotonicClock {
     }
 
     /// Collects due task wakers and current advance callbacks under the lock.
+    #[inline]
     fn collect_advance_effects(
         state: &mut ManualMonotonicState,
     ) -> AdvanceEffects {
@@ -555,6 +445,7 @@ impl ManualMonotonicClock {
 }
 
 impl std::fmt::Debug for ManualMonotonicClock {
+    #[inline]
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("ManualMonotonicClock")
@@ -565,6 +456,7 @@ impl std::fmt::Debug for ManualMonotonicClock {
 
 impl Default for ManualMonotonicClock {
     /// Creates a new independent manual clock domain.
+    #[inline(always)]
     fn default() -> Self {
         Self::new()
     }
@@ -572,6 +464,7 @@ impl Default for ManualMonotonicClock {
 
 impl MonotonicClock for ManualMonotonicClock {
     /// Returns the current instant in this clock's domain.
+    #[inline]
     fn now(&self) -> MonotonicInstant {
         MonotonicInstant::new(self.domain, self.lock_state().elapsed)
     }

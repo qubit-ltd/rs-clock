@@ -5,7 +5,7 @@
 // =============================================================================
 //! Stores callbacks observing successful manual time advances.
 
-use crate::monotonic::manual_waiter_registry::allocate_identifier;
+use super::manual_waiter_registry::allocate_identifier;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -22,6 +22,7 @@ pub(crate) struct ManualAdvanceRegistry {
 
 impl ManualAdvanceRegistry {
     /// Creates an empty registry.
+    #[inline]
     pub(crate) fn new() -> Self {
         Self {
             next_subscriber_id: 1,
@@ -32,6 +33,7 @@ impl ManualAdvanceRegistry {
     /// Registers callback and returns its subscription identifier.
     ///
     /// Panics when the registry cannot allocate another identifier.
+    #[inline]
     pub(crate) fn register(&mut self, callback: AdvanceCallback) -> u64 {
         let subscriber_id = allocate_identifier(
             &mut self.next_subscriber_id,
@@ -42,6 +44,7 @@ impl ManualAdvanceRegistry {
     }
 
     /// Removes the callback identified by subscriber_id.
+    #[inline(always)]
     pub(crate) fn unregister(&mut self, subscriber_id: u64) {
         self.subscribers.remove(&subscriber_id);
     }
