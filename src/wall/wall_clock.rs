@@ -21,6 +21,7 @@ where
     T: WallClock + ?Sized,
 {
     /// Delegates to the shared wall clock object.
+    #[inline(always)]
     fn now(&self) -> SystemTime {
         self.as_ref().now()
     }
@@ -31,6 +32,7 @@ where
     T: WallClock + ?Sized,
 {
     /// Delegates to the boxed wall clock object.
+    #[inline(always)]
     fn now(&self) -> SystemTime {
         self.as_ref().now()
     }

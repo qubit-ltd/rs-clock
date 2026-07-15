@@ -35,6 +35,7 @@ impl TokioAsyncSleeper {
     /// The caller must preserve the clock's Tokio time-driver affinity while
     /// using the returned sleeper.
     #[must_use]
+    #[inline(always)]
     pub const fn from_clock(clock: Arc<TokioMonotonicClock>) -> Self {
         Self { clock }
     }
@@ -43,6 +44,7 @@ impl TokioAsyncSleeper {
     ///
     /// Returns a domain mismatch or overflow error when conversion is not
     /// possible.
+    #[inline]
     fn native_deadline(
         &self,
         deadline: MonotonicInstant,
@@ -57,6 +59,7 @@ impl TokioAsyncSleeper {
 
 impl AsyncSleeper for TokioAsyncSleeper {
     /// Returns the Tokio monotonic clock driving this sleeper.
+    #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
     }
@@ -73,6 +76,7 @@ impl AsyncSleeper for TokioAsyncSleeper {
     ///
     /// The returned future panics when first polled without a Tokio runtime
     /// whose time driver is enabled.
+    #[inline]
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         let deadline = match self.native_deadline(deadline) {
             Ok(deadline) => deadline,

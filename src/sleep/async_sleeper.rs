@@ -30,6 +30,7 @@ pub trait AsyncSleeper: Send + Sync {
     /// The deadline is calculated when this method is called, before the
     /// returned future is first polled. The future owns its waiting state and
     /// has a `'static` lifetime.
+    #[inline]
     fn sleep_for_async(&self, duration: Duration) -> SleepFuture {
         match self.clock().now().checked_add(duration) {
             Ok(deadline) => self.sleep_until_async(deadline),
@@ -43,11 +44,13 @@ where
     T: AsyncSleeper + ?Sized,
 {
     /// Delegates the paired clock to the shared sleeper object.
+    #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates asynchronous waiting to the shared sleeper object.
+    #[inline(always)]
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         self.as_ref().sleep_until_async(deadline)
     }
@@ -58,17 +61,20 @@ where
     T: AsyncSleeper + ?Sized,
 {
     /// Delegates the paired clock to the boxed sleeper object.
+    #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates asynchronous waiting to the boxed sleeper object.
+    #[inline(always)]
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         self.as_ref().sleep_until_async(deadline)
     }
 }
 
 /// Creates an immediately ready sleep future for a precomputed result.
+#[inline]
 pub(crate) fn ready_sleep_result(result: Result<(), TimeError>) -> SleepFuture {
     Box::pin(async move { result })
 }

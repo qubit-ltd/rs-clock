@@ -70,6 +70,7 @@ impl ClockDomain {
     /// allocated rather than wrapping and reusing a prior identity.
     #[must_use]
     #[allow(clippy::new_without_default)]
+    #[inline(always)]
     pub fn new() -> Self {
         Self(allocate_clock_domain_identifier(&NEXT_CLOCK_DOMAIN))
     }

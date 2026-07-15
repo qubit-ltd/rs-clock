@@ -24,12 +24,15 @@ use std::sync::Weak;
 /// required.
 #[must_use = "dropping the subscription unregisters the callback"]
 pub struct ManualAdvanceSubscription {
+    /// The weak reference to the manual clock.
     clock: Weak<ManualMonotonicClock>,
+    /// The identifier of the subscriber.
     subscriber_id: u64,
 }
 
 impl ManualAdvanceSubscription {
     /// Creates a subscription for `subscriber_id` without retaining the clock.
+    #[inline(always)]
     pub(crate) const fn new(
         clock: Weak<ManualMonotonicClock>,
         subscriber_id: u64,
@@ -43,6 +46,7 @@ impl ManualAdvanceSubscription {
 
 impl Debug for ManualAdvanceSubscription {
     /// Formats the subscriber identifier without locking the clock.
+    #[inline]
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("ManualAdvanceSubscription")
@@ -53,6 +57,7 @@ impl Debug for ManualAdvanceSubscription {
 
 impl Drop for ManualAdvanceSubscription {
     /// Unregisters this subscriber if its manual clock still exists.
+    #[inline]
     fn drop(&mut self) {
         if let Some(clock) = self.clock.upgrade() {
             clock.unregister_advance_subscriber(self.subscriber_id);
