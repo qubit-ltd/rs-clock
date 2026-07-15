@@ -58,7 +58,7 @@ fn test_retry_exponential_backoff_uses_no_real_delay() {
 
 /// Waits until the retry worker registers the expected blocking deadline.
 ///
-/// # Arguments
+/// # Parameters
 ///
 /// * `clock` - Manual clock shared with the retry worker.
 /// * `expected_deadline` - Deadline the worker is expected to register.
