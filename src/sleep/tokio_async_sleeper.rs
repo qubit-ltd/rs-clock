@@ -24,6 +24,7 @@ use tokio::time::Instant;
 /// Tokio runtime time driver. Moving a task between threads of one runtime is
 /// supported, but moving the pair between independent runtimes is not. This
 /// contract is not checked at runtime.
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioAsyncSleeper {
     /// Shared Tokio clock used for deadline conversion and elapsed time.
