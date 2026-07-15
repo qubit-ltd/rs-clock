@@ -5,19 +5,30 @@
 // =============================================================================
 
 use qubit_clock::{
-    AsyncSleeper, BlockingSleeper, ManualAsyncSleeper, ManualBlockingSleeper, ManualMonotonicClock,
+    AsyncSleeper,
+    BlockingSleeper,
+    ManualAsyncSleeper,
+    ManualBlockingSleeper,
+    ManualMonotonicClock,
     MonotonicClock,
 };
 use std::future::pending;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{
+    AtomicUsize,
+    Ordering,
+};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{
+    Duration,
+    Instant,
+};
 
 #[test]
 fn test_retry_exponential_backoff_uses_no_real_delay() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
+    let sleeper =
+        Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
     let attempts = Arc::new(AtomicUsize::new(0));
     let worker_sleeper = Arc::clone(&sleeper);
     let worker_attempts = Arc::clone(&attempts);

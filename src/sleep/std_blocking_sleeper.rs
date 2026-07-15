@@ -5,7 +5,13 @@
 // =============================================================================
 //! Defines a standard-library blocking sleeper.
 
-use crate::{BlockingSleeper, MonotonicClock, MonotonicInstant, StdMonotonicClock, TimeError};
+use crate::{
+    BlockingSleeper,
+    MonotonicClock,
+    MonotonicInstant,
+    StdMonotonicClock,
+    TimeError,
+};
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
@@ -27,7 +33,10 @@ impl StdBlockingSleeper {
     ///
     /// Returns a domain mismatch or overflow error when conversion is not
     /// possible.
-    fn native_deadline(&self, deadline: MonotonicInstant) -> Result<Instant, TimeError> {
+    fn native_deadline(
+        &self,
+        deadline: MonotonicInstant,
+    ) -> Result<Instant, TimeError> {
         deadline.ensure_domain(self.clock.domain())?;
         self.clock
             .origin()

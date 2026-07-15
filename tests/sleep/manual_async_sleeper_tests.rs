@@ -5,7 +5,11 @@
 // =============================================================================
 
 use qubit_clock::{
-    AsyncSleeper, ManualAsyncSleeper, ManualMonotonicClock, MonotonicClock, TimeError,
+    AsyncSleeper,
+    ManualAsyncSleeper,
+    ManualMonotonicClock,
+    MonotonicClock,
+    TimeError,
 };
 use std::sync::Arc;
 use std::time::Duration;

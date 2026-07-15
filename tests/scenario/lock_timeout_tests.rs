@@ -5,17 +5,29 @@
 // =============================================================================
 
 use qubit_clock::{
-    AsyncSleeper, BlockingSleeper, ManualAsyncSleeper, ManualBlockingSleeper, ManualMonotonicClock,
+    AsyncSleeper,
+    BlockingSleeper,
+    ManualAsyncSleeper,
+    ManualBlockingSleeper,
+    ManualMonotonicClock,
     MonotonicClock,
 };
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{
+    Arc,
+    Condvar,
+    Mutex,
+};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{
+    Duration,
+    Instant,
+};
 
 #[test]
 fn test_blocking_lock_timeout_is_driven_by_manual_time() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
+    let sleeper =
+        Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
     let worker_sleeper = Arc::clone(&sleeper);
     let worker = thread::spawn(move || {
         worker_sleeper

@@ -44,14 +44,28 @@ pub mod wall;
 
 pub use error::TimeError;
 pub use monotonic::{
-    ClockDomain, ManualAdvanceSubscription, ManualMonotonicClock, ManualWaiterFuture,
-    MonotonicClock, MonotonicInstant, StdMonotonicClock,
+    ClockDomain,
+    ManualAdvanceSubscription,
+    ManualMonotonicClock,
+    ManualWaiterFuture,
+    MonotonicClock,
+    MonotonicInstant,
+    StdMonotonicClock,
 };
 pub use sleep::{
-    AsyncSleeper, BlockingSleeper, ManualAsyncSleeper, ManualBlockingSleeper, SleepFuture,
+    AsyncSleeper,
+    BlockingSleeper,
+    ManualAsyncSleeper,
+    ManualBlockingSleeper,
+    SleepFuture,
     StdBlockingSleeper,
 };
-pub use wall::{FixedWallClock, ManualWallClock, StdWallClock, WallClock};
+pub use wall::{
+    FixedWallClock,
+    ManualWallClock,
+    StdWallClock,
+    WallClock,
+};
 
 #[cfg(feature = "tokio")]
 pub use monotonic::TokioMonotonicClock;
