@@ -90,6 +90,7 @@ where
     T: MonotonicClock + ?Sized,
 {
     /// Delegates the current instant to the shared clock object.
+    #[inline(always)]
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()
     }
@@ -100,6 +101,7 @@ where
     T: MonotonicClock + ?Sized,
 {
     /// Delegates the current instant to the boxed clock object.
+    #[inline(always)]
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()
     }

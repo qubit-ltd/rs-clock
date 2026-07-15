@@ -23,6 +23,7 @@ pub struct ManualBlockingSleeper {
 impl ManualBlockingSleeper {
     /// Creates a blocking sleeper in the supplied manual clock domain.
     #[must_use]
+    #[inline(always)]
     pub const fn from_clock(clock: Arc<ManualMonotonicClock>) -> Self {
         Self { clock }
     }
@@ -30,6 +31,7 @@ impl ManualBlockingSleeper {
 
 impl BlockingSleeper for ManualBlockingSleeper {
     /// Returns the manual clock driving this sleeper.
+    #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
     }
@@ -41,6 +43,7 @@ impl BlockingSleeper for ManualBlockingSleeper {
     /// Panics after attempting every reached waiter-observer waker if one of
     /// those custom wakers panics. The blocking waiter is unregistered while
     /// the panic unwinds.
+    #[inline(always)]
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         self.clock.wait_until_blocking(deadline)
     }

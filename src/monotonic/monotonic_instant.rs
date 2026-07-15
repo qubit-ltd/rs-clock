@@ -56,6 +56,7 @@ impl MonotonicInstant {
     ///
     /// Returns [`TimeError::InstantOverflow`] when the result cannot be
     /// represented by [`Duration`].
+    #[inline]
     pub fn checked_add(self, duration: Duration) -> Result<Self, TimeError> {
         let elapsed = self
             .elapsed
@@ -69,6 +70,7 @@ impl MonotonicInstant {
     /// Returns [`TimeError::ClockDomainMismatch`] when `earlier` belongs to a
     /// different clock, and [`TimeError::InvalidInstantOrder`] when `earlier`
     /// is later than this instant.
+    #[inline]
     pub fn duration_since(self, earlier: Self) -> Result<Duration, TimeError> {
         earlier.ensure_domain(self.domain)?;
         self.elapsed

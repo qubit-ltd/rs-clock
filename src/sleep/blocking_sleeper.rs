@@ -27,6 +27,7 @@ pub trait BlockingSleeper: Send + Sync {
     ///
     /// Returns [`TimeError::InstantOverflow`] when the computed deadline is
     /// not representable.
+    #[inline]
     fn sleep_for(&self, duration: Duration) -> Result<(), TimeError> {
         let deadline = self.clock().now().checked_add(duration)?;
         self.sleep_until(deadline)
@@ -38,11 +39,13 @@ where
     T: BlockingSleeper + ?Sized,
 {
     /// Delegates the paired clock to the shared sleeper object.
+    #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates the blocking wait to the shared sleeper object.
+    #[inline(always)]
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         self.as_ref().sleep_until(deadline)
     }
@@ -53,11 +56,13 @@ where
     T: BlockingSleeper + ?Sized,
 {
     /// Delegates the paired clock to the boxed sleeper object.
+    #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates the blocking wait to the boxed sleeper object.
+    #[inline(always)]
     fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         self.as_ref().sleep_until(deadline)
     }

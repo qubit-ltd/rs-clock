@@ -25,6 +25,7 @@ pub struct StdBlockingSleeper {
 impl StdBlockingSleeper {
     /// Creates a sleeper in the supplied clock's monotonic domain.
     #[must_use]
+    #[inline(always)]
     pub const fn from_clock(clock: Arc<StdMonotonicClock>) -> Self {
         Self { clock }
     }
@@ -33,6 +34,7 @@ impl StdBlockingSleeper {
     ///
     /// Returns a domain mismatch or overflow error when conversion is not
     /// possible.
+    #[inline]
     fn native_deadline(
         &self,
         deadline: MonotonicInstant,
@@ -47,6 +49,7 @@ impl StdBlockingSleeper {
 
 impl BlockingSleeper for StdBlockingSleeper {
     /// Returns the standard monotonic clock driving this sleeper.
+    #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
     }

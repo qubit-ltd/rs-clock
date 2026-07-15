@@ -34,6 +34,7 @@ impl ManualWallClock {
     ///
     /// Future readings advance according to the explicitly shared `clock`.
     #[must_use]
+    #[inline]
     pub fn from_clock(
         wall_time: SystemTime,
         clock: Arc<ManualMonotonicClock>,
@@ -52,6 +53,7 @@ impl ManualWallClock {
     /// anchor mutex remains held while the monotonic clock is sampled, so
     /// concurrent calls to [`now()`](WallClock::now) observe either the old or
     /// the new mapping without combining both snapshots.
+    #[inline]
     pub fn reanchor(&self, wall_time: SystemTime) {
         let mut anchor = self.lock_anchor();
         let monotonic_anchor = self.clock.now();
@@ -59,6 +61,7 @@ impl ManualWallClock {
     }
 
     /// Locks the wall and monotonic anchor pair, recovering after poisoning.
+    #[inline]
     fn lock_anchor(&self) -> MutexGuard<'_, (SystemTime, MonotonicInstant)> {
         self.anchor
             .lock()
@@ -73,6 +76,7 @@ impl WallClock for ManualWallClock {
     ///
     /// Panics if the manually advanced duration cannot be represented by
     /// [`SystemTime`]. Normal application and test durations are representable.
+    #[inline]
     fn now(&self) -> SystemTime {
         let anchor = self.lock_anchor();
         let (wall_anchor, monotonic_anchor) = *anchor;

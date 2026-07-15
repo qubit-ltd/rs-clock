@@ -29,6 +29,7 @@ pub struct ManualAsyncSleeper {
 impl ManualAsyncSleeper {
     /// Creates an async sleeper in the supplied manual clock domain.
     #[must_use]
+    #[inline(always)]
     pub const fn from_clock(clock: Arc<ManualMonotonicClock>) -> Self {
         Self { clock }
     }
@@ -36,6 +37,7 @@ impl ManualAsyncSleeper {
 
 impl AsyncSleeper for ManualAsyncSleeper {
     /// Returns the manual clock driving this sleeper.
+    #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
     }
@@ -54,6 +56,7 @@ impl AsyncSleeper for ManualAsyncSleeper {
     /// Panics after attempting every reached waiter-observer waker if one of
     /// those custom wakers panics. The new waiter is unregistered while the
     /// panic unwinds.
+    #[inline]
     fn sleep_until_async(&self, deadline: MonotonicInstant) -> SleepFuture {
         Box::pin(ManualSleepFuture::new(Arc::clone(&self.clock), deadline))
     }

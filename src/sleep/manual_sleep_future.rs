@@ -32,6 +32,7 @@ pub(crate) struct ManualSleepFuture {
 
 impl ManualSleepFuture {
     /// Creates and immediately registers a manual async wait.
+    #[inline]
     pub(crate) fn new(
         clock: Arc<ManualMonotonicClock>,
         deadline: MonotonicInstant,
@@ -83,6 +84,7 @@ impl Future for ManualSleepFuture {
 
 impl Drop for ManualSleepFuture {
     /// Removes an incomplete waiter registration during cancellation.
+    #[inline]
     fn drop(&mut self) {
         if let Some(waiter_id) = self.waiter_id.take() {
             self.clock.unregister_async_waiter(waiter_id);

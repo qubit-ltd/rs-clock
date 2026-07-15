@@ -21,12 +21,15 @@ use std::task::{
 /// an incomplete future unregisters the observer from the clock.
 #[derive(Debug)]
 pub struct ManualWaiterFuture {
+    /// The reference to the manual clock.
     clock: Arc<ManualMonotonicClock>,
+    /// The identifier of the observer.
     observer_id: Option<u64>,
 }
 
 impl ManualWaiterFuture {
     /// Creates a waiter-count observer for `clock`.
+    #[inline]
     pub(crate) fn new(
         clock: Arc<ManualMonotonicClock>,
         expected_count: usize,
@@ -57,6 +60,7 @@ impl Future for ManualWaiterFuture {
 
 impl Drop for ManualWaiterFuture {
     /// Unregisters an incomplete waiter-count observer.
+    #[inline]
     fn drop(&mut self) {
         if let Some(observer_id) = self.observer_id.take() {
             self.clock.unregister_waiter_observer(observer_id);
