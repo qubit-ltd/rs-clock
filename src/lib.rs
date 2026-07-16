@@ -18,13 +18,12 @@
 //!
 //! ```
 //! use qubit_clock::{
-//!     BlockingSleeper, ManualBlockingSleeper, ManualMonotonicClock,
+//!     BlockingSleeper, ManualMonotonicClock,
 //! };
-//! use std::sync::Arc;
 //! use std::time::Duration;
 //!
-//! let clock = Arc::new(ManualMonotonicClock::new());
-//! let sleeper = ManualBlockingSleeper::from_clock(Arc::clone(&clock));
+//! let clock = ManualMonotonicClock::new_shared();
+//! let sleeper = clock.new_blocking_sleeper();
 //! let worker = std::thread::spawn(move || {
 //!     sleeper
 //!         .sleep_for(Duration::from_secs(5))
@@ -47,6 +46,7 @@ pub use error::TimeError;
 pub use monotonic::{
     ClockDomain,
     ManualAdvanceSubscription,
+    ManualDeadlineFuture,
     ManualMonotonicClock,
     ManualWaiterFuture,
     MonotonicClock,

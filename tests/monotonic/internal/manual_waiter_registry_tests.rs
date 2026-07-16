@@ -21,7 +21,7 @@ fn test_manual_registry_latches_reached_observer_after_waiter_unregisters() {
         .expect("an unsatisfied observer should be registered");
     let waiter_id = registry.register_async(Duration::from_secs(1));
 
-    assert!(registry.reached_observer_wakers().is_empty());
+    assert!(registry.reached_observer_wakers(Duration::ZERO).is_empty());
     assert!(registry.unregister_async(waiter_id).is_some());
 
     assert!(!registry.contains_observer(observer_id));
@@ -29,22 +29,23 @@ fn test_manual_registry_latches_reached_observer_after_waiter_unregisters() {
 }
 
 #[test]
-fn test_manual_registry_poll_observer_removes_reached_waker() {
+fn test_manual_registry_poll_observer_becomes_ready_after_reaching_count() {
     let mut registry = ManualWaiterRegistry::new();
     let observer_id = registry
         .register_observer(1, registry.count())
         .expect("an unsatisfied observer should be registered");
     let context = Context::from_waker(Waker::noop());
 
-    let (poll, replaced_waker) =
-        registry.poll_observer(observer_id, 0, &context);
+    let (poll, replaced_waker) = registry.poll_observer(observer_id, &context);
     assert_eq!(Poll::Pending, poll);
     assert!(replaced_waker.is_none());
 
-    let (poll, removed_waker) =
-        registry.poll_observer(observer_id, 1, &context);
+    let _ = registry.register_async(Duration::from_secs(1));
+    let wakers = registry.reached_observer_wakers(Duration::ZERO);
+    let (poll, removed_waker) = registry.poll_observer(observer_id, &context);
     assert_eq!(Poll::Ready(()), poll);
-    assert!(removed_waker.is_some());
+    assert_eq!(1, wakers.len());
+    assert!(removed_waker.is_none());
     assert!(!registry.contains_observer(observer_id));
 }
 
@@ -56,8 +57,70 @@ fn test_manual_registry_keeps_observer_below_expected_count() {
         .expect("an unsatisfied observer should be registered");
     let _ = registry.register_async(Duration::from_secs(1));
 
-    assert!(registry.reached_observer_wakers().is_empty());
+    assert!(registry.reached_observer_wakers(Duration::ZERO).is_empty());
     assert!(registry.contains_observer(observer_id));
+}
+
+#[test]
+fn test_manual_registry_deadline_observer_latches_new_deadline() {
+    let mut registry = ManualWaiterRegistry::new();
+    let observer_id = registry.register_deadline_observer(Duration::ZERO);
+    let context = Context::from_waker(Waker::noop());
+
+    let (poll, replaced_waker) =
+        registry.poll_deadline_observer(observer_id, &context);
+    assert_eq!(Poll::Pending, poll);
+    assert!(replaced_waker.is_none());
+
+    let (poll, replaced_waker) =
+        registry.poll_deadline_observer(observer_id, &context);
+    assert_eq!(Poll::Pending, poll);
+    assert!(replaced_waker.is_some());
+
+    let _ = registry.register_async(Duration::from_secs(2));
+    assert_eq!(1, registry.reached_observer_wakers(Duration::ZERO).len());
+
+    let (poll, removed_waker) =
+        registry.poll_deadline_observer(observer_id, &context);
+    assert_eq!(Poll::Ready(Duration::from_secs(2)), poll);
+    assert!(removed_waker.is_none());
+}
+
+#[test]
+fn test_manual_registry_deadline_observer_latches_existing_deadline() {
+    let mut registry = ManualWaiterRegistry::new();
+    let _ = registry.register_blocking(Duration::from_secs(3));
+    let observer_id = registry.register_deadline_observer(Duration::ZERO);
+    let context = Context::from_waker(Waker::noop());
+
+    let (poll, removed_waker) =
+        registry.poll_deadline_observer(observer_id, &context);
+
+    assert_eq!(Poll::Ready(Duration::from_secs(3)), poll);
+    assert!(removed_waker.is_none());
+}
+
+#[test]
+fn test_manual_registry_unregisters_pending_deadline_observer() {
+    let mut registry = ManualWaiterRegistry::new();
+    let observer_id = registry.register_deadline_observer(Duration::ZERO);
+    let context = Context::from_waker(Waker::noop());
+    let (poll, replaced_waker) =
+        registry.poll_deadline_observer(observer_id, &context);
+    assert_eq!(Poll::Pending, poll);
+    assert!(replaced_waker.is_none());
+
+    assert!(registry.unregister_observer(observer_id).is_some());
+    assert!(!registry.contains_observer(observer_id));
+}
+
+#[test]
+#[should_panic(expected = "manual deadline observer 1 is not registered")]
+fn test_manual_registry_rejects_missing_deadline_observer() {
+    let mut registry = ManualWaiterRegistry::new();
+    let context = Context::from_waker(Waker::noop());
+
+    let _ = registry.poll_deadline_observer(1, &context);
 }
 
 #[test]

@@ -14,7 +14,11 @@ use crate::monotonic::internal::{
 use crate::{
     ClockDomain,
     ManualAdvanceSubscription,
+    ManualAsyncSleeper,
+    ManualBlockingSleeper,
+    ManualDeadlineFuture,
     ManualWaiterFuture,
+    ManualWallClock,
     MonotonicClock,
     MonotonicInstant,
     TimeError,
@@ -29,8 +33,11 @@ use std::task::{
     Context,
     Poll,
 };
-use std::time::Duration;
-use std::time::Instant;
+use std::time::{
+    Duration,
+    Instant,
+    SystemTime,
+};
 
 /// A monotonic clock that advances only when explicitly instructed.
 ///
@@ -66,6 +73,66 @@ impl ManualMonotonicClock {
             changed: Condvar::new(),
             waiters_changed: Condvar::new(),
         }
+    }
+
+    /// Creates a shared manual clock at its zero-duration origin.
+    ///
+    /// This is the preferred constructor when the clock will also create wall
+    /// clocks or sleepers that share its timeline.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted manual clock with a newly allocated domain.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
+    #[must_use]
+    #[inline]
+    pub fn new_shared() -> Arc<Self> {
+        Arc::new(Self::new())
+    }
+
+    /// Creates a shared asynchronous sleeper driven by this clock.
+    ///
+    /// # Returns
+    ///
+    /// An asynchronous sleeper paired with this exact clock instance.
+    #[must_use]
+    #[inline(always)]
+    pub fn new_async_sleeper(self: &Arc<Self>) -> Arc<ManualAsyncSleeper> {
+        Arc::new(ManualAsyncSleeper::from_clock(Arc::clone(self)))
+    }
+
+    /// Creates a shared blocking sleeper driven by this clock.
+    ///
+    /// # Returns
+    ///
+    /// A blocking sleeper paired with this exact clock instance.
+    #[must_use]
+    #[inline(always)]
+    pub fn new_blocking_sleeper(
+        self: &Arc<Self>,
+    ) -> Arc<ManualBlockingSleeper> {
+        Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(self)))
+    }
+
+    /// Creates a shared wall clock projected from this clock's timeline.
+    ///
+    /// # Parameters
+    ///
+    /// * `wall_time` - Wall-clock value assigned to the current manual instant.
+    ///
+    /// # Returns
+    ///
+    /// A wall clock anchored to `wall_time` and driven by this exact clock.
+    #[must_use]
+    #[inline]
+    pub fn new_wall_clock(
+        self: &Arc<Self>,
+        wall_time: SystemTime,
+    ) -> Arc<ManualWallClock> {
+        Arc::new(ManualWallClock::from_clock(wall_time, Arc::clone(self)))
     }
 
     /// Advances this clock by `duration` and notifies time observers.
@@ -278,6 +345,30 @@ impl ManualMonotonicClock {
         }
     }
 
+    /// Returns a future that completes with the next future deadline.
+    ///
+    /// Existing due registrations are ignored. An existing strictly future
+    /// deadline is latched immediately; otherwise the first future deadline
+    /// registered after this call is latched even if its waiter is cancelled
+    /// before the returned future is polled. The observer is registered before
+    /// this method returns.
+    ///
+    /// # Returns
+    ///
+    /// A cancellation-safe future with its deadline observer already
+    /// registered.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the waiter-observer identifier space is exhausted.
+    #[must_use]
+    #[inline(always)]
+    pub fn wait_for_next_deadline_async(
+        self: &Arc<Self>,
+    ) -> ManualDeadlineFuture {
+        ManualDeadlineFuture::new(Arc::clone(self))
+    }
+
     /// Advances to the earliest registered future deadline.
     ///
     /// Returns `Some` with the reached instant, or `None` when no future
@@ -459,7 +550,8 @@ impl ManualMonotonicClock {
         }
         let waiter_id = state.waiters.register_blocking(deadline_elapsed);
         let registration = WaiterRegistrationGuard::blocking(self, waiter_id);
-        let observer_wakers = state.waiters.reached_observer_wakers();
+        let elapsed = state.elapsed;
+        let observer_wakers = state.waiters.reached_observer_wakers(elapsed);
         drop(state);
         self.waiters_changed.notify_all();
         let mut fanout = PanicFanout::new();
@@ -514,7 +606,8 @@ impl ManualMonotonicClock {
         let waiter_id = state.waiters.register_async(deadline_elapsed);
         let registration =
             WaiterRegistrationGuard::asynchronous(self, waiter_id);
-        let observer_wakers = state.waiters.reached_observer_wakers();
+        let elapsed = state.elapsed;
+        let observer_wakers = state.waiters.reached_observer_wakers(elapsed);
         drop(state);
         self.waiters_changed.notify_all();
         let mut fanout = PanicFanout::new();
@@ -549,6 +642,53 @@ impl ManualMonotonicClock {
         state.waiters.register_observer(expected_count, count)
     }
 
+    /// Registers an asynchronous observer of the next future deadline.
+    ///
+    /// # Returns
+    ///
+    /// The nonzero identifier assigned to the deadline observer.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the observer identifier space is exhausted.
+    #[must_use]
+    #[inline]
+    pub(crate) fn register_deadline_observer(&self) -> u64 {
+        let mut state = self.lock_state();
+        let elapsed = state.elapsed;
+        state.waiters.register_deadline_observer(elapsed)
+    }
+
+    /// Polls an asynchronous observer of the next future deadline.
+    ///
+    /// # Parameters
+    ///
+    /// * `observer_id` - Identifier of the deadline observer to poll.
+    /// * `context` - Task context whose waker is retained while pending.
+    ///
+    /// # Returns
+    ///
+    /// [`Poll::Ready`] with the observed deadline, otherwise
+    /// [`Poll::Pending`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the observer is unexpectedly missing or, after releasing the
+    /// clock state lock, if destroying a replaced custom task waker panics.
+    #[inline]
+    pub(crate) fn poll_deadline_observer(
+        &self,
+        observer_id: u64,
+        context: &Context<'_>,
+    ) -> Poll<MonotonicInstant> {
+        let (poll_result, replaced_waker) = {
+            let mut state = self.lock_state();
+            state.waiters.poll_deadline_observer(observer_id, context)
+        };
+        drop(replaced_waker);
+        poll_result.map(|elapsed| MonotonicInstant::new(self.domain, elapsed))
+    }
+
     /// Polls an asynchronous observer of the total waiter count.
     ///
     /// # Parameters
@@ -572,8 +712,7 @@ impl ManualMonotonicClock {
     ) -> Poll<()> {
         let (poll_result, replaced_waker) = {
             let mut state = self.lock_state();
-            let count = state.waiter_count();
-            state.waiters.poll_observer(observer_id, count, context)
+            state.waiters.poll_observer(observer_id, context)
         };
         drop(replaced_waker);
         poll_result

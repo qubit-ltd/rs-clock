@@ -12,10 +12,34 @@ use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
     TimeError,
+    WallClock,
 };
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{
+    Duration,
+    UNIX_EPOCH,
+};
+
+#[test]
+fn test_manual_monotonic_clock_shared_helpers_use_same_timeline() {
+    let clock = ManualMonotonicClock::new_shared();
+    let async_sleeper = clock.new_async_sleeper();
+    let blocking_sleeper = clock.new_blocking_sleeper();
+    let wall_clock = clock.new_wall_clock(UNIX_EPOCH);
+
+    assert_eq!(clock.now(), async_sleeper.clock().now());
+    assert_eq!(clock.now(), blocking_sleeper.clock().now());
+    assert_eq!(UNIX_EPOCH, wall_clock.now());
+
+    clock
+        .advance(Duration::from_secs(4))
+        .expect("short manual advance should succeed");
+
+    assert_eq!(clock.now(), async_sleeper.clock().now());
+    assert_eq!(clock.now(), blocking_sleeper.clock().now());
+    assert_eq!(UNIX_EPOCH + Duration::from_secs(4), wall_clock.now());
+}
 
 #[test]
 fn test_manual_monotonic_clock_starts_at_zero() {
