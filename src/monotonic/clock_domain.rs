@@ -53,6 +53,7 @@ pub(crate) fn next_identifier_state(identifier: u64) -> Option<u64> {
 /// # Panics
 ///
 /// Panics when the allocator has already reached its terminal zero state.
+#[must_use = "the allocated domain identifier must initialize a clock domain"]
 #[inline(always)]
 fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
     next.fetch_update(
@@ -75,6 +76,7 @@ fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
 ///
 /// let domain = ClockDomain::default();
 /// ```
+#[must_use = "clock domains should be retained to identify monotonic timelines"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClockDomain(
     /// Process-unique nonzero domain identifier.
@@ -95,7 +97,6 @@ impl ClockDomain {
     ///
     /// Panics if all representable nonzero domain identifiers have been
     /// allocated rather than wrapping and reusing a prior identity.
-    #[must_use]
     #[allow(clippy::new_without_default)]
     #[inline(always)]
     pub fn new() -> Self {

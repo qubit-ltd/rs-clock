@@ -26,6 +26,7 @@ impl ManualAdvanceRegistry {
     /// # Returns
     ///
     /// A registry with no advance subscribers.
+    #[must_use]
     #[inline]
     pub(crate) fn new() -> Self {
         Self {
@@ -49,6 +50,7 @@ impl ManualAdvanceRegistry {
     /// # Panics
     ///
     /// Panics when the subscriber identifier space is exhausted.
+    #[must_use = "the subscriber identifier is required to unregister the callback"]
     #[inline]
     pub(crate) fn register(&mut self, callback: AdvanceCallback) -> u64 {
         let subscriber_id = allocate_identifier(
@@ -82,6 +84,7 @@ impl ManualAdvanceRegistry {
     /// # Returns
     ///
     /// Shared handles to every currently registered callback.
+    #[must_use = "the cloned callbacks should be invoked after unlocking"]
     pub(crate) fn callbacks(&self) -> Vec<AdvanceCallback> {
         self.subscribers.values().cloned().collect()
     }

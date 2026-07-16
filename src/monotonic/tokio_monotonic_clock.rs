@@ -62,6 +62,7 @@ impl TokioMonotonicClock {
     /// # Returns
     ///
     /// The Tokio instant mapped to elapsed duration zero.
+    #[must_use]
     #[inline(always)]
     pub(crate) const fn origin(&self) -> Instant {
         self.origin

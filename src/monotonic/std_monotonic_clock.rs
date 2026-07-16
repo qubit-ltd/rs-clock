@@ -48,6 +48,7 @@ impl StdMonotonicClock {
     /// # Returns
     ///
     /// The standard-library instant mapped to elapsed duration zero.
+    #[must_use]
     #[inline(always)]
     pub(crate) const fn origin(&self) -> Instant {
         self.origin
