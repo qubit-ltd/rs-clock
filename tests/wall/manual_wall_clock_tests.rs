@@ -68,6 +68,23 @@ fn test_manual_wall_clock_reanchor_changes_only_wall_mapping() {
 }
 
 #[test]
+fn test_manual_wall_clock_now_panics_when_system_time_overflows() {
+    let monotonic_clock = Arc::new(ManualMonotonicClock::new());
+    let wall_clock =
+        ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
+    monotonic_clock
+        .advance(Duration::MAX)
+        .expect("maximum duration should fit the manual monotonic clock");
+
+    let panic = std::panic::catch_unwind(|| wall_clock.now());
+
+    assert!(
+        panic.is_err(),
+        "wall-clock reading should panic after SystemTime overflow",
+    );
+}
+
+#[test]
 fn test_manual_wall_clock_concurrent_reanchor_never_mixes_snapshots() {
     const ITERATIONS: u64 = 10_000;
     const READERS: usize = 4;
