@@ -7,8 +7,6 @@
 use qubit_clock::{
     AsyncSleeper,
     BlockingSleeper,
-    ManualAsyncSleeper,
-    ManualBlockingSleeper,
     ManualMonotonicClock,
     MonotonicClock,
 };
@@ -23,9 +21,8 @@ use std::time::Duration;
 
 #[test]
 fn test_retry_exponential_backoff_uses_no_real_delay() {
-    let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper =
-        Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
+    let clock = ManualMonotonicClock::new_shared();
+    let sleeper = clock.new_blocking_sleeper();
     let attempts = Arc::new(AtomicUsize::new(0));
     let worker_sleeper = Arc::clone(&sleeper);
     let worker_attempts = Arc::clone(&attempts);
@@ -47,9 +44,11 @@ fn test_retry_exponential_backoff_uses_no_real_delay() {
             .expect("retry deadline should be representable");
         wait_for_blocking_deadline(&clock, expected_deadline);
         assert_eq!(index + 1, attempts.load(Ordering::SeqCst));
-        clock
-            .advance(Duration::from_secs(seconds))
-            .expect("manual retry advance should succeed");
+        assert_eq!(
+            Some(expected_deadline),
+            clock.advance_to_next_deadline(),
+            "the observed retry deadline should remain active",
+        );
     }
 
     worker.join().expect("retry worker should not panic");
@@ -80,8 +79,8 @@ fn wait_for_blocking_deadline(
 
 #[tokio::test]
 async fn test_async_retry_timeout_uses_manual_deadline() {
-    let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = Arc::new(ManualAsyncSleeper::from_clock(Arc::clone(&clock)));
+    let clock = ManualMonotonicClock::new_shared();
+    let sleeper = clock.new_async_sleeper();
     let worker_sleeper = Arc::clone(&sleeper);
     let timeout_task = tokio::spawn(async move {
         tokio::select! {
@@ -94,10 +93,13 @@ async fn test_async_retry_timeout_uses_manual_deadline() {
         }
     });
 
-    clock.wait_for_waiters_async(1).await;
-    clock
-        .advance(Duration::from_secs(30))
-        .expect("manual timeout advance should succeed");
+    let observed = clock.wait_for_next_deadline_async().await;
+    assert_eq!(Duration::from_secs(30), observed.elapsed_since_origin());
+    assert_eq!(
+        Some(observed),
+        clock.advance_to_next_deadline(),
+        "the observed timeout deadline should remain active",
+    );
 
     assert!(timeout_task.await.expect("timeout task should not panic"),);
 }
