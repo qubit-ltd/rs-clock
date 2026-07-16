@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "checks": [
+    {
+      "name": "no-default-features",
+      "defaultFeatures": false,
+      "features": [],
+      "commands": [
+        "check",
+        "test",
+        "doc"
+      ]
+    }
+  ]
+}
