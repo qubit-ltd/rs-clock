@@ -53,11 +53,12 @@ pub(crate) struct ManualWaiterRegistry {
     next_async_waiter_id: u64,
     /// Async deadlines and optional task wakers keyed by registration ID.
     async_waiters: HashMap<u64, (Duration, Option<Waker>)>,
-    /// Next identifier assigned to a waiter-count observer.
+    /// Next identifier assigned to a waiter-registration observer.
     next_observer_id: u64,
-    /// Expected waiter counts and optional task wakers keyed by registration
-    /// ID.
-    observers: HashMap<u64, (usize, Option<Waker>)>,
+    /// Waiter-count observers keyed by registration identifier.
+    count_observers: HashMap<u64, (usize, Option<Waker>)>,
+    /// Future-deadline observers keyed by registration identifier.
+    deadline_observers: HashMap<u64, (Option<Duration>, Option<Waker>)>,
 }
 
 impl ManualWaiterRegistry {
@@ -75,7 +76,8 @@ impl ManualWaiterRegistry {
             next_async_waiter_id: 1,
             async_waiters: HashMap::new(),
             next_observer_id: 1,
-            observers: HashMap::new(),
+            count_observers: HashMap::new(),
+            deadline_observers: HashMap::new(),
         }
     }
 
@@ -242,8 +244,40 @@ impl ManualWaiterRegistry {
             &mut self.next_observer_id,
             "manual waiter observer identifiers exhausted",
         );
-        self.observers.insert(observer_id, (expected_count, None));
+        self.count_observers
+            .insert(observer_id, (expected_count, None));
         Some(observer_id)
+    }
+
+    /// Registers an observer for the earliest strictly future deadline.
+    ///
+    /// A deadline that already exists is latched immediately. Otherwise the
+    /// observer remains pending until a future waiter is registered.
+    ///
+    /// # Parameters
+    ///
+    /// * `elapsed` - Current elapsed duration used to exclude due waiters.
+    ///
+    /// # Returns
+    ///
+    /// The nonzero identifier assigned to the deadline observer.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the observer identifier space is exhausted.
+    #[must_use = "the observer identifier is required to poll or cancel the wait"]
+    pub(crate) fn register_deadline_observer(
+        &mut self,
+        elapsed: Duration,
+    ) -> u64 {
+        let ready_deadline = self.next_future_deadline(elapsed);
+        let observer_id = allocate_identifier(
+            &mut self.next_observer_id,
+            "manual waiter observer identifiers exhausted",
+        );
+        self.deadline_observers
+            .insert(observer_id, (ready_deadline, None));
+        observer_id
     }
 
     /// Polls an observer and records the task waker while it remains pending.
@@ -254,7 +288,6 @@ impl ManualWaiterRegistry {
     /// # Parameters
     ///
     /// * `observer_id` - Identifier of the observer to poll.
-    /// * `count` - Current registered waiter count.
     /// * `context` - Task context whose waker is retained while pending.
     ///
     /// # Returns
@@ -265,24 +298,16 @@ impl ManualWaiterRegistry {
     pub(crate) fn poll_observer(
         &mut self,
         observer_id: u64,
-        count: usize,
         context: &Context<'_>,
     ) -> (Poll<()>, Option<Waker>) {
-        let Some((expected_count, _)) = self.observers.get(&observer_id) else {
+        let Some((_, registered_waker)) =
+            self.count_observers.get_mut(&observer_id)
+        else {
             return (Poll::Ready(()), None);
         };
-        if count >= *expected_count {
-            let removed_waker = self
-                .observers
-                .remove(&observer_id)
-                .and_then(|(_, waker)| waker);
-            return (Poll::Ready(()), removed_waker);
-        }
-        let replaced_waker = if let Some((_, registered_waker)) =
-            self.observers.get_mut(&observer_id)
-            && registered_waker
-                .as_ref()
-                .is_none_or(|waker| !waker.will_wake(context.waker()))
+        let replaced_waker = if registered_waker
+            .as_ref()
+            .is_none_or(|waker| !waker.will_wake(context.waker()))
         {
             registered_waker.replace(context.waker().clone())
         } else {
@@ -291,7 +316,53 @@ impl ManualWaiterRegistry {
         (Poll::Pending, replaced_waker)
     }
 
-    /// Removes an incomplete waiter-count observer and returns its task waker.
+    /// Polls an observer for the earliest future deadline.
+    ///
+    /// # Parameters
+    ///
+    /// * `observer_id` - Identifier of the deadline observer to poll.
+    /// * `context` - Task context whose waker is retained while pending.
+    ///
+    /// # Returns
+    ///
+    /// The deadline poll state and any replaced or removed waker that the
+    /// caller must destroy after releasing the clock state lock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the identifier is missing or does not identify a deadline
+    /// observer.
+    #[must_use = "the poll state and detached waker must both be handled"]
+    pub(crate) fn poll_deadline_observer(
+        &mut self,
+        observer_id: u64,
+        context: &Context<'_>,
+    ) -> (Poll<Duration>, Option<Waker>) {
+        let Some((ready_deadline, registered_waker)) =
+            self.deadline_observers.get_mut(&observer_id)
+        else {
+            panic!("manual deadline observer {observer_id} is not registered");
+        };
+        if let Some(deadline) = *ready_deadline {
+            let removed_waker = self
+                .deadline_observers
+                .remove(&observer_id)
+                .and_then(|(_, waker)| waker);
+            return (Poll::Ready(deadline), removed_waker);
+        }
+        let replaced_waker = if registered_waker
+            .as_ref()
+            .is_none_or(|waker| !waker.will_wake(context.waker()))
+        {
+            registered_waker.replace(context.waker().clone())
+        } else {
+            None
+        };
+        (Poll::Pending, replaced_waker)
+    }
+
+    /// Removes an incomplete waiter-registration observer and returns its task
+    /// waker.
     ///
     /// # Parameters
     ///
@@ -305,7 +376,10 @@ impl ManualWaiterRegistry {
         &mut self,
         observer_id: u64,
     ) -> Option<Waker> {
-        self.observers
+        if let Some((_, waker)) = self.count_observers.remove(&observer_id) {
+            return waker;
+        }
+        self.deadline_observers
             .remove(&observer_id)
             .and_then(|(_, waker)| waker)
     }
@@ -322,7 +396,7 @@ impl ManualWaiterRegistry {
     #[must_use]
     #[inline(always)]
     pub(crate) fn contains_observer(&self, observer_id: u64) -> bool {
-        self.observers.contains_key(&observer_id)
+        self.count_observers.contains_key(&observer_id)
     }
 
     /// Updates the async waiter waker or reports that its deadline is due.
@@ -379,10 +453,14 @@ impl ManualWaiterRegistry {
     ///
     /// Stored task wakers for every observer whose threshold has been reached.
     #[must_use = "reached observer wakers should be invoked after unlocking"]
-    pub(crate) fn reached_observer_wakers(&mut self) -> Vec<Waker> {
+    pub(crate) fn reached_observer_wakers(
+        &mut self,
+        elapsed: Duration,
+    ) -> Vec<Waker> {
         let count = self.count();
+        let next_deadline = self.next_future_deadline(elapsed);
         let mut wakers = Vec::new();
-        self.observers.retain(|_, (expected_count, waker)| {
+        self.count_observers.retain(|_, (expected_count, waker)| {
             if *expected_count <= count {
                 if let Some(waker) = waker.take() {
                     wakers.push(waker);
@@ -392,6 +470,18 @@ impl ManualWaiterRegistry {
                 true
             }
         });
+        self.deadline_observers.values_mut().for_each(
+            |(ready_deadline, waker)| {
+                if ready_deadline.is_none()
+                    && let Some(deadline) = next_deadline
+                {
+                    *ready_deadline = Some(deadline);
+                    if let Some(waker) = waker.take() {
+                        wakers.push(waker);
+                    }
+                }
+            },
+        );
         wakers
     }
 
