@@ -138,11 +138,13 @@ fn test_manual_sleep_future_reuses_registered_waker() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
     let mut future = sleeper.sleep_for_async(Duration::from_secs(30));
-    let waker = Waker::noop();
-    let mut context = Context::from_waker(waker);
+    let wake_counter = Arc::new(WakeCounter::default());
+    let waker = Waker::from(Arc::clone(&wake_counter));
+    let mut context = Context::from_waker(&waker);
 
     assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending,));
     assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending,));
+    assert_eq!(0, wake_counter.0.load(Ordering::Relaxed));
 }
 
 #[test]
