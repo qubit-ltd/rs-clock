@@ -24,6 +24,24 @@ pub struct StdBlockingSleeper {
 }
 
 impl StdBlockingSleeper {
+    /// Creates a sleeper with a newly allocated standard clock domain.
+    ///
+    /// Use [`Self::from_clock`] when another component must share the exact
+    /// monotonic clock identity.
+    ///
+    /// # Returns
+    ///
+    /// A blocking sleeper paired with its own standard monotonic clock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
+    #[must_use]
+    #[inline]
+    pub fn new() -> Self {
+        Self::from_clock(Arc::new(StdMonotonicClock::new()))
+    }
+
     /// Creates a sleeper in the supplied clock's monotonic domain.
     ///
     /// # Parameters
@@ -67,6 +85,22 @@ impl StdBlockingSleeper {
             .origin()
             .checked_add(deadline.elapsed_since_origin())
             .ok_or(TimeError::InstantOverflow)
+    }
+}
+
+impl Default for StdBlockingSleeper {
+    /// Creates a sleeper with a newly allocated standard clock domain.
+    ///
+    /// # Returns
+    ///
+    /// A blocking sleeper with the same behavior as [`Self::new`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
+    #[inline(always)]
+    fn default() -> Self {
+        Self::new()
     }
 }
 

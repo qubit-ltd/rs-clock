@@ -14,6 +14,26 @@ use qubit_clock::{
 use std::sync::Arc;
 use std::time::Duration;
 
+/// Verifies that the convenience constructor creates a usable sleeper.
+#[test]
+fn test_std_blocking_sleeper_new_creates_usable_sleeper() {
+    let sleeper = StdBlockingSleeper::new();
+
+    sleeper
+        .sleep_for(Duration::ZERO)
+        .expect("zero-duration standard sleep should succeed");
+}
+
+/// Verifies that the default sleeper has the convenience-constructor behavior.
+#[test]
+fn test_std_blocking_sleeper_default_creates_usable_sleeper() {
+    let sleeper = StdBlockingSleeper::default();
+
+    sleeper
+        .sleep_for(Duration::ZERO)
+        .expect("default standard sleeper should accept a zero-duration sleep");
+}
+
 #[test]
 fn test_std_blocking_sleeper_uses_supplied_clock_domain() {
     let clock = Arc::new(StdMonotonicClock::new());

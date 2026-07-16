@@ -14,6 +14,26 @@ use qubit_clock::{
 use std::sync::Arc;
 use std::time::Duration;
 
+/// Verifies that the convenience constructor does not require a Tokio runtime.
+#[test]
+fn test_tokio_async_sleeper_new_can_be_created_outside_runtime() {
+    let sleeper = TokioAsyncSleeper::new();
+
+    let sleep = sleeper.sleep_for_async(Duration::ZERO);
+
+    drop(sleep);
+}
+
+/// Verifies that the default sleeper can also be created outside a runtime.
+#[test]
+fn test_tokio_async_sleeper_default_can_be_created_outside_runtime() {
+    let sleeper = TokioAsyncSleeper::default();
+
+    let sleep = sleeper.sleep_for_async(Duration::ZERO);
+
+    drop(sleep);
+}
+
 #[test]
 fn test_tokio_async_sleeper_future_can_be_created_outside_runtime() {
     let clock = Arc::new(TokioMonotonicClock::new());

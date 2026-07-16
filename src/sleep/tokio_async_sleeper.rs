@@ -32,6 +32,26 @@ pub struct TokioAsyncSleeper {
 }
 
 impl TokioAsyncSleeper {
+    /// Creates a sleeper with a newly allocated Tokio clock domain.
+    ///
+    /// Calling this method does not itself require a Tokio runtime. When using
+    /// paused or explicitly advanced Tokio time, call it after entering the
+    /// runtime that will poll the sleeper's futures. Use [`Self::from_clock`]
+    /// when another component must share the exact monotonic clock identity.
+    ///
+    /// # Returns
+    ///
+    /// An async sleeper paired with its own Tokio monotonic clock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
+    #[must_use]
+    #[inline]
+    pub fn new() -> Self {
+        Self::from_clock(Arc::new(TokioMonotonicClock::new()))
+    }
+
     /// Creates a Tokio sleeper in the supplied clock domain.
     ///
     /// The caller must preserve the clock's Tokio time-driver affinity while
@@ -78,6 +98,25 @@ impl TokioAsyncSleeper {
             .origin()
             .checked_add(deadline.elapsed_since_origin())
             .ok_or(TimeError::InstantOverflow)
+    }
+}
+
+impl Default for TokioAsyncSleeper {
+    /// Creates a sleeper with a newly allocated Tokio clock domain.
+    ///
+    /// When using paused or explicitly advanced Tokio time, construct the
+    /// default after entering the runtime that will poll its futures.
+    ///
+    /// # Returns
+    ///
+    /// An async sleeper with the same behavior as [`Self::new`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
+    #[inline(always)]
+    fn default() -> Self {
+        Self::new()
     }
 }
 
