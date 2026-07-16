@@ -70,8 +70,10 @@ Its contract is:
 
 - registration occurs when `wait_for_next_deadline_async` is called, not on the
   first poll;
-- it resolves to the earliest registered deadline that was strictly later than
-  the clock's elapsed time when the observer latched it;
+- every poll evaluates the current waiter state and resolves to the earliest
+  active deadline strictly later than the clock's current elapsed time;
+- waiter registration wakes a pending observer but does not latch a deadline;
+- waiters cancelled before observer polling do not satisfy it;
 - reached waiters that have not yet been removed do not satisfy it;
 - dropping a pending future immediately removes its observer registration;
 - replacing a waker does not drop the old waker while the clock state lock is
@@ -84,6 +86,12 @@ The waiter registry will distinguish count observers used by
 `ManualDeadlineFuture`. Registration, predicate evaluation, waker replacement,
 and removal remain serialized under the existing manual-clock state lock.
 Detached wakers continue to be invoked only after releasing that lock.
+
+The returned instant is a state snapshot, not an atomic reservation. A
+concurrent task can register an earlier deadline after the future resolves.
+Drivers use `advance_to_next_deadline()` to select and advance to the current
+earliest deadline atomically; the observer is only the synchronization signal
+that makes the driver runnable.
 
 ## Intended Downstream Usage
 
@@ -143,7 +151,8 @@ The async deadline future will cover:
 - pending behavior until a deadline is registered;
 - selection of the earliest mixed blocking/async deadline;
 - ignoring reached but not yet removed waiters;
-- registration before first poll;
+- registration before first poll without retaining cancelled registrations;
+- selection of the current earliest deadline at poll time;
 - cancellation cleanup;
 - waker replacement and destruction outside the state lock;
 - concurrent registration without lost wake-ups.
