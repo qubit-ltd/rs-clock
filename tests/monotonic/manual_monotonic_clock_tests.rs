@@ -215,6 +215,21 @@ fn test_manual_monotonic_clock_wait_for_waiters_is_already_satisfied() {
     assert_eq!(0, clock.pending_waiters());
 }
 
+/// Verifies that an already satisfied waiter count takes precedence over an
+/// unrepresentable real-time guard.
+#[test]
+fn test_manual_monotonic_clock_wait_for_waiters_prefers_satisfied_count() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let pending_sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+
+    assert_eq!(1, clock.pending_waiters());
+    assert!(clock.wait_for_waiters(1, Duration::MAX));
+
+    drop(pending_sleep);
+    assert_eq!(0, clock.pending_waiters());
+}
+
 /// Verifies that deadline coordination waits for a later registration after
 /// the previous blocking waiter becomes due.
 #[test]
@@ -266,6 +281,25 @@ fn test_manual_monotonic_clock_wait_for_next_deadline_times_out() {
     assert_eq!(None, clock.wait_for_next_deadline(Duration::ZERO));
     assert_eq!(None, clock.wait_for_next_deadline(Duration::from_millis(1)),);
     assert_eq!(None, clock.wait_for_next_deadline(Duration::MAX));
+}
+
+/// Verifies that an existing deadline takes precedence over an
+/// unrepresentable real-time guard.
+#[test]
+fn test_manual_monotonic_clock_wait_for_next_deadline_prefers_existing() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let pending_sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let expected_deadline = clock
+        .next_deadline()
+        .expect("pending sleep should register a deadline");
+
+    assert_eq!(
+        Some(expected_deadline),
+        clock.wait_for_next_deadline(Duration::MAX),
+    );
+
+    drop(pending_sleep);
 }
 
 #[test]

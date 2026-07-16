@@ -235,6 +235,8 @@ impl ManualMonotonicClock {
     /// ignored. This allows a test driver to wait for the next stage of a
     /// repeated operation even while the previous waiter is still cleaning up.
     /// `real_timeout` is only a test guard and never advances logical time.
+    /// An existing future deadline is returned before the guard is checked for
+    /// representability.
     ///
     /// # Parameters
     ///
@@ -243,19 +245,20 @@ impl ManualMonotonicClock {
     ///
     /// # Returns
     ///
-    /// The earliest registered future deadline, or `None` when the real-time
-    /// guard expires or cannot be represented.
+    /// The earliest registered future deadline. Returns `None` when no such
+    /// deadline exists and the real-time guard expires or cannot be
+    /// represented.
     #[must_use]
     pub fn wait_for_next_deadline(
         &self,
         real_timeout: Duration,
     ) -> Option<MonotonicInstant> {
-        let real_deadline = Instant::now().checked_add(real_timeout)?;
         let mut state = self.lock_state();
+        if let Some(deadline) = self.next_future_deadline(&state) {
+            return Some(deadline);
+        }
+        let real_deadline = Instant::now().checked_add(real_timeout)?;
         loop {
-            if let Some(deadline) = self.next_future_deadline(&state) {
-                return Some(deadline);
-            }
             let remaining =
                 real_deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
@@ -266,8 +269,11 @@ impl ManualMonotonicClock {
                 .wait_timeout(state, remaining)
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             state = next_state;
+            if let Some(deadline) = self.next_future_deadline(&state) {
+                return Some(deadline);
+            }
             if wait_result.timed_out() {
-                return self.next_future_deadline(&state);
+                return None;
             }
         }
     }
@@ -339,8 +345,9 @@ impl ManualMonotonicClock {
     /// `expected_count`. Reaching the count is latched even if waiters
     /// unregister before this thread reacquires the clock state. `real_timeout`
     /// is only a test guard and never advances logical time. Returns `true`
-    /// when the count is reached and `false` when the real-time guard expires
-    /// first or cannot be represented.
+    /// when the count is reached, including when it is already satisfied before
+    /// an unrepresentable guard is evaluated. Returns `false` when an
+    /// unsatisfied wait reaches a guard that expires or cannot be represented.
     /// Reached async waiters remain counted until their futures are polled or
     /// dropped, so a due registration can satisfy `expected_count`.
     ///
@@ -351,7 +358,8 @@ impl ManualMonotonicClock {
     ///
     /// # Returns
     ///
-    /// `true` when the count is reached and `false` when the real-time guard
+    /// `true` when the count is already satisfied or becomes reached. Returns
+    /// `false` when the count remains unsatisfied and the real-time guard
     /// expires or cannot be represented.
     ///
     /// # Panics
@@ -363,12 +371,15 @@ impl ManualMonotonicClock {
         expected_count: usize,
         real_timeout: Duration,
     ) -> bool {
+        let mut state = self.lock_state();
+        let count = state.waiter_count();
+        if count >= expected_count {
+            return true;
+        }
         let Some(real_deadline) = Instant::now().checked_add(real_timeout)
         else {
             return false;
         };
-        let mut state = self.lock_state();
-        let count = state.waiter_count();
         let Some(observer_id) =
             state.waiters.register_observer(expected_count, count)
         else {
