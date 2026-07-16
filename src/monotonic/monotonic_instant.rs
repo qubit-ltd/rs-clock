@@ -36,6 +36,7 @@ impl MonotonicInstant {
     /// # Returns
     ///
     /// An instant scoped to `domain` at `elapsed`.
+    #[must_use]
     #[inline(always)]
     pub const fn new(domain: ClockDomain, elapsed: Duration) -> Self {
         Self { domain, elapsed }
