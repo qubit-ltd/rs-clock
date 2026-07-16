@@ -29,6 +29,7 @@ impl PanicFanout {
     /// # Returns
     ///
     /// An empty panic accumulator.
+    #[must_use]
     #[inline(always)]
     pub(crate) fn new() -> Self {
         Self { first_panic: None }

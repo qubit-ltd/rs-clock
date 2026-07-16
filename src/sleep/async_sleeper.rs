@@ -54,6 +54,7 @@ pub trait AsyncSleeper: Send + Sync {
     ///
     /// The paired clock. Its domain remains stable for this sleeper's entire
     /// lifetime.
+    #[must_use = "the paired clock should be used to sample a deadline"]
     fn clock(&self) -> &dyn MonotonicClock;
 
     /// Returns a future completing when `deadline` is reached.

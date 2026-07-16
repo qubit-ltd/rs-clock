@@ -10,6 +10,7 @@ use crate::monotonic::manual_monotonic_clock::ManualMonotonicClock;
 
 /// Removes a waiter registration if control unwinds before ownership is
 /// transferred to its normal blocking or async lifetime.
+#[must_use = "dropping the guard unregisters the waiter"]
 pub(crate) struct WaiterRegistrationGuard<'a> {
     /// Clock that owns the registration.
     clock: &'a ManualMonotonicClock,
@@ -69,6 +70,7 @@ impl<'a> WaiterRegistrationGuard<'a> {
     /// # Panics
     ///
     /// Panics if this guard owns a blocking waiter instead of an async waiter.
+    #[must_use = "the transferred waiter identifier must be retained"]
     #[inline]
     pub(crate) fn into_async_waiter_id(mut self) -> u64 {
         let Some(RegisteredWaiter::Async(waiter_id)) = self.waiter.take()

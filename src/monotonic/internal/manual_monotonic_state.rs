@@ -25,6 +25,7 @@ impl ManualMonotonicState {
     /// # Returns
     ///
     /// Empty manual-clock state at elapsed duration zero.
+    #[must_use]
     #[inline]
     pub(crate) fn new() -> Self {
         Self {
@@ -39,6 +40,7 @@ impl ManualMonotonicState {
     /// # Returns
     ///
     /// The total number of registered deadline waiters.
+    #[must_use]
     #[inline(always)]
     pub(crate) fn waiter_count(&self) -> usize {
         self.waiters.count()

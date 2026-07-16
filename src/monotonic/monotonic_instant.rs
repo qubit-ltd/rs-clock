@@ -17,6 +17,16 @@ use std::time::Duration;
 /// Instants from different domains cannot be ordered or used in arithmetic
 /// together. The value carries the full precision available through
 /// [`Duration`] without claiming any particular hardware timer resolution.
+///
+/// Discarding a sampled instant is rejected when `unused_must_use` is denied:
+///
+/// ```compile_fail
+/// #![deny(unused_must_use)]
+/// use qubit_clock::{ManualMonotonicClock, MonotonicClock};
+///
+/// ManualMonotonicClock::new().now();
+/// ```
+#[must_use = "monotonic instants should be used to measure or compare time"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MonotonicInstant {
     /// The identifier of the originating monotonic clock domain.
@@ -36,7 +46,6 @@ impl MonotonicInstant {
     /// # Returns
     ///
     /// An instant scoped to `domain` at `elapsed`.
-    #[must_use]
     #[inline(always)]
     pub const fn new(domain: ClockDomain, elapsed: Duration) -> Self {
         Self { domain, elapsed }
@@ -47,7 +56,6 @@ impl MonotonicInstant {
     /// # Returns
     ///
     /// The domain carried by this instant.
-    #[must_use]
     #[inline(always)]
     pub const fn domain(self) -> ClockDomain {
         self.domain

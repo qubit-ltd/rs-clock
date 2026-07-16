@@ -11,12 +11,22 @@ use std::time::SystemTime;
 ///
 /// Unlike monotonic time, wall time may move backward after a system clock
 /// adjustment and must not be used to measure elapsed durations.
+///
+/// Discarding a sampled wall time is rejected when `unused_must_use` is denied:
+///
+/// ```compile_fail
+/// #![deny(unused_must_use)]
+/// use qubit_clock::{StdWallClock, WallClock};
+///
+/// StdWallClock::new().now();
+/// ```
 pub trait WallClock: Send + Sync {
     /// Returns the current wall-clock time.
     ///
     /// # Returns
     ///
     /// The implementor's current civil-time reading.
+    #[must_use = "the sampled wall-clock time should be used"]
     fn now(&self) -> SystemTime;
 }
 

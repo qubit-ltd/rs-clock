@@ -31,6 +31,7 @@ use std::time::Duration;
 /// # Panics
 ///
 /// Panics with `exhausted_message` when the allocator is already exhausted.
+#[must_use = "the allocated identifier must be retained by its registration"]
 #[inline(always)]
 pub(crate) fn allocate_identifier(
     next_identifier: &mut u64,
@@ -65,6 +66,7 @@ impl ManualWaiterRegistry {
     /// # Returns
     ///
     /// A registry with no waiters or observers.
+    #[must_use]
     #[inline]
     pub(crate) fn new() -> Self {
         Self {
@@ -92,6 +94,7 @@ impl ManualWaiterRegistry {
     /// # Panics
     ///
     /// Panics when the blocking-waiter identifier space is exhausted.
+    #[must_use = "the waiter identifier is required to complete or cancel the wait"]
     #[inline]
     pub(crate) fn register_blocking(&mut self, deadline: Duration) -> u64 {
         let waiter_id = allocate_identifier(
@@ -127,6 +130,7 @@ impl ManualWaiterRegistry {
     /// # Panics
     ///
     /// Panics when the async-waiter identifier space is exhausted.
+    #[must_use = "the waiter identifier is required to poll or cancel the wait"]
     #[inline]
     pub(crate) fn register_async(&mut self, deadline: Duration) -> u64 {
         let waiter_id = allocate_identifier(
@@ -194,6 +198,7 @@ impl ManualWaiterRegistry {
     /// # Returns
     ///
     /// Every stored waker whose deadline is at or before `elapsed`.
+    #[must_use = "due wakers should be invoked after unlocking"]
     pub(crate) fn take_due_async_wakers(
         &mut self,
         elapsed: Duration,
@@ -256,6 +261,7 @@ impl ManualWaiterRegistry {
     ///
     /// The observer poll state and any replaced or removed waker that the
     /// caller must destroy after releasing the clock state lock.
+    #[must_use = "the poll state and detached waker must both be handled"]
     pub(crate) fn poll_observer(
         &mut self,
         observer_id: u64,
@@ -313,6 +319,7 @@ impl ManualWaiterRegistry {
     /// # Returns
     ///
     /// `true` when the observer remains registered.
+    #[must_use]
     #[inline(always)]
     pub(crate) fn contains_observer(&self, observer_id: u64) -> bool {
         self.observers.contains_key(&observer_id)
@@ -336,6 +343,7 @@ impl ManualWaiterRegistry {
     /// # Panics
     ///
     /// Panics if `waiter_id` no longer identifies a registered async waiter.
+    #[must_use = "the poll state and detached waker must both be handled"]
     pub(crate) fn poll_async(
         &mut self,
         waiter_id: u64,
@@ -370,6 +378,7 @@ impl ManualWaiterRegistry {
     /// # Returns
     ///
     /// Stored task wakers for every observer whose threshold has been reached.
+    #[must_use = "reached observer wakers should be invoked after unlocking"]
     pub(crate) fn reached_observer_wakers(&mut self) -> Vec<Waker> {
         let count = self.count();
         let mut wakers = Vec::new();
@@ -391,6 +400,7 @@ impl ManualWaiterRegistry {
     /// # Returns
     ///
     /// The combined number of blocking and asynchronous waiter registrations.
+    #[must_use]
     #[inline(always)]
     pub(crate) fn count(&self) -> usize {
         self.blocking_waiters.len() + self.async_waiters.len()

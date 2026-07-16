@@ -24,6 +24,7 @@ pub trait BlockingSleeper: Send + Sync {
     ///
     /// The paired clock. Its domain remains stable for this sleeper's entire
     /// lifetime.
+    #[must_use = "the paired clock should be used to sample a deadline"]
     fn clock(&self) -> &dyn MonotonicClock;
 
     /// Blocks the current thread until `deadline` is reached.
