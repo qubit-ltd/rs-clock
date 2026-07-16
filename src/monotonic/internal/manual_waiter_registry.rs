@@ -57,8 +57,8 @@ pub(crate) struct ManualWaiterRegistry {
     next_observer_id: u64,
     /// Waiter-count observers keyed by registration identifier.
     count_observers: HashMap<u64, (usize, Option<Waker>)>,
-    /// Future-deadline observers keyed by registration identifier.
-    deadline_observers: HashMap<u64, (Option<Duration>, Option<Waker>)>,
+    /// Future-deadline observer wakers keyed by registration identifier.
+    deadline_observers: HashMap<u64, Option<Waker>>,
 }
 
 impl ManualWaiterRegistry {
@@ -251,13 +251,6 @@ impl ManualWaiterRegistry {
 
     /// Registers an observer for the earliest strictly future deadline.
     ///
-    /// A deadline that already exists is latched immediately. Otherwise the
-    /// observer remains pending until a future waiter is registered.
-    ///
-    /// # Parameters
-    ///
-    /// * `elapsed` - Current elapsed duration used to exclude due waiters.
-    ///
     /// # Returns
     ///
     /// The nonzero identifier assigned to the deadline observer.
@@ -266,17 +259,12 @@ impl ManualWaiterRegistry {
     ///
     /// Panics when the observer identifier space is exhausted.
     #[must_use = "the observer identifier is required to poll or cancel the wait"]
-    pub(crate) fn register_deadline_observer(
-        &mut self,
-        elapsed: Duration,
-    ) -> u64 {
-        let ready_deadline = self.next_future_deadline(elapsed);
+    pub(crate) fn register_deadline_observer(&mut self) -> u64 {
         let observer_id = allocate_identifier(
             &mut self.next_observer_id,
             "manual waiter observer identifiers exhausted",
         );
-        self.deadline_observers
-            .insert(observer_id, (ready_deadline, None));
+        self.deadline_observers.insert(observer_id, None);
         observer_id
     }
 
@@ -321,6 +309,7 @@ impl ManualWaiterRegistry {
     /// # Parameters
     ///
     /// * `observer_id` - Identifier of the deadline observer to poll.
+    /// * `elapsed` - Current elapsed duration used to exclude due waiters.
     /// * `context` - Task context whose waker is retained while pending.
     ///
     /// # Returns
@@ -336,20 +325,22 @@ impl ManualWaiterRegistry {
     pub(crate) fn poll_deadline_observer(
         &mut self,
         observer_id: u64,
+        elapsed: Duration,
         context: &Context<'_>,
     ) -> (Poll<Duration>, Option<Waker>) {
-        let Some((ready_deadline, registered_waker)) =
-            self.deadline_observers.get_mut(&observer_id)
-        else {
+        if !self.deadline_observers.contains_key(&observer_id) {
             panic!("manual deadline observer {observer_id} is not registered");
-        };
-        if let Some(deadline) = *ready_deadline {
-            let removed_waker = self
-                .deadline_observers
-                .remove(&observer_id)
-                .and_then(|(_, waker)| waker);
+        }
+        if let Some(deadline) = self.next_future_deadline(elapsed) {
+            let removed_waker =
+                self.deadline_observers.remove(&observer_id).flatten();
             return (Poll::Ready(deadline), removed_waker);
         }
+        let Some(registered_waker) =
+            self.deadline_observers.get_mut(&observer_id)
+        else {
+            unreachable!("deadline observer existence was checked above");
+        };
         let replaced_waker = if registered_waker
             .as_ref()
             .is_none_or(|waker| !waker.will_wake(context.waker()))
@@ -379,9 +370,7 @@ impl ManualWaiterRegistry {
         if let Some((_, waker)) = self.count_observers.remove(&observer_id) {
             return waker;
         }
-        self.deadline_observers
-            .remove(&observer_id)
-            .and_then(|(_, waker)| waker)
+        self.deadline_observers.remove(&observer_id).flatten()
     }
 
     /// Returns whether an observer is still waiting for its target count.
@@ -470,18 +459,13 @@ impl ManualWaiterRegistry {
                 true
             }
         });
-        self.deadline_observers.values_mut().for_each(
-            |(ready_deadline, waker)| {
-                if ready_deadline.is_none()
-                    && let Some(deadline) = next_deadline
-                {
-                    *ready_deadline = Some(deadline);
-                    if let Some(waker) = waker.take() {
-                        wakers.push(waker);
-                    }
+        if next_deadline.is_some() {
+            self.deadline_observers.values_mut().for_each(|waker| {
+                if let Some(waker) = waker.take() {
+                    wakers.push(waker);
                 }
-            },
-        );
+            });
+        }
         wakers
     }
 

@@ -17,12 +17,18 @@ use std::task::{
     Poll,
 };
 
-/// A future that completes with a manual clock's next future deadline.
+/// A future that observes a manual clock's earliest active future deadline.
 ///
 /// The observer is registered when the future is created, before its first
-/// poll. It latches the earliest deadline that is strictly later than the
-/// clock reading at observation time. Dropping an incomplete future
-/// unregisters the observer from the clock.
+/// poll, so later waiter registration can wake the observing task. Each poll
+/// reads current waiter state: it returns the earliest deadline strictly after
+/// the current manual time, or remains pending when no such deadline exists.
+/// It does not retain a cancelled waiter or a deadline that has become due.
+/// Dropping an incomplete future unregisters the observer from the clock.
+///
+/// The ready value is a point-in-time observation. Prefer
+/// [`ManualMonotonicClock::advance_to_next_deadline`] when the next operation
+/// must select and advance to the current earliest deadline atomically.
 #[derive(Debug)]
 pub struct ManualDeadlineFuture {
     /// Manual clock whose deadline registrations are observed.
@@ -59,7 +65,7 @@ impl ManualDeadlineFuture {
 impl Future for ManualDeadlineFuture {
     type Output = MonotonicInstant;
 
-    /// Polls for the first future deadline observed after registration.
+    /// Polls for the earliest currently active future deadline.
     ///
     /// # Parameters
     ///
@@ -67,7 +73,8 @@ impl Future for ManualDeadlineFuture {
     ///
     /// # Returns
     ///
-    /// [`Poll::Ready`] with the latched deadline, otherwise [`Poll::Pending`].
+    /// [`Poll::Ready`] with the earliest current future deadline, otherwise
+    /// [`Poll::Pending`].
     ///
     /// # Panics
     ///

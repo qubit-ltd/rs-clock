@@ -84,19 +84,22 @@ fn test_manual_deadline_future_returns_earliest_existing_deadline() {
 }
 
 #[test]
-fn test_manual_deadline_future_registers_before_first_poll() {
-    let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+fn test_manual_deadline_future_ignores_cancelled_deadline_before_poll() {
+    let clock = ManualMonotonicClock::new_shared();
+    let sleeper = clock.new_async_sleeper();
     let mut observer = pin!(clock.wait_for_next_deadline_async());
-    let sleep = sleeper.sleep_for_async(Duration::from_secs(3));
-    drop(sleep);
+    let cancelled = sleeper.sleep_for_async(Duration::from_secs(3));
+    drop(cancelled);
     let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
 
+    assert_eq!(Poll::Pending, observer.as_mut().poll(&mut context));
+
+    let _active = sleeper.sleep_for_async(Duration::from_secs(2));
     let Poll::Ready(deadline) = observer.as_mut().poll(&mut context) else {
-        panic!("deadline registration should remain latched");
+        panic!("the active future deadline should be ready");
     };
-    assert_eq!(Duration::from_secs(3), deadline.elapsed_since_origin());
+    assert_eq!(Duration::from_secs(2), deadline.elapsed_since_origin());
 }
 
 #[test]
@@ -180,19 +183,19 @@ fn test_manual_deadline_future_replacement_drops_waker_outside_clock_lock() {
 }
 
 #[test]
-fn test_manual_deadline_future_keeps_first_registration_latched() {
-    let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+fn test_manual_deadline_future_returns_earliest_deadline_at_poll() {
+    let clock = ManualMonotonicClock::new_shared();
+    let sleeper = clock.new_async_sleeper();
     let mut observer = pin!(clock.wait_for_next_deadline_async());
-    let _first = sleeper.sleep_for_async(Duration::from_secs(4));
-    let _second = sleeper.sleep_for_async(Duration::from_secs(1));
+    let _later = sleeper.sleep_for_async(Duration::from_secs(4));
+    let _earlier = sleeper.sleep_for_async(Duration::from_secs(1));
     let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
 
     let Poll::Ready(deadline) = observer.as_mut().poll(&mut context) else {
-        panic!("first observed deadline should remain latched");
+        panic!("an active future deadline should be ready");
     };
-    assert_eq!(Duration::from_secs(4), deadline.elapsed_since_origin());
+    assert_eq!(Duration::from_secs(1), deadline.elapsed_since_origin());
 }
 
 #[test]

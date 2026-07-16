@@ -345,18 +345,54 @@ impl ManualMonotonicClock {
         }
     }
 
-    /// Returns a future that completes with the next future deadline.
+    /// Returns a future that observes the earliest active future deadline.
     ///
-    /// Existing due registrations are ignored. An existing strictly future
-    /// deadline is latched immediately; otherwise the first future deadline
-    /// registered after this call is latched even if its waiter is cancelled
-    /// before the returned future is polled. The observer is registered before
-    /// this method returns.
+    /// The observer is registered before this method returns, so a waiter
+    /// created immediately afterward can wake the observing task. Registration
+    /// does not latch a particular waiter or deadline. Each poll examines the
+    /// clock's current waiter state and returns the earliest deadline strictly
+    /// later than the current manual time. Cancelled registrations and
+    /// registrations that are already due are ignored. When no active future
+    /// deadline exists, the future stores the current task waker and remains
+    /// pending.
+    ///
+    /// The returned instant is a snapshot selected while the clock state is
+    /// locked. Another task may register an earlier deadline after that poll.
+    /// Test drivers should therefore use
+    /// [`advance_to_next_deadline()`](Self::advance_to_next_deadline) to choose
+    /// the deadline atomically, rather than blindly advancing to the observed
+    /// value.
+    ///
+    /// # Examples
+    ///
+    /// Coordinate an asynchronous producer with a manual-time driver:
+    ///
+    /// ```
+    /// use qubit_clock::{AsyncSleeper, ManualMonotonicClock};
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let clock = ManualMonotonicClock::new_shared();
+    /// let sleeper = clock.new_async_sleeper();
+    /// let task = tokio::spawn(async move {
+    ///     sleeper.sleep_for_async(Duration::from_secs(5)).await
+    /// });
+    ///
+    /// let observed = clock.wait_for_next_deadline_async().await;
+    /// assert_eq!(Duration::from_secs(5), observed.elapsed_since_origin());
+    /// let reached = clock
+    ///     .advance_to_next_deadline()
+    ///     .expect("the observed waiter should remain active");
+    /// assert_eq!(observed, reached);
+    /// task.await??;
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Returns
     ///
-    /// A cancellation-safe future with its deadline observer already
-    /// registered.
+    /// A cancellation-safe state observer that is already registered.
     ///
     /// # Panics
     ///
@@ -407,8 +443,9 @@ impl ManualMonotonicClock {
     /// is registered before this method returns, rather than on the first poll.
     /// Reached async waiters remain counted until their futures are polled or
     /// dropped, so a due registration can satisfy `expected_count`. Use
-    /// [`wait_for_next_deadline()`](Self::wait_for_next_deadline) to coordinate
-    /// a later stage that specifically requires a future deadline.
+    /// [`wait_for_next_deadline_async()`](Self::wait_for_next_deadline_async)
+    /// when coordinating a later stage that specifically requires an active
+    /// future deadline instead of a historical count threshold.
     ///
     /// # Parameters
     ///
@@ -655,8 +692,7 @@ impl ManualMonotonicClock {
     #[inline]
     pub(crate) fn register_deadline_observer(&self) -> u64 {
         let mut state = self.lock_state();
-        let elapsed = state.elapsed;
-        state.waiters.register_deadline_observer(elapsed)
+        state.waiters.register_deadline_observer()
     }
 
     /// Polls an asynchronous observer of the next future deadline.
@@ -683,7 +719,10 @@ impl ManualMonotonicClock {
     ) -> Poll<MonotonicInstant> {
         let (poll_result, replaced_waker) = {
             let mut state = self.lock_state();
-            state.waiters.poll_deadline_observer(observer_id, context)
+            let elapsed = state.elapsed;
+            state
+                .waiters
+                .poll_deadline_observer(observer_id, elapsed, context)
         };
         drop(replaced_waker);
         poll_result.map(|elapsed| MonotonicInstant::new(self.domain, elapsed))
