@@ -27,22 +27,22 @@ use std::time::Duration;
 /// ```
 /// use qubit_clock::{
 ///     AsyncSleeper,
-///     ManualAsyncSleeper,
 ///     ManualMonotonicClock,
 /// };
-/// use std::sync::Arc;
 /// use std::time::Duration;
 ///
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let clock = Arc::new(ManualMonotonicClock::new());
-/// let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+/// let clock = ManualMonotonicClock::new_shared();
+/// let sleeper = clock.new_async_sleeper();
 /// let task = tokio::spawn(async move {
 ///     sleeper.sleep_for_async(Duration::from_secs(5)).await
 /// });
 ///
-/// clock.wait_for_waiters_async(1).await;
-/// clock.advance(Duration::from_secs(5))?;
+/// let _observed = clock.wait_for_next_deadline_async().await;
+/// clock
+///     .advance_to_next_deadline()
+///     .expect("the sleeper should have a future deadline");
 /// task.await??;
 /// # Ok(())
 /// # }
