@@ -18,6 +18,35 @@ use std::time::Duration;
 /// The clock returned by [`Self::clock`] defines the domain accepted by every
 /// deadline operation. Repeated calls to [`Self::clock`] must expose clocks
 /// whose instants belong to the same domain for this sleeper's lifetime.
+///
+/// # Examples
+///
+/// Coordinate with the manual clock before advancing time when the sleep is
+/// created by another task:
+///
+/// ```
+/// use qubit_clock::{
+///     AsyncSleeper,
+///     ManualAsyncSleeper,
+///     ManualMonotonicClock,
+/// };
+/// use std::sync::Arc;
+/// use std::time::Duration;
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let clock = Arc::new(ManualMonotonicClock::new());
+/// let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+/// let task = tokio::spawn(async move {
+///     sleeper.sleep_for_async(Duration::from_secs(5)).await
+/// });
+///
+/// clock.wait_for_waiters_async(1).await;
+/// clock.advance(Duration::from_secs(5))?;
+/// task.await??;
+/// # Ok(())
+/// # }
+/// ```
 pub trait AsyncSleeper: Send + Sync {
     /// Returns the monotonic clock paired with this sleeper.
     ///
