@@ -74,6 +74,11 @@ impl BlockingSleeper {
     ///
     /// Returns any error produced while registering the deadline, before the
     /// current thread parks.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the composed timer panics during registration or its
+    /// returned future panics while being polled.
     pub fn sleep_until(
         &self,
         deadline: MonotonicInstant,
@@ -99,6 +104,11 @@ impl BlockingSleeper {
     /// # Errors
     ///
     /// Returns deadline overflow or registration failure before parking.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the composed timer panics during registration or its
+    /// returned future panics while being polled.
     pub fn sleep_for(&self, duration: Duration) -> Result<(), TimeError> {
         let future = self.timer.after(duration)?;
         Self::block_on(future);
@@ -110,6 +120,10 @@ impl BlockingSleeper {
     /// # Parameters
     ///
     /// * `future` - Eagerly registered timer future to drive to completion.
+    ///
+    /// # Panics
+    ///
+    /// Panics when polling the timer future panics.
     fn block_on(mut future: TimerFuture) {
         let thread_waker = Arc::new(ThreadWaker::new(std::thread::current()));
         let waker = Waker::from(Arc::clone(&thread_waker));

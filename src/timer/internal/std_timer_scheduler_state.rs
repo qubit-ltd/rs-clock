@@ -190,6 +190,10 @@ impl StdTimerSchedulerState {
     /// # Returns
     ///
     /// The nonzero generation assigned to the new worker.
+    ///
+    /// # Panics
+    ///
+    /// Panics after every nonzero worker generation has been allocated.
     #[must_use]
     #[inline(always)]
     pub(super) fn mark_worker_started(&mut self) -> u64 {

@@ -45,6 +45,10 @@ impl<'a> WaiterRegistrationGuard<'a> {
     /// # Returns
     ///
     /// The identifier of the transferred timer waiter.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the guard no longer owns a timer waiter.
     #[must_use = "the transferred waiter identifier must be retained"]
     #[inline]
     pub(crate) fn into_waiter_id(mut self) -> u64 {
