@@ -86,8 +86,9 @@ pub trait MonotonicClock: Send + Sync {
     /// Returns the current instant in this clock's domain.
     ///
     /// Successive calls on the same clock never return an earlier instant.
-    /// Instants from different clock instances belong to different
-    /// [`ClockDomain`](crate::ClockDomain)s and must not be mixed.
+    /// Instants from independently created clock domains must not be mixed.
+    /// Cloned or derived same-domain handles may intentionally report the same
+    /// [`ClockDomain`](crate::ClockDomain).
     ///
     /// # Returns
     ///
