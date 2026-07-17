@@ -80,7 +80,10 @@ impl Future for WakeBeforeParkFuture {
             Poll::Ready(())
         } else {
             this.polled = true;
-            context.waker().wake_by_ref();
+            // Exercise the consuming Wake path; standard Timer tests cover
+            // borrowed Waker notifications.
+            #[allow(clippy::waker_clone_wake)]
+            context.waker().clone().wake();
             Poll::Pending
         }
     }

@@ -63,7 +63,14 @@ impl ThreadWaker {
 
 impl Wake for ThreadWaker {
     /// Latches a notification before unparking the blocked thread.
+    #[inline(always)]
     fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    /// Latches a notification before unparking the blocked thread.
+    #[inline(always)]
+    fn wake_by_ref(self: &Arc<Self>) {
         self.notified.store(true, Ordering::Release);
         self.thread.unpark();
     }
