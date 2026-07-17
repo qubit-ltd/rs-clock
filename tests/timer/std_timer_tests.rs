@@ -26,6 +26,7 @@ use std::time::{
 };
 
 use super::internal::{
+    DestructorPanickingWaker,
     PanickingWaker,
     block_on_timer_future,
 };
@@ -62,6 +63,29 @@ fn test_std_timer_continues_after_registered_waker_panics() {
         .after(Duration::from_millis(10))
         .expect("panicking deadline should register");
     let waker = Waker::from(Arc::new(PanickingWaker));
+    let mut context = Context::from_waker(&waker);
+    assert_eq!(Poll::Pending, panicking.as_mut().poll(&mut context));
+
+    let survivor = timer
+        .after(Duration::from_millis(30))
+        .expect("surviving deadline should register");
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        block_on_timer_future(survivor);
+        sender.send(()).expect("receiver should remain available");
+    });
+
+    assert_eq!(Ok(()), receiver.recv_timeout(Duration::from_secs(1)),);
+}
+
+#[test]
+fn test_std_timer_survives_panicking_waker_payload_destructor() {
+    let clock = StdMonotonicClock::new();
+    let timer = StdTimer::from_clock(&clock);
+    let mut panicking = timer
+        .after(Duration::from_millis(10))
+        .expect("panicking deadline should register");
+    let waker = Waker::from(Arc::new(DestructorPanickingWaker));
     let mut context = Context::from_waker(&waker);
     assert_eq!(Poll::Pending, panicking.as_mut().poll(&mut context));
 
@@ -141,6 +165,18 @@ fn test_std_timer_completes_many_deadlines_with_one_scheduler() {
         .expect("all deadlines should register");
 
     futures.into_iter().for_each(block_on_timer_future);
+}
+
+#[test]
+fn test_std_timer_reuses_worker_during_idle_grace_period() {
+    let clock = StdMonotonicClock::new();
+    let timer = StdTimer::from_clock(&clock);
+    for _ in 0..64 {
+        let future = timer
+            .after(Duration::from_micros(100))
+            .expect("short deadline should register");
+        block_on_timer_future(future);
+    }
 }
 
 #[test]

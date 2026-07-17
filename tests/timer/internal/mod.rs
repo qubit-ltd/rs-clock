@@ -7,8 +7,11 @@
 // =============================================================================
 //! Provides task wakers used by Timer integration tests.
 
-mod panicking_waker;
-mod thread_waker;
+mod panicking_waker_tests;
+mod thread_waker_tests;
 
-pub(super) use panicking_waker::PanickingWaker;
-pub(super) use thread_waker::block_on_timer_future;
+pub(super) use panicking_waker_tests::{
+    DestructorPanickingWaker,
+    PanickingWaker,
+};
+pub(super) use thread_waker_tests::block_on_timer_future;
