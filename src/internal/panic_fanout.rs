@@ -2,8 +2,10 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Attempts every waker before resuming the first panic.
+//! Attempts every Waker while retaining at most one panic payload.
 
 use std::any::Any;
 use std::panic::{
@@ -16,7 +18,7 @@ use std::task::Waker;
 /// Panic payload retained while a notification fanout attempts every target.
 type PanicPayload = Box<dyn Any + Send + 'static>;
 
-/// Attempts every waker before resuming the first panic.
+/// Attempts every Waker while retaining at most the first panic payload.
 pub(crate) struct PanicFanout {
     /// First panic observed in notification order.
     first_panic: Option<PanicPayload>,
@@ -38,10 +40,10 @@ impl PanicFanout {
     ///
     /// # Parameters
     ///
-    /// * `wakers` - Task wakers to invoke and destroy in iteration order.
+    /// * `wakers` - Task Wakers to invoke and destroy in iteration order.
     pub(crate) fn wake_all(&mut self, wakers: Vec<Waker>) {
         for waker in wakers {
-            // Borrowing for the wake keeps the waker's destructor out of the
+            // Borrowing for the wake keeps the Waker's destructor out of the
             // wake panic's unwind path, preventing a double-panic abort.
             self.record(catch_unwind(AssertUnwindSafe(|| waker.wake_by_ref())));
             self.record(catch_unwind(AssertUnwindSafe(|| drop(waker))));
@@ -60,11 +62,28 @@ impl PanicFanout {
         }
     }
 
+    /// Discards the retained panic without allowing its destructor to unwind.
+    ///
+    /// A detached background notifier has no caller to receive a Waker panic.
+    /// The original payload is normally dropped; if that destructor panics,
+    /// the secondary payload is deliberately leaked so notification threads
+    /// remain alive.
+    pub(crate) fn discard_panics(mut self) {
+        let Some(payload) = self.first_panic.take() else {
+            return;
+        };
+        if let Err(drop_panic) =
+            catch_unwind(AssertUnwindSafe(|| drop(payload)))
+        {
+            std::mem::forget(drop_panic);
+        }
+    }
+
     /// Records `result` when it is the first panic in this fanout.
     ///
     /// # Parameters
     ///
-    /// * `result` - Caught result from a waker or its destructor.
+    /// * `result` - Caught result from a Waker or its destructor.
     #[inline]
     fn record(&mut self, result: Result<(), PanicPayload>) {
         if let Err(payload) = result {

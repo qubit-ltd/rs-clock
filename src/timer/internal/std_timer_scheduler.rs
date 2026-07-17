@@ -6,7 +6,9 @@
 //! Schedules standard timer registrations on one shared worker thread.
 
 use super::std_timer_waiter::StdTimerWaiter;
+use super::std_timer_worker_guard::StdTimerWorkerGuard;
 use crate::TimeError;
+use crate::internal::PanicFanout;
 use std::cmp::Reverse;
 use std::collections::{
     BinaryHeap,
@@ -134,7 +136,12 @@ impl StdTimerScheduler {
         let scheduler = Arc::clone(self);
         let spawn_result = std::thread::Builder::new()
             .name("qubit-clock-timer".to_owned())
-            .spawn(move || scheduler.run());
+            .spawn(move || {
+                let mut worker_guard =
+                    StdTimerWorkerGuard::new(scheduler.as_ref());
+                scheduler.run();
+                worker_guard.disarm();
+            });
         if spawn_result.is_err() {
             state.waiters.remove(&waiter_id);
             state.worker_running = false;
@@ -194,10 +201,21 @@ impl StdTimerScheduler {
                 }
             }
             drop(state);
-            due_waiters.iter().for_each(|waiter| waiter.complete());
+            let wakers = due_waiters
+                .iter()
+                .filter_map(|waiter| waiter.complete())
+                .collect();
             drop(due_waiters);
+            let mut fanout = PanicFanout::new();
+            fanout.wake_all(wakers);
+            fanout.discard_panics();
             state = self.lock_state();
         }
+    }
+
+    /// Clears the worker-running flag after an unexpected worker exit.
+    pub(super) fn mark_worker_stopped(&self) {
+        self.lock_state().worker_running = false;
     }
 
     /// Locks scheduler state, recovering the inner value after poisoning.

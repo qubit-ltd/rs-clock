@@ -38,6 +38,8 @@
 //! worker.join().expect("sleeping thread should finish");
 //! ```
 
+pub(crate) mod internal;
+
 pub mod error;
 pub mod monotonic;
 pub mod sleep;

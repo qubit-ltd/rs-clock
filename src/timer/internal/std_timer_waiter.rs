@@ -76,18 +76,19 @@ impl StdTimerWaiter {
         Poll::Pending
     }
 
-    /// Latches completion and wakes the currently registered task.
-    pub(crate) fn complete(&self) {
-        let waker = {
-            let mut state = self
-                .state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            state.ready = true;
-            state.waker.take()
-        };
-        if let Some(waker) = waker {
-            waker.wake();
-        }
+    /// Latches completion and detaches the currently registered task Waker.
+    ///
+    /// # Returns
+    ///
+    /// The detached Waker that must be invoked outside scheduler locks, or
+    /// `None` when this future has not yet registered one.
+    #[must_use = "the detached Waker must be invoked or safely discarded"]
+    pub(crate) fn complete(&self) -> Option<Waker> {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        state.ready = true;
+        state.waker.take()
     }
 }
