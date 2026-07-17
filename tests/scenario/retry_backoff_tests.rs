@@ -5,10 +5,10 @@
 // =============================================================================
 
 use qubit_clock::{
-    AsyncSleeper,
     BlockingSleeper,
     ManualMonotonicClock,
     MonotonicClock,
+    Timer,
 };
 use std::future::pending;
 use std::sync::Arc;
@@ -22,9 +22,9 @@ use std::time::Duration;
 #[test]
 fn test_retry_exponential_backoff_uses_no_real_delay() {
     let clock = ManualMonotonicClock::new_shared();
-    let sleeper = clock.new_blocking_sleeper();
+    let sleeper = BlockingSleeper::new(clock.new_timer());
     let attempts = Arc::new(AtomicUsize::new(0));
-    let worker_sleeper = Arc::clone(&sleeper);
+    let worker_sleeper = sleeper.clone();
     let worker_attempts = Arc::clone(&attempts);
     let delays = [1_u64, 2, 4, 8];
     let worker = thread::spawn(move || {
@@ -80,14 +80,14 @@ fn wait_for_blocking_deadline(
 #[tokio::test]
 async fn test_async_retry_timeout_uses_manual_deadline() {
     let clock = ManualMonotonicClock::new_shared();
-    let sleeper = clock.new_async_sleeper();
-    let worker_sleeper = Arc::clone(&sleeper);
+    let timer = clock.new_timer();
+    let worker_timer = Arc::clone(&timer);
     let timeout_task = tokio::spawn(async move {
         tokio::select! {
             () = pending::<()>() => false,
-            result = worker_sleeper
-                .sleep_for_async(Duration::from_secs(30)) => {
-                result.expect("manual timeout sleep should complete");
+            () = worker_timer
+                .after(Duration::from_secs(30))
+                .expect("manual timeout should register") => {
                 true
             },
         }

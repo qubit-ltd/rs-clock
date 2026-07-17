@@ -6,50 +6,138 @@
 
 use qubit_clock::{
     BlockingSleeper,
-    ManualBlockingSleeper,
     ManualMonotonicClock,
     MonotonicClock,
+    MonotonicInstant,
+    StdMonotonicClock,
     TimeError,
+    Timer,
+    TimerFuture,
 };
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{
+    Context,
+    Poll,
+};
+use std::thread;
 use std::time::Duration;
 
 #[test]
-fn test_blocking_sleeper_supports_trait_object() {
-    let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper: Arc<dyn BlockingSleeper> =
-        Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
+fn test_blocking_sleeper_uses_manual_timer_without_real_delay() {
+    let clock = ManualMonotonicClock::new_shared();
+    let sleeper = BlockingSleeper::new(clock.new_timer());
+    let worker =
+        thread::spawn(move || sleeper.sleep_for(Duration::from_secs(16)));
 
-    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
-    sleeper
-        .sleep_for(Duration::ZERO)
-        .expect("zero sleep should complete immediately");
+    assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
+    let _reached = clock
+        .advance_to_next_deadline()
+        .expect("blocking deadline should exist");
+    worker
+        .join()
+        .expect("blocking worker should finish")
+        .expect("blocking sleep should succeed");
 }
 
 #[test]
-fn test_blocking_sleeper_box_delegates_to_inner_sleeper() {
-    let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper: Box<dyn BlockingSleeper> =
-        Box::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
+fn test_blocking_sleeper_uses_standard_timer() {
+    let clock = StdMonotonicClock::new();
+    let sleeper = BlockingSleeper::new(clock.new_timer());
 
-    assert_eq!(clock.now().domain(), sleeper.clock().now().domain());
     sleeper
-        .sleep_until(clock.now())
-        .expect("reached deadline should complete immediately");
+        .sleep_for(Duration::from_millis(2))
+        .expect("standard timer should complete");
 }
 
-/// Verifies that a relative wait reports an unrepresentable deadline.
 #[test]
-fn test_blocking_sleeper_sleep_for_reports_deadline_overflow() {
-    let clock = Arc::new(ManualMonotonicClock::new());
-    clock
-        .advance(Duration::MAX)
-        .expect("maximum elapsed duration should fit from zero");
-    let sleeper = ManualBlockingSleeper::from_clock(Arc::clone(&clock));
+fn test_blocking_sleeper_exposes_composed_timer() {
+    let clock = ManualMonotonicClock::new();
+    let sleeper = BlockingSleeper::new(clock.new_timer());
+    let cloned = sleeper.clone();
+
+    assert_eq!(clock.now().domain(), sleeper.timer().clock().now().domain(),);
+    assert_eq!(clock.now().domain(), cloned.timer().clock().now().domain(),);
+    assert!(format!("{sleeper:?}").starts_with("BlockingSleeper"));
+}
+
+struct WakeBeforeParkFuture {
+    polled: bool,
+}
+
+impl Future for WakeBeforeParkFuture {
+    type Output = ();
+
+    fn poll(
+        self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        if this.polled {
+            Poll::Ready(())
+        } else {
+            this.polled = true;
+            context.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
+}
+
+struct WakeBeforeParkTimer {
+    clock: ManualMonotonicClock,
+}
+
+impl Timer for WakeBeforeParkTimer {
+    fn clock(&self) -> &dyn MonotonicClock {
+        &self.clock
+    }
+
+    fn at(
+        &self,
+        _deadline: MonotonicInstant,
+    ) -> Result<TimerFuture, TimeError> {
+        Ok(Box::pin(WakeBeforeParkFuture { polled: false }))
+    }
+}
+
+#[test]
+fn test_blocking_sleeper_handles_wake_before_park() {
+    let clock = ManualMonotonicClock::new();
+    let deadline = clock.now();
+    let timer = Arc::new(WakeBeforeParkTimer { clock });
+    let sleeper = BlockingSleeper::new(timer);
+
+    sleeper
+        .sleep_until(deadline)
+        .expect("latched wake should cause an immediate repoll");
+}
+
+struct FailingTimer {
+    clock: ManualMonotonicClock,
+}
+
+impl Timer for FailingTimer {
+    fn clock(&self) -> &dyn MonotonicClock {
+        &self.clock
+    }
+
+    fn at(
+        &self,
+        _deadline: MonotonicInstant,
+    ) -> Result<TimerFuture, TimeError> {
+        Err(TimeError::TimerUnavailable)
+    }
+}
+
+#[test]
+fn test_blocking_sleeper_returns_registration_error_without_parking() {
+    let clock = ManualMonotonicClock::new();
+    let deadline = clock.now();
+    let sleeper = BlockingSleeper::new(Arc::new(FailingTimer { clock }));
 
     assert_eq!(
-        Err(TimeError::InstantOverflow),
-        sleeper.sleep_for(Duration::from_nanos(1)),
+        Err(TimeError::TimerUnavailable),
+        sleeper.sleep_until(deadline),
     );
-    assert_eq!(0, clock.pending_waiters());
 }

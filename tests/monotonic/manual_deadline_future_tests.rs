@@ -5,9 +5,9 @@
 // =============================================================================
 
 use qubit_clock::{
-    AsyncSleeper,
-    ManualAsyncSleeper,
     ManualMonotonicClock,
+    MonotonicClock,
+    Timer,
 };
 use std::future::Future;
 use std::pin::pin;
@@ -70,9 +70,9 @@ impl Drop for ReentrantDropWaker {
 #[test]
 fn test_manual_deadline_future_returns_earliest_existing_deadline() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    let _later = sleeper.sleep_for_async(Duration::from_secs(5));
-    let _earlier = sleeper.sleep_for_async(Duration::from_secs(2));
+    let timer = clock.new_timer();
+    let _later = timer.after(Duration::from_secs(5)).unwrap();
+    let _earlier = timer.after(Duration::from_secs(2)).unwrap();
     let mut observer = pin!(clock.wait_for_next_deadline_async());
     let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
@@ -86,16 +86,16 @@ fn test_manual_deadline_future_returns_earliest_existing_deadline() {
 #[test]
 fn test_manual_deadline_future_ignores_cancelled_deadline_before_poll() {
     let clock = ManualMonotonicClock::new_shared();
-    let sleeper = clock.new_async_sleeper();
+    let timer = clock.new_timer();
     let mut observer = pin!(clock.wait_for_next_deadline_async());
-    let cancelled = sleeper.sleep_for_async(Duration::from_secs(3));
+    let cancelled = timer.after(Duration::from_secs(3)).unwrap();
     drop(cancelled);
     let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
 
     assert_eq!(Poll::Pending, observer.as_mut().poll(&mut context));
 
-    let _active = sleeper.sleep_for_async(Duration::from_secs(2));
+    let _active = timer.after(Duration::from_secs(2)).unwrap();
     let Poll::Ready(deadline) = observer.as_mut().poll(&mut context) else {
         panic!("the active future deadline should be ready");
     };
@@ -105,8 +105,8 @@ fn test_manual_deadline_future_ignores_cancelled_deadline_before_poll() {
 #[test]
 fn test_manual_deadline_future_ignores_already_due_waiters() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    let due = sleeper.sleep_for_async(Duration::from_secs(1));
+    let timer = clock.new_timer();
+    let due = timer.after(Duration::from_secs(1)).unwrap();
     clock
         .advance(Duration::from_secs(1))
         .expect("short manual advance should succeed");
@@ -115,7 +115,7 @@ fn test_manual_deadline_future_ignores_already_due_waiters() {
     let mut context = Context::from_waker(waker);
     assert_eq!(Poll::Pending, observer.as_mut().poll(&mut context));
 
-    let _future = sleeper.sleep_for_async(Duration::from_secs(2));
+    let _future = timer.after(Duration::from_secs(2)).unwrap();
 
     let Poll::Ready(deadline) = observer.as_mut().poll(&mut context) else {
         panic!("new future deadline should be ready");
@@ -127,14 +127,14 @@ fn test_manual_deadline_future_ignores_already_due_waiters() {
 #[test]
 fn test_manual_deadline_future_wakes_when_deadline_registers() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let timer = clock.new_timer();
     let mut observer = Box::pin(clock.wait_for_next_deadline_async());
     let wake_counter = Arc::new(WakeCounter::default());
     let waker = Waker::from(Arc::clone(&wake_counter));
     let mut context = Context::from_waker(&waker);
     assert_eq!(Poll::Pending, observer.as_mut().poll(&mut context));
 
-    let _sleep = sleeper.sleep_for_async(Duration::from_secs(2));
+    let _future = timer.after(Duration::from_secs(2)).unwrap();
 
     assert_eq!(1, wake_counter.wakes.load(Ordering::SeqCst));
     assert!(observer.as_mut().poll(&mut context).is_ready());
@@ -185,10 +185,10 @@ fn test_manual_deadline_future_replacement_drops_waker_outside_clock_lock() {
 #[test]
 fn test_manual_deadline_future_returns_earliest_deadline_at_poll() {
     let clock = ManualMonotonicClock::new_shared();
-    let sleeper = clock.new_async_sleeper();
+    let timer = clock.new_timer();
     let mut observer = pin!(clock.wait_for_next_deadline_async());
-    let _later = sleeper.sleep_for_async(Duration::from_secs(4));
-    let _earlier = sleeper.sleep_for_async(Duration::from_secs(1));
+    let _later = timer.after(Duration::from_secs(4)).unwrap();
+    let _earlier = timer.after(Duration::from_secs(1)).unwrap();
     let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
 
@@ -201,7 +201,7 @@ fn test_manual_deadline_future_returns_earliest_deadline_at_poll() {
 #[test]
 fn test_manual_deadline_future_unregisters_on_drop() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let timer = clock.new_timer();
     let wake_counter = Arc::new(WakeCounter::default());
     let waker = Waker::from(Arc::clone(&wake_counter));
     let mut context = Context::from_waker(&waker);
@@ -209,7 +209,7 @@ fn test_manual_deadline_future_unregisters_on_drop() {
     assert_eq!(Poll::Pending, observer.as_mut().poll(&mut context));
     drop(observer);
 
-    let _sleep = sleeper.sleep_for_async(Duration::from_secs(2));
+    let _future = timer.after(Duration::from_secs(2)).unwrap();
 
     assert_eq!(0, wake_counter.wakes.load(Ordering::SeqCst));
 }

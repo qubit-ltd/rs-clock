@@ -39,3 +39,12 @@ fn test_std_monotonic_clock_default_creates_clock() {
     let other = StdMonotonicClock::new();
     assert_ne!(clock.now().domain(), other.now().domain());
 }
+
+#[test]
+fn test_std_monotonic_clock_creates_same_domain_timer_directly() {
+    let clock = StdMonotonicClock::new();
+
+    let timer = clock.new_timer();
+
+    assert_eq!(clock.now().domain(), timer.clock().now().domain());
+}

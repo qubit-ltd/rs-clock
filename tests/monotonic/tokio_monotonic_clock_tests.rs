@@ -32,3 +32,12 @@ async fn test_tokio_monotonic_clock_default_creates_clock() {
     let other = TokioMonotonicClock::new();
     assert_ne!(clock.now().domain(), other.now().domain());
 }
+
+#[tokio::test(start_paused = true)]
+async fn test_tokio_monotonic_clock_creates_same_domain_timer_directly() {
+    let clock = TokioMonotonicClock::new();
+
+    let timer = clock.new_timer();
+
+    assert_eq!(clock.now().domain(), timer.clock().now().domain());
+}

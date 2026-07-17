@@ -37,6 +37,10 @@ fn test_time_error_other_variants_display() {
         "earlier monotonic instant is later than the current instant",
         TimeError::InvalidInstantOrder.to_string(),
     );
+    assert_eq!(
+        "monotonic timer driver is unavailable",
+        TimeError::TimerUnavailable.to_string(),
+    );
 }
 
 #[test]
