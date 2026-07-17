@@ -2,9 +2,12 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Blocking adaptation over asynchronous monotonic timers.
 
 mod blocking_sleeper;
+mod internal;
 
 pub use blocking_sleeper::BlockingSleeper;

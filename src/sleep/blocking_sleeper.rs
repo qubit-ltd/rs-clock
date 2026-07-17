@@ -2,26 +2,22 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Defines a blocking adapter over the asynchronous Timer capability.
 
+use super::internal::ThreadWaker;
 use crate::{
     MonotonicInstant,
     TimeError,
     Timer,
     TimerFuture,
 };
-use std::sync::{
-    Arc,
-    atomic::{
-        AtomicBool,
-        Ordering,
-    },
-};
+use std::sync::Arc;
 use std::task::{
     Context,
     Poll,
-    Wake,
     Waker,
 };
 use std::time::Duration;
@@ -115,18 +111,15 @@ impl BlockingSleeper {
     ///
     /// * `future` - Eagerly registered timer future to drive to completion.
     fn block_on(mut future: TimerFuture) {
-        let thread_waker = Arc::new(ThreadWaker {
-            thread: std::thread::current(),
-            notified: AtomicBool::new(false),
-        });
+        let thread_waker = Arc::new(ThreadWaker::new(std::thread::current()));
         let waker = Waker::from(Arc::clone(&thread_waker));
         let mut context = Context::from_waker(&waker);
         loop {
-            thread_waker.notified.store(false, Ordering::Release);
+            thread_waker.clear_notification();
             if matches!(future.as_mut().poll(&mut context), Poll::Ready(())) {
                 return;
             }
-            while !thread_waker.notified.swap(false, Ordering::AcqRel) {
+            while !thread_waker.take_notification() {
                 std::thread::park();
             }
         }
@@ -152,26 +145,5 @@ impl std::fmt::Debug for BlockingSleeper {
         formatter
             .debug_struct("BlockingSleeper")
             .finish_non_exhaustive()
-    }
-}
-
-/// Thread notification latch used as a future waker.
-struct ThreadWaker {
-    /// Thread parked while its timer future remains pending.
-    thread: std::thread::Thread,
-    /// Notification bit preventing wake-before-park races.
-    notified: AtomicBool,
-}
-
-impl Wake for ThreadWaker {
-    /// Latches a notification before unparking the blocked thread.
-    fn wake(self: Arc<Self>) {
-        self.wake_by_ref();
-    }
-
-    /// Latches a notification before unparking the blocked thread.
-    fn wake_by_ref(self: &Arc<Self>) {
-        self.notified.store(true, Ordering::Release);
-        self.thread.unpark();
     }
 }

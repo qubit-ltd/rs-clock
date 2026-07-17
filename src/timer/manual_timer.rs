@@ -2,6 +2,8 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Defines a timer driven by explicitly advanced monotonic time.
 
@@ -71,6 +73,11 @@ impl Timer for ManualTimer {
     /// # Errors
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline.
+    ///
+    /// # Panics
+    ///
+    /// Panics when waiter identifiers are exhausted or when a reached
+    /// observer waker panics during registration notification.
     #[inline]
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let future =
