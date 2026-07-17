@@ -5,20 +5,13 @@
 // =============================================================================
 //! Stores completion state for one standard timer registration.
 
+use super::std_timer_waiter_state::StdTimerWaiterState;
 use std::sync::Mutex;
 use std::task::{
     Context,
     Poll,
     Waker,
 };
-
-/// Completion state protected by one waiter lock.
-struct StdTimerWaiterState {
-    /// Whether the scheduler has reached this waiter's deadline.
-    ready: bool,
-    /// Most recently registered task waker.
-    waker: Option<Waker>,
-}
 
 /// Completion latch and task waker shared by a future and scheduler worker.
 pub(crate) struct StdTimerWaiter {
@@ -36,10 +29,7 @@ impl StdTimerWaiter {
     #[inline]
     pub(crate) const fn new() -> Self {
         Self {
-            state: Mutex::new(StdTimerWaiterState {
-                ready: false,
-                waker: None,
-            }),
+            state: Mutex::new(StdTimerWaiterState::new()),
         }
     }
 

@@ -5,15 +5,11 @@
 // =============================================================================
 //! Schedules standard timer registrations on one shared worker thread.
 
+use super::std_timer_scheduler_state::StdTimerSchedulerState;
 use super::std_timer_waiter::StdTimerWaiter;
 use super::std_timer_worker_guard::StdTimerWorkerGuard;
 use crate::TimeError;
 use crate::internal::PanicFanout;
-use std::cmp::Reverse;
-use std::collections::{
-    BinaryHeap,
-    HashMap,
-};
 use std::sync::{
     Arc,
     Condvar,
@@ -21,64 +17,6 @@ use std::sync::{
     MutexGuard,
 };
 use std::time::Instant;
-
-/// Mutable registrations protected by one scheduler lock.
-struct StdTimerSchedulerState {
-    /// Next nonzero registration identifier.
-    next_waiter_id: u64,
-    /// Deadline keys ordered from earliest to latest, including stale keys.
-    deadlines: BinaryHeap<Reverse<(Instant, u64)>>,
-    /// Active waiters keyed by registration identifier.
-    waiters: HashMap<u64, Arc<StdTimerWaiter>>,
-    /// Whether a scheduler worker is currently running.
-    worker_running: bool,
-}
-
-impl StdTimerSchedulerState {
-    /// Creates empty scheduler state.
-    ///
-    /// # Returns
-    ///
-    /// State without registrations or a worker thread.
-    #[must_use]
-    fn new() -> Self {
-        Self {
-            next_waiter_id: 1,
-            deadlines: BinaryHeap::new(),
-            waiters: HashMap::new(),
-            worker_running: false,
-        }
-    }
-
-    /// Allocates a nonzero waiter identifier without reuse after exhaustion.
-    ///
-    /// # Returns
-    ///
-    /// The next registration identifier.
-    ///
-    /// # Panics
-    ///
-    /// Panics after all nonzero identifiers have been allocated.
-    fn allocate_waiter_id(&mut self) -> u64 {
-        let waiter_id = self.next_waiter_id;
-        assert_ne!(waiter_id, 0, "standard timer waiter identifiers exhausted");
-        self.next_waiter_id = waiter_id.wrapping_add(1);
-        waiter_id
-    }
-
-    /// Removes stale heap keys whose registrations have been cancelled.
-    fn remove_stale_deadlines(&mut self) {
-        while self
-            .deadlines
-            .peek()
-            .is_some_and(|Reverse((_, waiter_id))| {
-                !self.waiters.contains_key(waiter_id)
-            })
-        {
-            self.deadlines.pop();
-        }
-    }
-}
 
 /// One lazily started worker shared by every future from a standard timer.
 pub(crate) struct StdTimerScheduler {
@@ -124,15 +62,13 @@ impl StdTimerScheduler {
         waiter: Arc<StdTimerWaiter>,
     ) -> Result<u64, TimeError> {
         let mut state = self.lock_state();
-        let waiter_id = state.allocate_waiter_id();
-        state.waiters.insert(waiter_id, waiter);
-        state.deadlines.push(Reverse((deadline, waiter_id)));
-        if state.worker_running {
+        let waiter_id = state.register(deadline, waiter);
+        if state.worker_running() {
             drop(state);
             self.changed.notify_one();
             return Ok(waiter_id);
         }
-        state.worker_running = true;
+        state.mark_worker_started();
         let scheduler = Arc::clone(self);
         let spawn_result = std::thread::Builder::new()
             .name("qubit-clock-timer".to_owned())
@@ -143,8 +79,8 @@ impl StdTimerScheduler {
                 worker_guard.disarm();
             });
         if spawn_result.is_err() {
-            state.waiters.remove(&waiter_id);
-            state.worker_running = false;
+            drop(state.cancel(waiter_id));
+            state.mark_worker_stopped();
             return Err(TimeError::TimerUnavailable);
         }
         drop(state);
@@ -157,7 +93,7 @@ impl StdTimerScheduler {
     ///
     /// * `waiter_id` - Registration identifier to cancel.
     pub(crate) fn cancel(&self, waiter_id: u64) {
-        let waiter = self.lock_state().waiters.remove(&waiter_id);
+        let waiter = self.lock_state().cancel(waiter_id);
         let was_registered = waiter.is_some();
         drop(waiter);
         if was_registered {
@@ -169,15 +105,13 @@ impl StdTimerScheduler {
     fn run(&self) {
         let mut state = self.lock_state();
         loop {
-            state.remove_stale_deadlines();
-            if state.waiters.is_empty() {
-                state.worker_running = false;
+            if state.is_empty() {
+                state.mark_worker_stopped();
                 return;
             }
-            let Some(Reverse((deadline, _))) = state.deadlines.peek().copied()
-            else {
-                unreachable!("active standard timer waiter has no deadline");
-            };
+            let deadline = state.next_deadline().expect(
+                "active standard Timer registration must have a deadline",
+            );
             let now = Instant::now();
             if deadline > now {
                 let duration = deadline.duration_since(now);
@@ -188,18 +122,7 @@ impl StdTimerScheduler {
                 state = next_state;
                 continue;
             }
-            let mut due_waiters = Vec::new();
-            while let Some(Reverse((deadline, waiter_id))) =
-                state.deadlines.peek().copied()
-            {
-                if deadline > now {
-                    break;
-                }
-                state.deadlines.pop();
-                if let Some(waiter) = state.waiters.remove(&waiter_id) {
-                    due_waiters.push(waiter);
-                }
-            }
+            let due_waiters = state.take_due(now);
             drop(state);
             let wakers = due_waiters
                 .iter()
@@ -215,7 +138,7 @@ impl StdTimerScheduler {
 
     /// Clears the worker-running flag after an unexpected worker exit.
     pub(super) fn mark_worker_stopped(&self) {
-        self.lock_state().worker_running = false;
+        self.lock_state().mark_worker_stopped();
     }
 
     /// Locks scheduler state, recovering the inner value after poisoning.

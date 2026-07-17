@@ -91,6 +91,27 @@ fn test_std_timer_cancellation_does_not_block_later_registration() {
 }
 
 #[test]
+fn test_std_timer_handles_cancellation_churn_behind_active_anchor() {
+    let clock = StdMonotonicClock::new();
+    let timer = StdTimer::from_clock(&clock);
+    let anchor = timer
+        .after(Duration::from_secs(30))
+        .expect("anchor deadline should register");
+    for offset in 0..4096_u64 {
+        let cancelled = timer
+            .after(Duration::from_secs(31 + offset))
+            .expect("churn deadline should register");
+        drop(cancelled);
+    }
+    drop(anchor);
+
+    let survivor = timer
+        .after(Duration::from_millis(5))
+        .expect("post-churn deadline should register");
+    block_on_timer_future(survivor);
+}
+
+#[test]
 fn test_std_timer_wakes_scheduler_for_new_earlier_deadline() {
     let clock = StdMonotonicClock::new();
     let timer = StdTimer::from_clock(&clock);
