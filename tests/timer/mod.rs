@@ -2,9 +2,11 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Tests for the sleep module.
 
-mod blocking_sleeper_tests;
+mod manual_timer_tests;
+mod std_timer_tests;
+mod timer_tests;
+
+#[cfg(feature = "tokio")]
+mod tokio_timer_tests;

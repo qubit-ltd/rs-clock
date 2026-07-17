@@ -5,11 +5,10 @@
 // =============================================================================
 
 use qubit_clock::{
-    AsyncSleeper,
     BlockingSleeper,
-    ManualAsyncSleeper,
-    ManualBlockingSleeper,
     ManualMonotonicClock,
+    MonotonicClock,
+    Timer,
 };
 use std::future::Future;
 use std::pin::pin;
@@ -92,8 +91,10 @@ fn test_manual_waiter_future_is_ready_for_zero_expected_count() {
 #[test]
 fn test_manual_waiter_future_is_ready_when_count_is_already_satisfied() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    let sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let timer = clock.new_timer();
+    let sleep = timer
+        .after(Duration::from_secs(1))
+        .expect("timer deadline should register");
     let mut waiter = pin!(clock.wait_for_waiters_async(1));
     let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
@@ -103,9 +104,9 @@ fn test_manual_waiter_future_is_ready_when_count_is_already_satisfied() {
 }
 
 #[test]
-fn test_manual_waiter_future_observes_blocking_waiter_registration() {
+fn test_manual_waiter_future_observes_blocking_adapter_registration() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualBlockingSleeper::from_clock(Arc::clone(&clock));
+    let sleeper = BlockingSleeper::new(clock.new_timer());
     let mut waiter = Box::pin(clock.wait_for_waiters_async(1));
     let wake_counter = Arc::new(WakeCounter::default());
     let waker = Waker::from(Arc::clone(&wake_counter));
@@ -130,14 +131,16 @@ fn test_manual_waiter_future_observes_blocking_waiter_registration() {
 #[test]
 fn test_manual_waiter_future_wakes_when_expected_waiter_registers() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let timer = clock.new_timer();
     let mut waiter = pin!(clock.wait_for_waiters_async(1));
     let wake_counter = Arc::new(WakeCounter::default());
     let waker = Waker::from(Arc::clone(&wake_counter));
     let mut context = Context::from_waker(&waker);
     assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut context));
 
-    let sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let sleep = timer
+        .after(Duration::from_secs(1))
+        .expect("timer deadline should register");
 
     assert_eq!(1, wake_counter.wakes.load(Ordering::SeqCst));
     assert_eq!(Poll::Ready(()), waiter.as_mut().poll(&mut context));
@@ -147,7 +150,7 @@ fn test_manual_waiter_future_wakes_when_expected_waiter_registers() {
 #[test]
 fn test_manual_waiter_future_replaces_registered_waker() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let timer = clock.new_timer();
     let first_counter = Arc::new(WakeCounter::default());
     let second_counter = Arc::new(WakeCounter::default());
     let first_waker = Waker::from(Arc::clone(&first_counter));
@@ -158,7 +161,9 @@ fn test_manual_waiter_future_replaces_registered_waker() {
     assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut first_context));
     assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut second_context));
 
-    let sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let sleep = timer
+        .after(Duration::from_secs(1))
+        .expect("timer deadline should register");
 
     assert_eq!(0, first_counter.wakes.load(Ordering::SeqCst));
     assert_eq!(1, second_counter.wakes.load(Ordering::SeqCst));
@@ -215,7 +220,7 @@ fn test_manual_waiter_future_reuses_registered_waker() {
 #[test]
 fn test_manual_waiter_future_unregisters_on_drop() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let timer = clock.new_timer();
     let wake_counter = Arc::new(WakeCounter::default());
     let waker = Waker::from(Arc::clone(&wake_counter));
     let mut context = Context::from_waker(&waker);
@@ -223,7 +228,9 @@ fn test_manual_waiter_future_unregisters_on_drop() {
     assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut context));
     drop(waiter);
 
-    let sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let sleep = timer
+        .after(Duration::from_secs(1))
+        .expect("timer deadline should register");
 
     assert_eq!(0, wake_counter.wakes.load(Ordering::SeqCst));
     drop(sleep);
@@ -257,14 +264,16 @@ fn test_manual_waiter_future_cancellation_drops_waker_outside_clock_lock() {
 #[test]
 fn test_manual_waiter_future_latches_reached_count_before_waiter_drops() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let timer = clock.new_timer();
     let wake_counter = Arc::new(WakeCounter::default());
     let waker = Waker::from(Arc::clone(&wake_counter));
     let mut context = Context::from_waker(&waker);
     let mut waiter = Box::pin(clock.wait_for_waiters_async(1));
     assert_eq!(Poll::Pending, waiter.as_mut().poll(&mut context));
 
-    let sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let sleep = timer
+        .after(Duration::from_secs(1))
+        .expect("timer deadline should register");
     drop(sleep);
 
     assert_eq!(1, wake_counter.wakes.load(Ordering::SeqCst));
@@ -272,9 +281,9 @@ fn test_manual_waiter_future_latches_reached_count_before_waiter_drops() {
 }
 
 #[test]
-fn test_async_waiter_registration_cleans_up_after_observer_waker_panics() {
+fn test_timer_waiter_registration_cleans_up_after_observer_waker_panics() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
+    let timer = clock.new_timer();
     let panic_waker = Waker::from(Arc::new(PanicWaker));
     let wake_counter = Arc::new(WakeCounter::default());
     let counting_waker = Waker::from(Arc::clone(&wake_counter));
@@ -292,7 +301,7 @@ fn test_async_waiter_registration_cleans_up_after_observer_waker_panics() {
     );
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        sleeper.sleep_for_async(Duration::from_secs(1))
+        timer.after(Duration::from_secs(1))
     }));
 
     assert!(result.is_err());
@@ -309,9 +318,9 @@ fn test_async_waiter_registration_cleans_up_after_observer_waker_panics() {
 }
 
 #[test]
-fn test_blocking_waiter_registration_cleans_up_after_observer_waker_panics() {
+fn test_blocking_adapter_registration_cleans_up_after_observer_waker_panics() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualBlockingSleeper::from_clock(Arc::clone(&clock));
+    let sleeper = BlockingSleeper::new(clock.new_timer());
     let panic_waker = Waker::from(Arc::new(PanicWaker));
     let wake_counter = Arc::new(WakeCounter::default());
     let counting_waker = Waker::from(Arc::clone(&wake_counter));

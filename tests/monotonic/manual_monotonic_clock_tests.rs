@@ -5,13 +5,11 @@
 // =============================================================================
 
 use qubit_clock::{
-    AsyncSleeper,
     BlockingSleeper,
-    ManualAsyncSleeper,
-    ManualBlockingSleeper,
     ManualMonotonicClock,
     MonotonicClock,
     TimeError,
+    Timer,
     WallClock,
 };
 use std::sync::Arc;
@@ -24,21 +22,21 @@ use std::time::{
 #[test]
 fn test_manual_monotonic_clock_shared_helpers_use_same_timeline() {
     let clock = ManualMonotonicClock::new_shared();
-    let async_sleeper = clock.new_async_sleeper();
-    let blocking_sleeper = clock.new_blocking_sleeper();
     let wall_clock = clock.new_wall_clock(UNIX_EPOCH);
+    let timer = clock.new_timer();
+    let blocking_sleeper = BlockingSleeper::new(Arc::clone(&timer));
 
-    assert_eq!(clock.now(), async_sleeper.clock().now());
-    assert_eq!(clock.now(), blocking_sleeper.clock().now());
     assert_eq!(UNIX_EPOCH, wall_clock.now());
+    assert_eq!(clock.now(), timer.clock().now());
+    assert_eq!(clock.now(), blocking_sleeper.timer().clock().now());
 
     clock
         .advance(Duration::from_secs(4))
         .expect("short manual advance should succeed");
 
-    assert_eq!(clock.now(), async_sleeper.clock().now());
-    assert_eq!(clock.now(), blocking_sleeper.clock().now());
     assert_eq!(UNIX_EPOCH + Duration::from_secs(4), wall_clock.now());
+    assert_eq!(clock.now(), timer.clock().now());
+    assert_eq!(clock.now(), blocking_sleeper.timer().clock().now());
 }
 
 #[test]
@@ -148,10 +146,11 @@ fn test_manual_monotonic_clock_advance_to_current_is_noop() {
 #[tokio::test]
 async fn test_manual_monotonic_clock_drives_mixed_waiters_in_deadline_order() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let async_sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    let blocking_sleeper =
-        Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(&clock)));
-    let async_wait = async_sleeper.sleep_for_async(Duration::from_secs(2));
+    let timer = clock.new_timer();
+    let blocking_sleeper = Arc::new(BlockingSleeper::new(Arc::clone(&timer)));
+    let async_wait = timer
+        .after(Duration::from_secs(2))
+        .expect("timer deadline should register");
     let worker_sleeper = Arc::clone(&blocking_sleeper);
     let worker = thread::spawn(move || {
         worker_sleeper
@@ -175,7 +174,7 @@ async fn test_manual_monotonic_clock_drives_mixed_waiters_in_deadline_order() {
             .expect("async deadline should exist")
             .elapsed_since_origin(),
     );
-    async_wait.await.expect("async wait should complete");
+    async_wait.await;
 
     assert_eq!(1, clock.pending_waiters());
     assert_eq!(
@@ -229,8 +228,10 @@ fn test_manual_monotonic_clock_wait_for_waiters_times_out() {
 #[test]
 fn test_manual_monotonic_clock_wait_for_waiters_is_already_satisfied() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    let pending_sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let timer = clock.new_timer();
+    let pending_sleep = timer
+        .after(Duration::from_secs(1))
+        .expect("timer deadline should register");
 
     assert_eq!(1, clock.pending_waiters());
     assert!(clock.wait_for_waiters(1, Duration::ZERO));
@@ -244,8 +245,10 @@ fn test_manual_monotonic_clock_wait_for_waiters_is_already_satisfied() {
 #[test]
 fn test_manual_monotonic_clock_wait_for_waiters_prefers_satisfied_count() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    let pending_sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let timer = clock.new_timer();
+    let pending_sleep = timer
+        .after(Duration::from_secs(1))
+        .expect("timer deadline should register");
 
     assert_eq!(1, clock.pending_waiters());
     assert!(clock.wait_for_waiters(1, Duration::MAX));
@@ -259,7 +262,7 @@ fn test_manual_monotonic_clock_wait_for_waiters_prefers_satisfied_count() {
 #[test]
 fn test_manual_monotonic_clock_wait_for_next_deadline_tracks_retries() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualBlockingSleeper::from_clock(Arc::clone(&clock));
+    let sleeper = BlockingSleeper::new(clock.new_timer());
     let worker = thread::spawn(move || {
         sleeper
             .sleep_for(Duration::from_secs(1))
@@ -312,8 +315,10 @@ fn test_manual_monotonic_clock_wait_for_next_deadline_times_out() {
 #[test]
 fn test_manual_monotonic_clock_wait_for_next_deadline_prefers_existing() {
     let clock = Arc::new(ManualMonotonicClock::new());
-    let sleeper = ManualAsyncSleeper::from_clock(Arc::clone(&clock));
-    let pending_sleep = sleeper.sleep_for_async(Duration::from_secs(1));
+    let timer = clock.new_timer();
+    let pending_sleep = timer
+        .after(Duration::from_secs(1))
+        .expect("timer deadline should register");
     let expected_deadline = clock
         .next_deadline()
         .expect("pending sleep should register a deadline");

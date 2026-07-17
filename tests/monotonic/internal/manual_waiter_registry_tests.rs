@@ -19,10 +19,10 @@ fn test_manual_registry_latches_reached_observer_after_waiter_unregisters() {
     let observer_id = registry
         .register_observer(1, registry.count())
         .expect("an unsatisfied observer should be registered");
-    let waiter_id = registry.register_async(Duration::from_secs(1));
+    let waiter_id = registry.register_timer(Duration::from_secs(1));
 
     assert!(registry.reached_observer_wakers(Duration::ZERO).is_empty());
-    assert!(registry.unregister_async(waiter_id).is_some());
+    assert!(registry.unregister_timer(waiter_id).is_some());
 
     assert!(!registry.contains_observer(observer_id));
     assert_eq!(0, registry.count());
@@ -40,7 +40,7 @@ fn test_manual_registry_poll_observer_becomes_ready_after_reaching_count() {
     assert_eq!(Poll::Pending, poll);
     assert!(replaced_waker.is_none());
 
-    let _ = registry.register_async(Duration::from_secs(1));
+    let _ = registry.register_timer(Duration::from_secs(1));
     let wakers = registry.reached_observer_wakers(Duration::ZERO);
     let (poll, removed_waker) = registry.poll_observer(observer_id, &context);
     assert_eq!(Poll::Ready(()), poll);
@@ -55,7 +55,7 @@ fn test_manual_registry_keeps_observer_below_expected_count() {
     let observer_id = registry
         .register_observer(2, registry.count())
         .expect("an unsatisfied observer should be registered");
-    let _ = registry.register_async(Duration::from_secs(1));
+    let _ = registry.register_timer(Duration::from_secs(1));
 
     assert!(registry.reached_observer_wakers(Duration::ZERO).is_empty());
     assert!(registry.contains_observer(observer_id));
@@ -72,16 +72,16 @@ fn test_manual_registry_deadline_observer_tracks_current_deadline() {
     assert_eq!(Poll::Pending, poll);
     assert!(replaced_waker.is_none());
 
-    let cancelled = registry.register_async(Duration::from_secs(2));
+    let cancelled = registry.register_timer(Duration::from_secs(2));
     assert_eq!(1, registry.reached_observer_wakers(Duration::ZERO).len());
-    assert!(registry.unregister_async(cancelled).is_some());
+    assert!(registry.unregister_timer(cancelled).is_some());
 
     let (poll, replaced_waker) =
         registry.poll_deadline_observer(observer_id, Duration::ZERO, &context);
     assert_eq!(Poll::Pending, poll);
     assert!(replaced_waker.is_none());
 
-    let _ = registry.register_async(Duration::from_secs(3));
+    let _ = registry.register_timer(Duration::from_secs(3));
     assert_eq!(1, registry.reached_observer_wakers(Duration::ZERO).len());
 
     let (poll, removed_waker) =
@@ -93,7 +93,7 @@ fn test_manual_registry_deadline_observer_tracks_current_deadline() {
 #[test]
 fn test_manual_registry_deadline_observer_returns_existing_deadline() {
     let mut registry = ManualWaiterRegistry::new();
-    let _ = registry.register_blocking(Duration::from_secs(3));
+    let _ = registry.register_timer(Duration::from_secs(3));
     let observer_id = registry.register_deadline_observer();
     let context = Context::from_waker(Waker::noop());
 
@@ -143,14 +143,14 @@ fn test_manual_registry_identifier_allocates_maximum_before_exhaustion() {
     assert!(result.is_err());
 }
 
-/// Verifies that a lost async registration fails instead of hanging forever.
+/// Verifies that a lost timer registration fails instead of hanging forever.
 #[test]
-#[should_panic(expected = "manual async waiter 1 is not registered")]
-fn test_manual_registry_poll_async_panics_for_missing_waiter() {
+#[should_panic(expected = "manual timer waiter 1 is not registered")]
+fn test_manual_registry_poll_timer_panics_for_missing_waiter() {
     let mut registry = ManualWaiterRegistry::new();
-    let waiter_id = registry.register_async(Duration::from_secs(1));
-    assert!(registry.unregister_async(waiter_id).is_some());
+    let waiter_id = registry.register_timer(Duration::from_secs(1));
+    assert!(registry.unregister_timer(waiter_id).is_some());
     let context = Context::from_waker(Waker::noop());
 
-    let _ = registry.poll_async(waiter_id, Duration::ZERO, &context);
+    let _ = registry.poll_timer(waiter_id, Duration::ZERO, &context);
 }
