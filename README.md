@@ -114,6 +114,9 @@ cargo test --all-features
 
 # Check code coverage
 ./coverage.sh
+
+# Benchmark the process-wide standard Timer scheduler
+cargo bench --bench std_timer_scheduler
 ```
 
 ## License

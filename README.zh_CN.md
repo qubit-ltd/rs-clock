@@ -110,6 +110,9 @@ cargo test --all-features
 
 # 检查代码覆盖率
 ./coverage.sh
+
+# 对进程级标准 Timer scheduler 运行基准测试
+cargo bench --bench std_timer_scheduler
 ```
 
 ## 许可证

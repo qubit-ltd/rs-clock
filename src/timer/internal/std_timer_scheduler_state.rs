@@ -206,7 +206,8 @@ impl StdTimerSchedulerState {
     ///
     /// # Parameters
     ///
-    /// * `generation` - Generation of the worker that has exited.
+    /// * `generation` - Generation of the worker that has exited, or zero for a
+    ///   disarmed guard.
     #[inline(always)]
     pub(super) fn mark_worker_stopped(&mut self, generation: u64) {
         if self.worker_generation == generation {

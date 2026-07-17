@@ -23,12 +23,13 @@ use std::time::Instant;
 
 /// A real-time asynchronous timer backed by [`std::time::Instant`].
 ///
-/// All active futures created by one timer share a single lazily started
-/// scheduler worker. The worker exits when no active registrations remain.
+/// Every standard Timer in the process shares one scheduler worker. The worker
+/// starts lazily with the first future registration and remains parked while
+/// idle so later registrations do not need to create another native thread.
 pub struct StdTimer {
     /// Private clock handle retaining the source domain and native origin.
     clock: Arc<StdMonotonicClock>,
-    /// Lazy scheduler shared by every registration from this timer.
+    /// Process-wide scheduler shared by every standard Timer registration.
     scheduler: Arc<StdTimerScheduler>,
 }
 
@@ -41,13 +42,13 @@ impl StdTimer {
     ///
     /// # Returns
     ///
-    /// A timer with an initially idle scheduler.
+    /// A timer retaining the process-wide lazy scheduler.
     #[must_use]
     #[inline]
     pub fn from_clock(clock: &StdMonotonicClock) -> Self {
         Self {
             clock: Arc::new(clock.same_domain_handle()),
-            scheduler: Arc::new(StdTimerScheduler::new()),
+            scheduler: StdTimerScheduler::shared(),
         }
     }
 
