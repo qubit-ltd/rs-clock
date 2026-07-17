@@ -11,19 +11,11 @@ use qubit_clock::{
     StdTimer,
     TimeError,
     Timer,
-    TimerFuture,
 };
-use std::sync::{
-    Arc,
-    atomic::{
-        AtomicBool,
-        Ordering,
-    },
-};
+use std::sync::Arc;
 use std::task::{
     Context,
     Poll,
-    Wake,
     Waker,
 };
 use std::time::{
@@ -31,49 +23,10 @@ use std::time::{
     Instant,
 };
 
-/// Wakes the thread synchronously polling one timer future.
-struct ThreadWaker {
-    /// Thread parked between future polls.
-    thread: std::thread::Thread,
-    /// Latches notifications that race with parking.
-    notified: AtomicBool,
-}
-
-impl Wake for ThreadWaker {
-    /// Latches the notification before unparking the polling thread.
-    fn wake(self: Arc<Self>) {
-        self.wake_by_ref();
-    }
-
-    /// Latches the notification before unparking the polling thread.
-    fn wake_by_ref(self: &Arc<Self>) {
-        self.notified.store(true, Ordering::Release);
-        self.thread.unpark();
-    }
-}
-
-/// Blocks the current thread until a timer future becomes ready.
-///
-/// # Parameters
-///
-/// * `future` - Timer future to drive to completion.
-fn block_on_timer_future(mut future: TimerFuture) {
-    let thread_waker = Arc::new(ThreadWaker {
-        thread: std::thread::current(),
-        notified: AtomicBool::new(false),
-    });
-    let waker = Waker::from(Arc::clone(&thread_waker));
-    let mut context = Context::from_waker(&waker);
-    loop {
-        thread_waker.notified.store(false, Ordering::Release);
-        if matches!(future.as_mut().poll(&mut context), Poll::Ready(())) {
-            return;
-        }
-        while !thread_waker.notified.swap(false, Ordering::AcqRel) {
-            std::thread::park();
-        }
-    }
-}
+use super::internal::{
+    PanickingWaker,
+    block_on_timer_future,
+};
 
 #[test]
 fn test_std_timer_returns_ready_future_for_reached_deadline() {
@@ -97,6 +50,29 @@ fn test_std_timer_completes_real_short_deadline() {
         .expect("short deadline should register");
 
     block_on_timer_future(future);
+}
+
+#[test]
+fn test_std_timer_continues_after_registered_waker_panics() {
+    let clock = StdMonotonicClock::new();
+    let timer = StdTimer::from_clock(&clock);
+    let mut panicking = timer
+        .after(Duration::from_millis(10))
+        .expect("panicking deadline should register");
+    let waker = Waker::from(Arc::new(PanickingWaker));
+    let mut context = Context::from_waker(&waker);
+    assert_eq!(Poll::Pending, panicking.as_mut().poll(&mut context));
+
+    let survivor = timer
+        .after(Duration::from_millis(30))
+        .expect("surviving deadline should register");
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        block_on_timer_future(survivor);
+        sender.send(()).expect("receiver should remain available");
+    });
+
+    assert_eq!(Ok(()), receiver.recv_timeout(Duration::from_secs(1)),);
 }
 
 #[test]

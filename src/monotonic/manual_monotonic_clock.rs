@@ -5,11 +5,11 @@
 // =============================================================================
 //! Defines an explicitly advanced monotonic clock for deterministic tests.
 
+use crate::internal::PanicFanout;
 use crate::monotonic::internal::{
     AdvanceEffects,
     ManualMonotonicState,
     ManualTimeDomain,
-    PanicFanout,
     WaiterRegistrationGuard,
 };
 use crate::{
