@@ -24,10 +24,10 @@ use tokio::time::Instant;
 ///
 /// When Tokio time is paused or explicitly advanced, create this clock after
 /// entering the runtime and read it only from that runtime. A paired
-/// A paired [`TokioTimer`](crate::TokioTimer) must also be polled by the
-/// same runtime time driver. Moving tasks between worker threads of one runtime
-/// is supported; moving the clock or timer between independent runtimes is
-/// not. Driver identity is a caller contract because Tokio does not expose an
+/// [`TokioTimer`](crate::TokioTimer) must also be polled by the same runtime
+/// time driver. Moving tasks between worker threads of one runtime is
+/// supported; moving the clock or timer between independent runtimes is not.
+/// Driver identity is a caller contract because Tokio does not expose an
 /// identity that this crate can validate.
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]

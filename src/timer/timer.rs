@@ -32,6 +32,20 @@ pub trait Timer: Send + Sync {
     /// # Returns
     ///
     /// The clock retained by this timer.
+    ///
+    /// # Examples
+    ///
+    /// Discarding the retained clock is diagnosed when unused results are
+    /// denied:
+    ///
+    /// ```compile_fail
+    /// #![deny(unused_must_use)]
+    /// use qubit_clock::{MonotonicClock, StdMonotonicClock, Timer};
+    ///
+    /// let timer = StdMonotonicClock::new().new_timer();
+    /// timer.clock();
+    /// ```
+    #[must_use = "the Timer clock should be used to sample or validate deadlines"]
     fn clock(&self) -> &dyn MonotonicClock;
 
     /// Registers a notification for an absolute monotonic deadline.
