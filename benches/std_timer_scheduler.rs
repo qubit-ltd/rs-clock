@@ -19,6 +19,7 @@ use qubit_clock::{
 use std::hint::black_box;
 use std::sync::{
     Arc,
+    Barrier,
     atomic::{
         AtomicBool,
         Ordering,
@@ -105,56 +106,95 @@ fn block_on_timer_future(mut future: TimerFuture) {
     }
 }
 
-/// Completes short deadlines registered by independent standard Timers.
+/// Registers and cancels deadlines concurrently on independent standard Timers.
 ///
 /// # Parameters
 ///
-/// * `timer_count` - Number of independent Timers registered in one batch.
-fn complete_independent_timers(timer_count: usize) {
-    let futures = (0..timer_count)
-        .map(|_| {
-            StdMonotonicClock::new()
-                .new_timer()
-                .after(Duration::from_micros(250))
-                .expect("benchmark deadline should register")
-        })
-        .collect::<Vec<_>>();
-    futures.into_iter().for_each(block_on_timer_future);
-}
-
-/// Completes waits separated by more than the former worker idle grace.
+/// * `timer_count` - Number of independent Timers registering concurrently.
+/// * `registrations_per_timer` - Registrations cancelled by each Timer.
 ///
-/// # Parameters
+/// # Panics
 ///
-/// * `wait_count` - Number of sequential waits to complete.
-fn complete_sparse_waits(wait_count: usize) {
-    let timer = StdMonotonicClock::new().new_timer();
-    for index in 0..wait_count {
-        let future = timer
-            .after(Duration::from_micros(250))
-            .expect("benchmark deadline should register");
-        block_on_timer_future(future);
-        if index + 1 < wait_count {
-            std::thread::sleep(Duration::from_millis(2));
+/// Panics when a deadline cannot be registered or a benchmark worker panics.
+fn register_and_cancel_parallel_timers(
+    timer_count: usize,
+    registrations_per_timer: usize,
+) {
+    let barrier = Arc::new(Barrier::new(timer_count));
+    std::thread::scope(|scope| {
+        let mut workers = Vec::with_capacity(timer_count);
+        for _ in 0..timer_count {
+            let barrier = Arc::clone(&barrier);
+            workers.push(scope.spawn(move || {
+                let timer = StdMonotonicClock::new().new_timer();
+                barrier.wait();
+                for _ in 0..registrations_per_timer {
+                    let future = timer
+                        .after(Duration::from_secs(60))
+                        .expect("benchmark deadline should register");
+                    drop(future);
+                }
+            }));
         }
-    }
+        for worker in workers {
+            worker.join().expect("benchmark worker should finish");
+        }
+    });
 }
 
-/// Benchmarks concurrent registrations from independent standard Timers.
-fn benchmark_concurrent_independent_timers(criterion: &mut Criterion) {
+/// Completes deadlines concurrently on independent standard Timers.
+///
+/// # Parameters
+///
+/// * `timer_count` - Number of independent Timers completing concurrently.
+///
+/// # Panics
+///
+/// Panics when a deadline cannot be registered or a benchmark worker panics.
+fn complete_parallel_timers(timer_count: usize) {
+    let barrier = Arc::new(Barrier::new(timer_count));
+    std::thread::scope(|scope| {
+        let mut workers = Vec::with_capacity(timer_count);
+        for _ in 0..timer_count {
+            let barrier = Arc::clone(&barrier);
+            workers.push(scope.spawn(move || {
+                let timer = StdMonotonicClock::new().new_timer();
+                barrier.wait();
+                let future = timer
+                    .after(Duration::from_millis(1))
+                    .expect("benchmark deadline should register");
+                block_on_timer_future(future);
+            }));
+        }
+        for worker in workers {
+            worker.join().expect("benchmark worker should finish");
+        }
+    });
+}
+
+/// Benchmarks shared-scheduler contention during registration and cancellation.
+fn benchmark_parallel_registration_and_cancellation(criterion: &mut Criterion) {
     criterion.bench_function(
-        "std_timer/concurrent_independent_timers",
+        "std_timer/parallel_registration_and_cancellation",
         |bencher| {
-            bencher.iter(|| complete_independent_timers(black_box(16)));
+            bencher.iter(|| {
+                register_and_cancel_parallel_timers(
+                    black_box(8),
+                    black_box(32),
+                );
+            });
         },
     );
 }
 
-/// Benchmarks sequential waits separated by an idle interval.
-fn benchmark_sparse_sequential_waits(criterion: &mut Criterion) {
-    criterion.bench_function("std_timer/sparse_sequential_waits", |bencher| {
-        bencher.iter(|| complete_sparse_waits(black_box(8)));
-    });
+/// Benchmarks parallel deadline completion and Waker fanout.
+fn benchmark_parallel_deadline_completion(criterion: &mut Criterion) {
+    criterion.bench_function(
+        "std_timer/parallel_deadline_completion",
+        |bencher| {
+            bencher.iter(|| complete_parallel_timers(black_box(16)));
+        },
+    );
 }
 
 criterion_group! {
@@ -164,7 +204,7 @@ criterion_group! {
         .warm_up_time(Duration::from_secs(1))
         .measurement_time(Duration::from_secs(2));
     targets =
-        benchmark_concurrent_independent_timers,
-        benchmark_sparse_sequential_waits
+        benchmark_parallel_registration_and_cancellation,
+        benchmark_parallel_deadline_completion
 }
 criterion_main!(benches);
