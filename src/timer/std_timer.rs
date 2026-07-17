@@ -126,6 +126,11 @@ impl Timer for StdTimer {
     ///
     /// Returns a domain mismatch, native-instant overflow, or scheduler startup
     /// error before returning a future.
+    ///
+    /// # Panics
+    ///
+    /// Panics when scheduler registration identifiers or worker generations
+    /// are exhausted, or an internal scheduler index invariant is violated.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let deadline = self.native_deadline(deadline)?;
         if deadline <= Instant::now() {

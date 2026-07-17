@@ -72,6 +72,11 @@ impl StdTimerScheduler {
     ///
     /// Returns [`TimeError::TimerUnavailable`] when the worker thread cannot be
     /// started. The attempted registration is removed before returning.
+    ///
+    /// # Panics
+    ///
+    /// Panics when registration identifiers or worker generations are
+    /// exhausted, or an internal scheduler index invariant is violated.
     pub(crate) fn register(
         self: &Arc<Self>,
         deadline: Instant,
@@ -93,6 +98,11 @@ impl StdTimerScheduler {
     /// # Parameters
     ///
     /// * `waiter_id` - Registration identifier to cancel.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the registration index contains an entry without its exact
+    /// deadline key.
     #[inline]
     pub(crate) fn cancel(&self, waiter_id: u64) {
         let waiter = self.lock_state().cancel(waiter_id);
@@ -137,6 +147,10 @@ impl StdTimerScheduler {
     /// # Errors
     ///
     /// Returns [`TimeError::TimerUnavailable`] when the worker cannot spawn.
+    ///
+    /// # Panics
+    ///
+    /// Panics when spawn rollback encounters inconsistent scheduler indexes.
     fn spawn_worker(
         self: &Arc<Self>,
         mut state: MutexGuard<'_, StdTimerSchedulerState>,
@@ -168,6 +182,11 @@ impl StdTimerScheduler {
     /// The worker waits on the scheduler condition variable while no
     /// registrations are active, so future standard Timers can reuse it without
     /// spawning another native thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics when active scheduler indexes disagree about their earliest
+    /// deadline or registration.
     fn run(&self) {
         let mut state = self.lock_state();
         loop {
