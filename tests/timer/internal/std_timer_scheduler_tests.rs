@@ -74,21 +74,18 @@ impl WakeThreadRecorder {
         }
     }
 
-    /// Returns the thread identifier recorded by the Timer wake.
+    /// Returns the thread identifier recorded by the Timer wake, if any.
     ///
     /// # Returns
     ///
-    /// The unique identifier of the thread that delivered the wake.
-    ///
-    /// # Panics
-    ///
-    /// Panics when the future completed without a registered wake.
+    /// The unique identifier of the thread that delivered the wake, or `None`
+    /// when the future completed before registering its Waker.
     #[must_use]
-    fn wake_thread(&self) -> ThreadId {
-        self.wake_thread
+    fn wake_thread(&self) -> Option<ThreadId> {
+        *self
+            .wake_thread
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .expect("pending Timer future should record its waking thread")
     }
 }
 
@@ -112,7 +109,7 @@ impl Wake for WakeThreadRecorder {
     }
 }
 
-/// Blocks until `future` completes and returns its waking worker thread.
+/// Blocks until `future` completes and returns its waking worker, if any.
 ///
 /// # Parameters
 ///
@@ -120,8 +117,9 @@ impl Wake for WakeThreadRecorder {
 ///
 /// # Returns
 ///
-/// The unique identifier of the thread that delivered the completion wake.
-fn block_on_with_wake_thread(mut future: TimerFuture) -> ThreadId {
+/// The worker that delivered the completion wake, or `None` when the future
+/// was already ready before its first poll.
+fn block_on_with_wake_thread(mut future: TimerFuture) -> Option<ThreadId> {
     let recorder = Arc::new(WakeThreadRecorder::new(std::thread::current()));
     let waker = Waker::from(Arc::clone(&recorder));
     let mut context = Context::from_waker(&waker);
@@ -134,34 +132,59 @@ fn block_on_with_wake_thread(mut future: TimerFuture) -> ThreadId {
     }
 }
 
+/// Registers deadlines until one observes the standard Timer worker.
+///
+/// # Parameters
+///
+/// * `timer` - Standard Timer whose process worker should be observed.
+///
+/// # Returns
+///
+/// The unique identifier of the worker that completed one deadline.
+///
+/// # Panics
+///
+/// Panics when deadline registration fails or every bounded attempt completes
+/// before its first poll.
+fn observe_worker(timer: &dyn Timer) -> ThreadId {
+    for _ in 0..4 {
+        let future = timer
+            .after(Duration::from_millis(50))
+            .expect("worker observation deadline should register");
+        if let Some(worker) = block_on_with_wake_thread(future) {
+            return worker;
+        }
+    }
+    panic!("standard Timer worker should be observable within four attempts");
+}
+
+/// Verifies that an immediately ready future does not require a prior wake.
+#[test]
+fn test_block_on_with_wake_thread_accepts_immediate_ready_future() {
+    let future: TimerFuture = Box::pin(std::future::ready(()));
+    assert_eq!(block_on_with_wake_thread(future), None);
+}
+
 /// Verifies that independent standard Timers retain one process worker.
 #[test]
 fn test_std_timer_scheduler_shares_and_retains_process_worker() {
     let first_clock = StdMonotonicClock::new();
     let second_clock = StdMonotonicClock::new();
-    let first_timer = StdTimer::from_clock(&first_clock);
-    let second_timer = StdTimer::from_clock(&second_clock);
-    let first_future = first_timer
-        .after(Duration::from_millis(100))
-        .expect("first deadline should register");
-    let second_future = second_timer
-        .after(Duration::from_millis(100))
-        .expect("second deadline should register");
+    let first_timer = Arc::new(StdTimer::from_clock(&first_clock));
+    let second_timer = Arc::new(StdTimer::from_clock(&second_clock));
 
+    let first_waiter = Arc::clone(&first_timer);
+    let second_waiter = Arc::clone(&second_timer);
     let first =
-        std::thread::spawn(move || block_on_with_wake_thread(first_future));
+        std::thread::spawn(move || observe_worker(first_waiter.as_ref()));
     let second =
-        std::thread::spawn(move || block_on_with_wake_thread(second_future));
+        std::thread::spawn(move || observe_worker(second_waiter.as_ref()));
 
     let first_worker = first.join().expect("first waiter should finish");
     let second_worker = second.join().expect("second waiter should finish");
     assert_eq!(first_worker, second_worker);
 
-    std::thread::sleep(Duration::from_millis(10));
-    let later_future = first_timer
-        .after(Duration::from_millis(5))
-        .expect("later deadline should register");
-    let retained_worker = block_on_with_wake_thread(later_future);
+    let retained_worker = observe_worker(first_timer.as_ref());
 
     assert_eq!(first_worker, retained_worker);
 }
