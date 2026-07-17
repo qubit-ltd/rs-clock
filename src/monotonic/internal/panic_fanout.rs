@@ -3,9 +3,8 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
-//! Attempts every waker and callback before resuming the first panic.
+//! Attempts every waker before resuming the first panic.
 
-use super::manual_advance_registry::AdvanceCallback;
 use std::any::Any;
 use std::panic::{
     AssertUnwindSafe,
@@ -17,7 +16,7 @@ use std::task::Waker;
 /// Panic payload retained while a notification fanout attempts every target.
 type PanicPayload = Box<dyn Any + Send + 'static>;
 
-/// Attempts every waker and callback before resuming the first panic.
+/// Attempts every waker before resuming the first panic.
 pub(crate) struct PanicFanout {
     /// First panic observed in notification order.
     first_panic: Option<PanicPayload>,
@@ -49,20 +48,6 @@ impl PanicFanout {
         }
     }
 
-    /// Attempts every advance callback and retains only the first panic
-    /// payload across both waker and callback phases.
-    ///
-    /// # Parameters
-    ///
-    /// * `callbacks` - Advance callbacks to invoke and destroy in iteration
-    ///   order.
-    pub(crate) fn call_all(&mut self, callbacks: Vec<AdvanceCallback>) {
-        for callback in callbacks {
-            self.record(catch_unwind(AssertUnwindSafe(|| callback())));
-            self.record(catch_unwind(AssertUnwindSafe(|| drop(callback))));
-        }
-    }
-
     /// Resumes the first retained panic after every target was attempted.
     ///
     /// # Panics
@@ -79,7 +64,7 @@ impl PanicFanout {
     ///
     /// # Parameters
     ///
-    /// * `result` - Caught result from a waker, callback, or destructor.
+    /// * `result` - Caught result from a waker or its destructor.
     #[inline]
     fn record(&mut self, result: Result<(), PanicPayload>) {
         if let Err(payload) = result {

@@ -4,26 +4,27 @@
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
 #![cfg_attr(docsrs, feature(doc_cfg))]
-//! Injectable wall clocks, monotonic clocks, and deterministic sleepers.
+//! Injectable wall clocks, monotonic clocks, and deterministic timers.
 //!
 //! Wall time and monotonic time are deliberately separate. Long-lived
 //! services can inject [`WallClock`] for business timestamps, while timeout
-//! and delay code injects [`MonotonicClock`], [`BlockingSleeper`], or
-//! [`AsyncSleeper`]. Manual implementations allow tests to advance logical
-//! time without waiting for real time to pass.
+//! and delay code injects [`MonotonicClock`] or [`Timer`]. A
+//! [`BlockingSleeper`] can adapt the same timer when synchronous code must
+//! block. Manual implementations allow tests to advance logical time without
+//! waiting for real time to pass.
 //!
 //! # Examples
 //!
-//! A manual clock can drive a blocking sleep without waiting for real time:
+//! A manual timer can drive a blocking sleep without waiting for real time:
 //!
 //! ```
 //! use qubit_clock::{
-//!     BlockingSleeper, ManualMonotonicClock,
+//!     BlockingSleeper, ManualMonotonicClock, MonotonicClock,
 //! };
 //! use std::time::Duration;
 //!
 //! let clock = ManualMonotonicClock::new_shared();
-//! let sleeper = clock.new_blocking_sleeper();
+//! let sleeper = BlockingSleeper::new(clock.new_timer());
 //! let worker = std::thread::spawn(move || {
 //!     sleeper
 //!         .sleep_for(Duration::from_secs(5))
@@ -40,12 +41,12 @@
 pub mod error;
 pub mod monotonic;
 pub mod sleep;
+pub mod timer;
 pub mod wall;
 
 pub use error::TimeError;
 pub use monotonic::{
     ClockDomain,
-    ManualAdvanceSubscription,
     ManualDeadlineFuture,
     ManualMonotonicClock,
     ManualWaiterFuture,
@@ -53,13 +54,12 @@ pub use monotonic::{
     MonotonicInstant,
     StdMonotonicClock,
 };
-pub use sleep::{
-    AsyncSleeper,
-    BlockingSleeper,
-    ManualAsyncSleeper,
-    ManualBlockingSleeper,
-    SleepFuture,
-    StdBlockingSleeper,
+pub use sleep::BlockingSleeper;
+pub use timer::{
+    ManualTimer,
+    StdTimer,
+    Timer,
+    TimerFuture,
 };
 pub use wall::{
     FixedWallClock,
@@ -71,4 +71,4 @@ pub use wall::{
 #[cfg(feature = "tokio")]
 pub use monotonic::TokioMonotonicClock;
 #[cfg(feature = "tokio")]
-pub use sleep::TokioAsyncSleeper;
+pub use timer::TokioTimer;

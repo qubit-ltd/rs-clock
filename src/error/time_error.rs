@@ -22,6 +22,7 @@ use thiserror::Error;
 ///         TimeError::InstantOverflow => "overflow",
 ///         TimeError::CannotMoveBackward => "backward move",
 ///         TimeError::InvalidInstantOrder => "invalid order",
+///         TimeError::TimerUnavailable => "timer unavailable",
 ///         _ => "other time error",
 ///     }
 /// }
@@ -41,6 +42,7 @@ use thiserror::Error;
 ///         TimeError::InstantOverflow => "overflow",
 ///         TimeError::CannotMoveBackward => "backward move",
 ///         TimeError::InvalidInstantOrder => "invalid order",
+///         TimeError::TimerUnavailable => "timer unavailable",
 ///     }
 /// }
 /// ```
@@ -66,4 +68,7 @@ pub enum TimeError {
     /// Duration was requested with an earlier instant after the current one.
     #[error("earlier monotonic instant is later than the current instant")]
     InvalidInstantOrder,
+    /// A timer could not register a requested deadline.
+    #[error("monotonic timer driver is unavailable")]
+    TimerUnavailable,
 }

@@ -3,96 +3,61 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
-//! Removes a waiter registration if control unwinds before ownership transfers.
+//! Removes a timer registration if control unwinds before ownership transfers.
 
-use super::registered_waiter::RegisteredWaiter;
 use crate::monotonic::manual_monotonic_clock::ManualMonotonicClock;
 
-/// Removes a waiter registration if control unwinds before ownership is
-/// transferred to its normal blocking or async lifetime.
-#[must_use = "dropping the guard unregisters the waiter"]
+/// Guards one newly registered manual timer waiter during notification fanout.
+#[must_use = "dropping the guard unregisters the timer waiter"]
 pub(crate) struct WaiterRegistrationGuard<'a> {
-    /// Clock that owns the registration.
+    /// Clock whose shared time domain owns the registration.
     clock: &'a ManualMonotonicClock,
     /// Registration still owned by this guard.
-    waiter: Option<RegisteredWaiter>,
+    waiter_id: Option<u64>,
 }
 
 impl<'a> WaiterRegistrationGuard<'a> {
-    /// Guards a newly registered blocking waiter.
+    /// Guards a newly registered timer waiter.
     ///
     /// # Parameters
     ///
-    /// * `clock` - Manual clock that owns the waiter.
-    /// * `waiter_id` - Identifier of the blocking registration.
-    ///
-    /// # Returns
-    ///
-    /// A guard that unregisters the waiter unless ownership is completed.
-    #[inline(always)]
-    pub(crate) fn blocking(
-        clock: &'a ManualMonotonicClock,
-        waiter_id: u64,
-    ) -> Self {
-        Self {
-            clock,
-            waiter: Some(RegisteredWaiter::Blocking(waiter_id)),
-        }
-    }
-
-    /// Guards a newly registered async waiter.
-    ///
-    /// # Parameters
-    ///
-    /// * `clock` - Manual clock that owns the waiter.
-    /// * `waiter_id` - Identifier of the asynchronous registration.
+    /// * `clock` - Manual clock whose domain owns the waiter.
+    /// * `waiter_id` - Identifier of the timer registration.
     ///
     /// # Returns
     ///
     /// A guard that unregisters the waiter unless ownership is transferred.
     #[inline(always)]
-    pub(crate) fn asynchronous(
+    pub(crate) const fn new(
         clock: &'a ManualMonotonicClock,
         waiter_id: u64,
     ) -> Self {
         Self {
             clock,
-            waiter: Some(RegisteredWaiter::Async(waiter_id)),
+            waiter_id: Some(waiter_id),
         }
     }
 
-    /// Transfers an async registration to the returned future.
+    /// Transfers the timer registration to its returned future.
     ///
     /// # Returns
     ///
-    /// The identifier of the transferred asynchronous waiter.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this guard owns a blocking waiter instead of an async waiter.
+    /// The identifier of the transferred timer waiter.
     #[must_use = "the transferred waiter identifier must be retained"]
     #[inline]
-    pub(crate) fn into_async_waiter_id(mut self) -> u64 {
-        let Some(RegisteredWaiter::Async(waiter_id)) = self.waiter.take()
-        else {
-            unreachable!("only async registration guards can be transferred");
-        };
-        waiter_id
+    pub(crate) fn into_waiter_id(mut self) -> u64 {
+        self.waiter_id
+            .take()
+            .expect("registration guard must own a timer waiter")
     }
 }
 
 impl Drop for WaiterRegistrationGuard<'_> {
-    /// Removes a registration still owned by this guard.
+    /// Removes a timer registration still owned during unwinding.
     #[inline]
     fn drop(&mut self) {
-        match self.waiter.take() {
-            Some(RegisteredWaiter::Blocking(waiter_id)) => {
-                self.clock.unregister_blocking_waiter(waiter_id);
-            }
-            Some(RegisteredWaiter::Async(waiter_id)) => {
-                self.clock.unregister_async_waiter(waiter_id);
-            }
-            None => {}
+        if let Some(waiter_id) = self.waiter_id.take() {
+            self.clock.unregister_timer_waiter(waiter_id);
         }
     }
 }

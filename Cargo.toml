@@ -6,7 +6,7 @@ rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/qubit-ltd/rs-clock"
-description = "Injectable wall and monotonic clocks with deterministic blocking and async sleepers"
+description = "Injectable wall and monotonic clocks with deterministic timers"
 homepage = "https://github.com/qubit-ltd/rs-clock"
 documentation = "https://docs.rs/qubit-clock"
 readme = "README.md"
@@ -32,7 +32,7 @@ tokio = ["dep:tokio"]
 
 [dependencies]
 thiserror = "2.0"
-tokio = { version = "1.52", optional = true, features = ["time"] }
+tokio = { version = "1.52", optional = true, features = ["rt", "time"] }
 
 [dev-dependencies]
 tokio = { version = "1.52", features = ["macros", "rt", "sync", "test-util", "time"] }

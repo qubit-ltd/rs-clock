@@ -9,7 +9,10 @@ use crate::{
     ClockDomain,
     MonotonicClock,
     MonotonicInstant,
+    StdTimer,
+    Timer,
 };
+use std::sync::Arc;
 use std::time::Instant;
 
 /// A real monotonic clock backed by [`std::time::Instant`].
@@ -43,7 +46,21 @@ impl StdMonotonicClock {
         }
     }
 
-    /// Returns the native origin used by the paired blocking sleeper.
+    /// Creates a private handle retaining this exact standard clock domain.
+    ///
+    /// # Returns
+    ///
+    /// A clock handle with the same domain identifier and native origin.
+    #[must_use]
+    #[inline]
+    pub(crate) const fn same_domain_handle(&self) -> Self {
+        Self {
+            domain: self.domain,
+            origin: self.origin,
+        }
+    }
+
+    /// Returns the native origin used by a paired standard timer.
     ///
     /// # Returns
     ///
@@ -90,5 +107,15 @@ impl MonotonicClock for StdMonotonicClock {
     #[inline]
     fn now(&self) -> MonotonicInstant {
         MonotonicInstant::new(self.domain, self.origin.elapsed())
+    }
+
+    /// Creates a timer retaining this exact standard clock domain and origin.
+    ///
+    /// # Returns
+    ///
+    /// A shared timer backed by one lazy standard scheduler worker.
+    #[inline]
+    fn new_timer(&self) -> Arc<dyn Timer> {
+        Arc::new(StdTimer::from_clock(self))
     }
 }

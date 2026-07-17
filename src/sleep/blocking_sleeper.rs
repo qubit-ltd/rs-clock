@@ -3,136 +3,175 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
-//! Defines blocking monotonic sleep operations.
+//! Defines a blocking adapter over the asynchronous Timer capability.
 
 use crate::{
-    MonotonicClock,
     MonotonicInstant,
     TimeError,
+    Timer,
+    TimerFuture,
+};
+use std::sync::{
+    Arc,
+    atomic::{
+        AtomicBool,
+        Ordering,
+    },
+};
+use std::task::{
+    Context,
+    Poll,
+    Wake,
+    Waker,
 };
 use std::time::Duration;
 
-/// Provides blocking waits in the implementor's monotonic clock domain.
+/// Adapts any [`Timer`] into synchronous blocking sleep operations.
 ///
-/// The clock returned by [`Self::clock`] defines the domain accepted by every
-/// deadline operation. Repeated calls to [`Self::clock`] must expose clocks
-/// whose instants belong to the same domain for this sleeper's lifetime.
-pub trait BlockingSleeper: Send + Sync {
-    /// Returns the monotonic clock paired with this sleeper.
-    ///
-    /// # Returns
-    ///
-    /// The paired clock. Its domain remains stable for this sleeper's entire
-    /// lifetime.
-    #[must_use = "the paired clock should be used to sample a deadline"]
-    fn clock(&self) -> &dyn MonotonicClock;
+/// This type owns no clock or scheduling policy of its own. It composes a
+/// shared timer and blocks only the calling thread while polling the timer's
+/// future. Clones share that same timer.
+#[derive(Clone)]
+pub struct BlockingSleeper {
+    /// Timer providing eager deadline registration and completion futures.
+    timer: Arc<dyn Timer>,
+}
 
-    /// Blocks the current thread until `deadline` is reached.
-    ///
-    /// A reached deadline completes immediately.
+impl BlockingSleeper {
+    /// Creates a blocking adapter over a shared timer.
     ///
     /// # Parameters
     ///
-    /// * `deadline` - The instant to wait for. It must belong to the stable
-    ///   domain exposed by [`Self::clock`].
+    /// * `timer` - Timer used for every blocking deadline.
     ///
     /// # Returns
     ///
-    /// `Ok(())` after `deadline` is reached.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline. An
-    /// implementation may return [`TimeError::InstantOverflow`] when its
-    /// native timer cannot represent `deadline`.
-    fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError>;
+    /// A cloneable blocking sleeper composing `timer`.
+    #[must_use]
+    #[inline(always)]
+    pub const fn new(timer: Arc<dyn Timer>) -> Self {
+        Self { timer }
+    }
 
-    /// Blocks the current thread for `duration` in this sleeper's domain.
+    /// Returns the timer composed by this adapter.
     ///
-    /// The deadline is calculated when this method is called.
+    /// # Returns
+    ///
+    /// The timer used to register blocking sleeps.
+    #[must_use]
+    #[inline(always)]
+    pub fn timer(&self) -> &dyn Timer {
+        self.timer.as_ref()
+    }
+
+    /// Blocks the current thread until an absolute deadline is reached.
     ///
     /// # Parameters
     ///
-    /// * `duration` - The amount of monotonic time to wait.
+    /// * `deadline` - Deadline in the composed timer's clock domain.
     ///
     /// # Returns
     ///
-    /// `Ok(())` after `duration` has elapsed.
+    /// `Ok(())` after the deadline future completes.
     ///
     /// # Errors
     ///
-    /// Returns [`TimeError::InstantOverflow`] when the computed deadline is
-    /// not representable. Errors from [`Self::sleep_until`] are otherwise
-    /// propagated.
-    #[inline]
-    fn sleep_for(&self, duration: Duration) -> Result<(), TimeError> {
-        let deadline = self.clock().now().checked_add(duration)?;
-        self.sleep_until(deadline)
+    /// Returns any error produced while registering the deadline, before the
+    /// current thread parks.
+    pub fn sleep_until(
+        &self,
+        deadline: MonotonicInstant,
+    ) -> Result<(), TimeError> {
+        let future = self.timer.at(deadline)?;
+        Self::block_on(future);
+        Ok(())
+    }
+
+    /// Blocks the current thread for a relative duration.
+    ///
+    /// The timer fixes the absolute deadline before this method begins polling
+    /// and parking.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Duration measured by the composed timer's clock.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after the deadline future completes.
+    ///
+    /// # Errors
+    ///
+    /// Returns deadline overflow or registration failure before parking.
+    pub fn sleep_for(&self, duration: Duration) -> Result<(), TimeError> {
+        let future = self.timer.after(duration)?;
+        Self::block_on(future);
+        Ok(())
+    }
+
+    /// Polls one timer future, parking between incomplete polls.
+    ///
+    /// # Parameters
+    ///
+    /// * `future` - Eagerly registered timer future to drive to completion.
+    fn block_on(mut future: TimerFuture) {
+        let thread_waker = Arc::new(ThreadWaker {
+            thread: std::thread::current(),
+            notified: AtomicBool::new(false),
+        });
+        let waker = Waker::from(Arc::clone(&thread_waker));
+        let mut context = Context::from_waker(&waker);
+        loop {
+            thread_waker.notified.store(false, Ordering::Release);
+            if matches!(future.as_mut().poll(&mut context), Poll::Ready(())) {
+                return;
+            }
+            while !thread_waker.notified.swap(false, Ordering::AcqRel) {
+                std::thread::park();
+            }
+        }
     }
 }
 
-impl<T> BlockingSleeper for std::sync::Arc<T>
-where
-    T: BlockingSleeper + ?Sized,
-{
-    /// Delegates the paired clock to the shared sleeper object.
-    ///
-    /// # Returns
-    ///
-    /// The monotonic clock exposed by the wrapped sleeper.
-    #[inline(always)]
-    fn clock(&self) -> &dyn MonotonicClock {
-        self.as_ref().clock()
-    }
-
-    /// Delegates the blocking wait to the shared sleeper object.
+impl std::fmt::Debug for BlockingSleeper {
+    /// Formats this adapter without requiring the timer trait object to be
+    /// debug-formattable.
     ///
     /// # Parameters
     ///
-    /// * `deadline` - Domain-scoped deadline forwarded to the wrapped sleeper.
+    /// * `formatter` - Destination formatter.
     ///
     /// # Returns
     ///
-    /// `Ok(())` after the wrapped sleeper reaches the deadline.
+    /// `Ok(())` when formatting succeeds.
     ///
     /// # Errors
     ///
-    /// Returns any [`TimeError`] produced by the wrapped sleeper.
-    #[inline(always)]
-    fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
-        self.as_ref().sleep_until(deadline)
+    /// Returns [`std::fmt::Error`] when the destination rejects output.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("BlockingSleeper")
+            .finish_non_exhaustive()
     }
 }
 
-impl<T> BlockingSleeper for Box<T>
-where
-    T: BlockingSleeper + ?Sized,
-{
-    /// Delegates the paired clock to the boxed sleeper object.
-    ///
-    /// # Returns
-    ///
-    /// The monotonic clock exposed by the wrapped sleeper.
-    #[inline(always)]
-    fn clock(&self) -> &dyn MonotonicClock {
-        self.as_ref().clock()
+/// Thread notification latch used as a future waker.
+struct ThreadWaker {
+    /// Thread parked while its timer future remains pending.
+    thread: std::thread::Thread,
+    /// Notification bit preventing wake-before-park races.
+    notified: AtomicBool,
+}
+
+impl Wake for ThreadWaker {
+    /// Latches a notification before unparking the blocked thread.
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
     }
 
-    /// Delegates the blocking wait to the boxed sleeper object.
-    ///
-    /// # Parameters
-    ///
-    /// * `deadline` - Domain-scoped deadline forwarded to the wrapped sleeper.
-    ///
-    /// # Returns
-    ///
-    /// `Ok(())` after the wrapped sleeper reaches the deadline.
-    ///
-    /// # Errors
-    ///
-    /// Returns any [`TimeError`] produced by the wrapped sleeper.
-    #[inline(always)]
-    fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
-        self.as_ref().sleep_until(deadline)
+    /// Latches a notification before unparking the blocked thread.
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.notified.store(true, Ordering::Release);
+        self.thread.unpark();
     }
 }
