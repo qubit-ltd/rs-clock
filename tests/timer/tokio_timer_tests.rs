@@ -12,6 +12,11 @@ use qubit_clock::{
     TokioMonotonicClock,
     TokioTimer,
 };
+use std::task::{
+    Context,
+    Poll,
+    Waker,
+};
 use std::time::Duration;
 
 #[tokio::test(start_paused = true)]
@@ -51,6 +56,20 @@ fn test_tokio_timer_reports_disabled_time_driver_at_registration() {
             timer.after(Duration::from_secs(1)).map(drop),
         );
     });
+}
+
+#[test]
+fn test_tokio_timer_returns_reached_deadline_outside_runtime() {
+    let clock = TokioMonotonicClock::new();
+    let timer = TokioTimer::from_clock(&clock);
+    let deadline = clock.now();
+    let mut future = timer
+        .at(deadline)
+        .expect("reached deadline should not require a runtime");
+    let waker = Waker::noop();
+    let mut context = Context::from_waker(waker);
+
+    assert_eq!(Poll::Ready(()), future.as_mut().poll(&mut context));
 }
 
 #[tokio::test]

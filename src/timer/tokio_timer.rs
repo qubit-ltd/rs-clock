@@ -20,9 +20,10 @@ use tokio::time::Instant;
 /// An asynchronous timer backed by one Tokio runtime time driver.
 ///
 /// Native Tokio timer registration happens before [`Timer::at`] returns. The
-/// timer retains the source clock's exact domain and origin, but callers must
-/// still create and poll its futures under the same Tokio time driver. Tokio
-/// does not expose a driver identity that this crate can validate.
+/// timer retains the source clock's exact domain and origin. Future deadlines
+/// must be created and polled under the same Tokio time driver; reached
+/// deadlines return an immediately ready future without accessing a runtime.
+/// Tokio does not expose a driver identity that this crate can validate.
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioTimer {
@@ -99,8 +100,9 @@ impl Timer for TokioTimer {
     /// # Errors
     ///
     /// Returns a domain mismatch or instant overflow before runtime access.
-    /// Returns [`TimeError::TimerUnavailable`] when no runtime is entered or
-    /// its time driver is disabled.
+    /// For future deadlines, returns [`TimeError::TimerUnavailable`] when no
+    /// runtime is entered or its time driver is disabled. Reached deadlines do
+    /// not require runtime access.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let deadline = self.native_deadline(deadline)?;
         if deadline <= Instant::now() {

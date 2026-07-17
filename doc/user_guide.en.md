@@ -43,10 +43,11 @@ an incomplete future cancels its registration.
 ## Tokio timer
 
 Enable the `tokio` feature for `TokioMonotonicClock` and `TokioTimer`.
-Registration must occur inside a runtime with time enabled. A missing or
-disabled driver returns `TimeError::TimerUnavailable` from `at` or `after`.
-When time is paused, create the clock, register deadlines, advance time, and
-poll futures under the same runtime time driver.
+Future-deadline registration must occur inside a runtime with time enabled. A
+missing or disabled driver returns `TimeError::TimerUnavailable` from `at` or
+`after`; an already reached deadline returns a ready future without runtime
+access. When time is paused, create the clock, register future deadlines,
+advance time, and poll futures under the same runtime time driver.
 
 ## Deterministic manual time
 

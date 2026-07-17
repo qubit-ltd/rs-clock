@@ -38,9 +38,10 @@ let _still_usable = clock.now();
 
 ## Tokio Timer
 
-`TokioMonotonicClock` 与 `TokioTimer` 需要启用 `tokio` feature。注册必须发生在启用
-time 的 runtime 中；缺失或禁用 time driver 时，`at`/`after` 立即返回
-`TimeError::TimerUnavailable`。暂停时间时，clock 创建、deadline 注册、时间推进与
+`TokioMonotonicClock` 与 `TokioTimer` 需要启用 `tokio` feature。未来 deadline 的
+注册必须发生在启用 time 的 runtime 中；缺失或禁用 time driver 时，`at`/`after`
+立即返回 `TimeError::TimerUnavailable`。已经到达的 deadline 无需访问 runtime，
+会直接返回 ready future。暂停时间时，clock 创建、未来 deadline 注册、时间推进与
 future poll 必须位于同一个 runtime time driver。
 
 ## 确定性 Manual Time
