@@ -9,6 +9,7 @@
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
+    MonotonicInstant,
     StdMonotonicClock,
     StdTimer,
     TimeError,
@@ -168,18 +169,6 @@ fn test_std_timer_completes_many_deadlines_with_one_scheduler() {
 }
 
 #[test]
-fn test_std_timer_reuses_worker_during_idle_grace_period() {
-    let clock = StdMonotonicClock::new();
-    let timer = StdTimer::from_clock(&clock);
-    for _ in 0..64 {
-        let future = timer
-            .after(Duration::from_micros(100))
-            .expect("short deadline should register");
-        block_on_timer_future(future);
-    }
-}
-
-#[test]
 fn test_std_timer_rejects_foreign_deadline_immediately() {
     let clock = StdMonotonicClock::new();
     let timer = StdTimer::from_clock(&clock);
@@ -198,6 +187,21 @@ fn test_std_timer_rejects_foreign_deadline_immediately() {
         },
         error,
     );
+}
+
+/// Verifies that an unrepresentable native deadline reports exact overflow.
+#[test]
+fn test_std_timer_reports_native_instant_overflow() {
+    let clock = StdMonotonicClock::new();
+    let timer = StdTimer::from_clock(&clock);
+    let deadline = MonotonicInstant::new(clock.now().domain(), Duration::MAX);
+
+    let error = match timer.at(deadline) {
+        Ok(_) => panic!("overflowing native deadline should fail"),
+        Err(error) => error,
+    };
+
+    assert_eq!(TimeError::InstantOverflow, error);
 }
 
 #[test]

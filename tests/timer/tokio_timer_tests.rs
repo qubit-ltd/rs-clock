@@ -9,6 +9,7 @@
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
+    MonotonicInstant,
     TimeError,
     Timer,
     TokioMonotonicClock,
@@ -72,6 +73,21 @@ fn test_tokio_timer_returns_reached_deadline_outside_runtime() {
     let mut context = Context::from_waker(waker);
 
     assert_eq!(Poll::Ready(()), future.as_mut().poll(&mut context));
+}
+
+/// Verifies that native overflow is reported before Tokio runtime validation.
+#[test]
+fn test_tokio_timer_reports_native_instant_overflow() {
+    let clock = TokioMonotonicClock::new();
+    let timer = TokioTimer::from_clock(&clock);
+    let deadline = MonotonicInstant::new(clock.now().domain(), Duration::MAX);
+
+    let error = match timer.at(deadline) {
+        Ok(_) => panic!("overflowing native deadline should fail"),
+        Err(error) => error,
+    };
+
+    assert_eq!(TimeError::InstantOverflow, error);
 }
 
 #[tokio::test]
