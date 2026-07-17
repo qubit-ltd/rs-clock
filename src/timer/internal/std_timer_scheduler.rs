@@ -9,7 +9,6 @@
 
 use super::std_timer_scheduler_state::StdTimerSchedulerState;
 use super::std_timer_waiter::StdTimerWaiter;
-use super::std_timer_worker_guard::StdTimerWorkerGuard;
 use crate::TimeError;
 use crate::internal::PanicFanout;
 use std::sync::{
@@ -76,19 +75,49 @@ impl StdTimerScheduler {
             self.changed.notify_one();
             return Ok(waiter_id);
         }
-        state.mark_worker_started();
+        let worker_generation = state.mark_worker_started();
+        self.spawn_worker(state, waiter_id, worker_generation)
+    }
+
+    /// Starts the native worker after its running state is committed.
+    ///
+    /// Native thread-spawn failure depends on operating-system failure
+    /// injection that cannot be made deterministic in the integration suite.
+    /// Observable registration behavior is exercised through the public Timer
+    /// tests.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Locked scheduler state with the worker marked as running.
+    /// * `waiter_id` - Registration to roll back if spawning fails.
+    /// * `worker_generation` - Generation assigned to the new worker.
+    ///
+    /// # Returns
+    ///
+    /// The registration identifier after a successful spawn.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::TimerUnavailable`] when the worker cannot spawn.
+    fn spawn_worker(
+        self: &Arc<Self>,
+        mut state: MutexGuard<'_, StdTimerSchedulerState>,
+        waiter_id: u64,
+        worker_generation: u64,
+    ) -> Result<u64, TimeError> {
         let scheduler = Arc::clone(self);
         let spawn_result = std::thread::Builder::new()
             .name("qubit-clock-timer".to_owned())
             .spawn(move || {
-                let mut worker_guard =
-                    StdTimerWorkerGuard::new(scheduler.as_ref());
-                scheduler.run();
-                worker_guard.disarm();
+                let _worker_guard = StdTimerWorkerGuard::new(
+                    scheduler.as_ref(),
+                    worker_generation,
+                );
+                scheduler.run(worker_generation);
             });
         if spawn_result.is_err() {
             drop(state.cancel(waiter_id));
-            state.mark_worker_stopped();
+            state.mark_worker_stopped(worker_generation);
             return Err(TimeError::TimerUnavailable);
         }
         drop(state);
@@ -110,17 +139,17 @@ impl StdTimerScheduler {
     }
 
     /// Runs deadline selection and completion until no active waiters remain.
-    fn run(&self) {
+    fn run(&self, worker_generation: u64) {
         let mut state = self.lock_state();
         loop {
             if state.is_empty() {
                 let (next_state, _) = self
                     .changed
                     .wait_timeout(state, WORKER_IDLE_GRACE)
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 state = next_state;
                 if state.is_empty() {
-                    state.mark_worker_stopped();
+                    state.mark_worker_stopped(worker_generation);
                     return;
                 }
                 continue;
@@ -152,9 +181,9 @@ impl StdTimerScheduler {
         }
     }
 
-    /// Clears the worker-running flag after an unexpected worker exit.
-    pub(super) fn mark_worker_stopped(&self) {
-        self.lock_state().mark_worker_stopped();
+    /// Clears the worker-running flag after a worker exits.
+    fn mark_worker_stopped(&self, worker_generation: u64) {
+        self.lock_state().mark_worker_stopped(worker_generation);
     }
 
     /// Locks scheduler state, recovering the inner value after poisoning.
@@ -166,5 +195,36 @@ impl StdTimerScheduler {
         self.state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+/// Restores scheduler state whenever a standard Timer worker exits.
+struct StdTimerWorkerGuard<'a> {
+    /// Scheduler whose worker state must be restored during exit.
+    scheduler: &'a StdTimerScheduler,
+    /// Generation of the guarded worker.
+    worker_generation: u64,
+}
+
+impl<'a> StdTimerWorkerGuard<'a> {
+    /// Creates an exit guard for `scheduler` and its worker generation.
+    #[must_use]
+    #[inline(always)]
+    const fn new(
+        scheduler: &'a StdTimerScheduler,
+        worker_generation: u64,
+    ) -> Self {
+        Self {
+            scheduler,
+            worker_generation,
+        }
+    }
+}
+
+impl Drop for StdTimerWorkerGuard<'_> {
+    /// Restores scheduler state after normal exit or unwinding.
+    #[inline]
+    fn drop(&mut self) {
+        self.scheduler.mark_worker_stopped(self.worker_generation);
     }
 }

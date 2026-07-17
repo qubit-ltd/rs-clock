@@ -26,6 +26,8 @@ pub(super) struct StdTimerSchedulerState {
     registrations: HashMap<u64, StdTimerRegistration>,
     /// Whether a scheduler worker is currently running.
     worker_running: bool,
+    /// Generation identifying the most recently started worker.
+    worker_generation: u64,
 }
 
 impl StdTimerSchedulerState {
@@ -42,6 +44,7 @@ impl StdTimerSchedulerState {
             deadlines: BTreeSet::new(),
             registrations: HashMap::new(),
             worker_running: false,
+            worker_generation: 0,
         }
     }
 
@@ -182,16 +185,33 @@ impl StdTimerSchedulerState {
         self.worker_running
     }
 
-    /// Marks the scheduler worker as running.
+    /// Marks a new scheduler worker as running.
+    ///
+    /// # Returns
+    ///
+    /// The nonzero generation assigned to the new worker.
+    #[must_use]
     #[inline(always)]
-    pub(super) fn mark_worker_started(&mut self) {
+    pub(super) fn mark_worker_started(&mut self) -> u64 {
+        self.worker_generation = self.worker_generation.wrapping_add(1);
+        assert_ne!(
+            self.worker_generation, 0,
+            "standard Timer worker generations exhausted",
+        );
         self.worker_running = true;
+        self.worker_generation
     }
 
-    /// Marks the scheduler worker as stopped.
+    /// Marks the matching scheduler worker as stopped.
+    ///
+    /// # Parameters
+    ///
+    /// * `generation` - Generation of the worker that has exited.
     #[inline(always)]
-    pub(super) fn mark_worker_stopped(&mut self) {
-        self.worker_running = false;
+    pub(super) fn mark_worker_stopped(&mut self, generation: u64) {
+        if self.worker_generation == generation {
+            self.worker_running = false;
+        }
     }
 
     /// Allocates a nonzero waiter identifier without reuse after exhaustion.
