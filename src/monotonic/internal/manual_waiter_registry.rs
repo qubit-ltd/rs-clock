@@ -45,14 +45,10 @@ pub(crate) fn allocate_identifier(
 
 /// Waiters registered against one manual monotonic timeline.
 pub(crate) struct ManualWaiterRegistry {
-    /// Next identifier assigned to a blocking waiter.
-    next_blocking_waiter_id: u64,
-    /// Blocking waiter deadlines keyed by registration identifier.
-    blocking_waiters: HashMap<u64, Duration>,
-    /// Next identifier assigned to an async waiter.
-    next_async_waiter_id: u64,
-    /// Async deadlines and optional task wakers keyed by registration ID.
-    async_waiters: HashMap<u64, (Duration, Option<Waker>)>,
+    /// Next identifier assigned to a timer waiter.
+    next_timer_waiter_id: u64,
+    /// Timer deadlines and optional task wakers keyed by registration ID.
+    timer_waiters: HashMap<u64, (Duration, Option<Waker>)>,
     /// Next identifier assigned to a waiter-registration observer.
     next_observer_id: u64,
     /// Waiter-count observers keyed by registration identifier.
@@ -71,17 +67,15 @@ impl ManualWaiterRegistry {
     #[inline]
     pub(crate) fn new() -> Self {
         Self {
-            next_blocking_waiter_id: 1,
-            blocking_waiters: HashMap::new(),
-            next_async_waiter_id: 1,
-            async_waiters: HashMap::new(),
+            next_timer_waiter_id: 1,
+            timer_waiters: HashMap::new(),
             next_observer_id: 1,
             count_observers: HashMap::new(),
             deadline_observers: HashMap::new(),
         }
     }
 
-    /// Registers a blocking deadline and returns its registration identifier.
+    /// Registers a timer deadline and returns its registration identifier.
     ///
     /// Panics when the registry cannot allocate another identifier.
     ///
@@ -91,77 +85,41 @@ impl ManualWaiterRegistry {
     ///
     /// # Returns
     ///
-    /// The nonzero identifier assigned to the blocking waiter.
+    /// The nonzero identifier assigned to the timer waiter.
     ///
     /// # Panics
     ///
-    /// Panics when the blocking-waiter identifier space is exhausted.
-    #[must_use = "the waiter identifier is required to complete or cancel the wait"]
-    #[inline]
-    pub(crate) fn register_blocking(&mut self, deadline: Duration) -> u64 {
-        let waiter_id = allocate_identifier(
-            &mut self.next_blocking_waiter_id,
-            "manual blocking waiter identifiers exhausted",
-        );
-        self.blocking_waiters.insert(waiter_id, deadline);
-        waiter_id
-    }
-
-    /// Removes the blocking waiter identified by waiter_id.
-    ///
-    /// # Parameters
-    ///
-    /// * `waiter_id` - Identifier of the blocking waiter to remove.
-    #[inline(always)]
-    pub(crate) fn unregister_blocking(&mut self, waiter_id: u64) {
-        self.blocking_waiters.remove(&waiter_id);
-    }
-
-    /// Registers an async deadline and returns its registration identifier.
-    ///
-    /// Panics when the registry cannot allocate another identifier.
-    ///
-    /// # Parameters
-    ///
-    /// * `deadline` - Elapsed clock duration at which the waiter becomes ready.
-    ///
-    /// # Returns
-    ///
-    /// The nonzero identifier assigned to the async waiter.
-    ///
-    /// # Panics
-    ///
-    /// Panics when the async-waiter identifier space is exhausted.
+    /// Panics when the timer-waiter identifier space is exhausted.
     #[must_use = "the waiter identifier is required to poll or cancel the wait"]
     #[inline]
-    pub(crate) fn register_async(&mut self, deadline: Duration) -> u64 {
+    pub(crate) fn register_timer(&mut self, deadline: Duration) -> u64 {
         let waiter_id = allocate_identifier(
-            &mut self.next_async_waiter_id,
-            "manual async waiter identifiers exhausted",
+            &mut self.next_timer_waiter_id,
+            "manual timer waiter identifiers exhausted",
         );
-        self.async_waiters.insert(waiter_id, (deadline, None));
+        self.timer_waiters.insert(waiter_id, (deadline, None));
         waiter_id
     }
 
-    /// Removes an async waiter and returns its optional registered waker.
+    /// Removes a timer waiter and returns its optional registered waker.
     ///
     /// The outer option reports whether the waiter existed. The inner option
     /// contains the waker most recently registered by polling its future.
     ///
     /// # Parameters
     ///
-    /// * `waiter_id` - Identifier of the async waiter to remove.
+    /// * `waiter_id` - Identifier of the timer waiter to remove.
     ///
     /// # Returns
     ///
     /// `None` when the waiter was absent, `Some(None)` for an unpolled waiter,
     /// or `Some(Some(waker))` for a waiter with a registered task waker.
     #[inline(always)]
-    pub(crate) fn unregister_async(
+    pub(crate) fn unregister_timer(
         &mut self,
         waiter_id: u64,
     ) -> Option<Option<Waker>> {
-        self.async_waiters
+        self.timer_waiters
             .remove(&waiter_id)
             .map(|(_, waker)| waker)
     }
@@ -179,15 +137,15 @@ impl ManualWaiterRegistry {
         &self,
         elapsed: Duration,
     ) -> Option<Duration> {
-        self.blocking_waiters
+        self.timer_waiters
             .values()
-            .chain(self.async_waiters.values().map(|(deadline, _)| deadline))
+            .map(|(deadline, _)| deadline)
             .filter(|deadline| **deadline > elapsed)
             .min()
             .copied()
     }
 
-    /// Takes task wakers for async deadlines reached by elapsed.
+    /// Takes task wakers for timer deadlines reached by elapsed.
     ///
     /// Waiter registrations remain present until their futures are polled or
     /// dropped, but subsequent advances cannot wake the same stored waker
@@ -201,11 +159,11 @@ impl ManualWaiterRegistry {
     ///
     /// Every stored waker whose deadline is at or before `elapsed`.
     #[must_use = "due wakers should be invoked after unlocking"]
-    pub(crate) fn take_due_async_wakers(
+    pub(crate) fn take_due_timer_wakers(
         &mut self,
         elapsed: Duration,
     ) -> Vec<Waker> {
-        self.async_waiters
+        self.timer_waiters
             .values_mut()
             .filter(|(deadline, _)| *deadline <= elapsed)
             .filter_map(|(_, waker)| waker.take())
@@ -388,13 +346,13 @@ impl ManualWaiterRegistry {
         self.count_observers.contains_key(&observer_id)
     }
 
-    /// Updates the async waiter waker or reports that its deadline is due.
+    /// Updates the timer waiter waker or reports that its deadline is due.
     ///
     /// The returned ready state removes the waiter registration.
     ///
     /// # Parameters
     ///
-    /// * `waiter_id` - Identifier of the registered async waiter.
+    /// * `waiter_id` - Identifier of the registered timer waiter.
     /// * `elapsed` - Current elapsed duration of the manual clock.
     /// * `context` - Task context whose waker is stored while pending.
     ///
@@ -405,18 +363,18 @@ impl ManualWaiterRegistry {
     ///
     /// # Panics
     ///
-    /// Panics if `waiter_id` no longer identifies a registered async waiter.
+    /// Panics if `waiter_id` no longer identifies a registered timer waiter.
     #[must_use = "the poll state and detached waker must both be handled"]
-    pub(crate) fn poll_async(
+    pub(crate) fn poll_timer(
         &mut self,
         waiter_id: u64,
         elapsed: Duration,
         context: &Context<'_>,
     ) -> (Poll<()>, Option<Waker>) {
         let Some((deadline, registered_waker)) =
-            self.async_waiters.get_mut(&waiter_id)
+            self.timer_waiters.get_mut(&waiter_id)
         else {
-            panic!("manual async waiter {waiter_id} is not registered");
+            panic!("manual timer waiter {waiter_id} is not registered");
         };
         if elapsed < *deadline {
             let replaced_waker = if registered_waker
@@ -430,7 +388,7 @@ impl ManualWaiterRegistry {
             return (Poll::Pending, replaced_waker);
         }
         let removed_waker = self
-            .async_waiters
+            .timer_waiters
             .remove(&waiter_id)
             .and_then(|(_, waker)| waker);
         (Poll::Ready(()), removed_waker)
@@ -473,10 +431,10 @@ impl ManualWaiterRegistry {
     ///
     /// # Returns
     ///
-    /// The combined number of blocking and asynchronous waiter registrations.
+    /// The number of timer waiter registrations.
     #[must_use]
     #[inline(always)]
     pub(crate) fn count(&self) -> usize {
-        self.blocking_waiters.len() + self.async_waiters.len()
+        self.timer_waiters.len()
     }
 }

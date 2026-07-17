@@ -7,7 +7,6 @@
 
 mod clock_domain;
 mod internal;
-mod manual_advance_subscription;
 mod manual_deadline_future;
 mod manual_monotonic_clock;
 mod manual_waiter_future;
@@ -19,7 +18,6 @@ mod std_monotonic_clock;
 mod tokio_monotonic_clock;
 
 pub use clock_domain::ClockDomain;
-pub use manual_advance_subscription::ManualAdvanceSubscription;
 pub use manual_deadline_future::ManualDeadlineFuture;
 pub use manual_monotonic_clock::ManualMonotonicClock;
 pub use manual_waiter_future::ManualWaiterFuture;

@@ -9,7 +9,11 @@
 //! [`MonotonicInstant`] values used for timeouts, deadlines, and elapsed-time
 //! measurements. Wall time belongs on [`WallClock`](crate::WallClock) instead.
 
-use crate::MonotonicInstant;
+use crate::{
+    MonotonicInstant,
+    Timer,
+};
+use std::sync::Arc;
 
 /// Provides the current instant in a stable, non-decreasing clock domain.
 ///
@@ -87,6 +91,19 @@ pub trait MonotonicClock: Send + Sync {
     ///
     /// The current domain-scoped monotonic instant.
     fn now(&self) -> MonotonicInstant;
+
+    /// Creates a timer in this clock's exact monotonic domain.
+    ///
+    /// The call borrows rather than consumes the clock. The returned timer
+    /// retains an independent same-domain handle, so callers do not need to
+    /// clone an `Arc` before invoking this method and may continue using or
+    /// drop the original clock afterward.
+    ///
+    /// # Returns
+    ///
+    /// A shared timer whose [`Timer::clock`] reports this clock's domain.
+    #[must_use = "the timer should be retained to register deadlines"]
+    fn new_timer(&self) -> Arc<dyn Timer>;
 }
 
 impl<T> MonotonicClock for std::sync::Arc<T>
@@ -102,6 +119,16 @@ where
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()
     }
+
+    /// Delegates timer creation without consuming the shared clock pointer.
+    ///
+    /// # Returns
+    ///
+    /// A timer in the wrapped clock's exact monotonic domain.
+    #[inline(always)]
+    fn new_timer(&self) -> Arc<dyn Timer> {
+        self.as_ref().new_timer()
+    }
 }
 
 impl<T> MonotonicClock for Box<T>
@@ -116,5 +143,15 @@ where
     #[inline(always)]
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()
+    }
+
+    /// Delegates timer creation without consuming the boxed clock.
+    ///
+    /// # Returns
+    ///
+    /// A timer in the wrapped clock's exact monotonic domain.
+    #[inline(always)]
+    fn new_timer(&self) -> Arc<dyn Timer> {
+        self.as_ref().new_timer()
     }
 }

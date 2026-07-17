@@ -9,7 +9,10 @@ use crate::{
     ClockDomain,
     MonotonicClock,
     MonotonicInstant,
+    Timer,
+    TokioTimer,
 };
+use std::sync::Arc;
 use tokio::time::Instant;
 
 /// A monotonic clock backed by Tokio's time driver.
@@ -19,9 +22,9 @@ use tokio::time::Instant;
 ///
 /// When Tokio time is paused or explicitly advanced, create this clock after
 /// entering the runtime and read it only from that runtime. A paired
-/// [`TokioAsyncSleeper`](crate::TokioAsyncSleeper) must also be polled by the
+/// A paired [`TokioTimer`](crate::TokioTimer) must also be polled by the
 /// same runtime time driver. Moving tasks between worker threads of one runtime
-/// is supported; moving the clock or sleeper between independent runtimes is
+/// is supported; moving the clock or timer between independent runtimes is
 /// not. Driver identity is a caller contract because Tokio does not expose an
 /// identity that this crate can validate.
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
@@ -39,7 +42,7 @@ impl TokioMonotonicClock {
     /// Calling this method does not itself require a Tokio runtime. When using
     /// paused or explicitly advanced Tokio time, call it after entering the
     /// runtime whose time driver will read this clock and poll its paired
-    /// sleeper.
+    /// timer.
     ///
     /// # Returns
     ///
@@ -57,7 +60,21 @@ impl TokioMonotonicClock {
         }
     }
 
-    /// Returns the Tokio origin used by the paired async sleeper.
+    /// Creates a private handle retaining this exact Tokio clock domain.
+    ///
+    /// # Returns
+    ///
+    /// A clock handle with the same domain identifier and Tokio origin.
+    #[must_use]
+    #[inline]
+    pub(crate) const fn same_domain_handle(&self) -> Self {
+        Self {
+            domain: self.domain,
+            origin: self.origin,
+        }
+    }
+
+    /// Returns the Tokio origin used by the paired timer.
     ///
     /// # Returns
     ///
@@ -104,5 +121,15 @@ impl MonotonicClock for TokioMonotonicClock {
     #[inline]
     fn now(&self) -> MonotonicInstant {
         MonotonicInstant::new(self.domain, self.origin.elapsed())
+    }
+
+    /// Creates a timer retaining this exact Tokio clock domain and origin.
+    ///
+    /// # Returns
+    ///
+    /// A shared timer using the same caller-managed Tokio driver affinity.
+    #[inline]
+    fn new_timer(&self) -> Arc<dyn Timer> {
+        Arc::new(TokioTimer::from_clock(self))
     }
 }

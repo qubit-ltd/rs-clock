@@ -8,25 +8,23 @@
 use crate::monotonic::internal::{
     AdvanceEffects,
     ManualMonotonicState,
+    ManualTimeDomain,
     PanicFanout,
     WaiterRegistrationGuard,
 };
 use crate::{
     ClockDomain,
-    ManualAdvanceSubscription,
-    ManualAsyncSleeper,
-    ManualBlockingSleeper,
     ManualDeadlineFuture,
+    ManualTimer,
     ManualWaiterFuture,
     ManualWallClock,
     MonotonicClock,
     MonotonicInstant,
     TimeError,
+    Timer,
 };
 use std::sync::{
     Arc,
-    Condvar,
-    Mutex,
     MutexGuard,
 };
 use std::task::{
@@ -46,12 +44,8 @@ use std::time::{
 pub struct ManualMonotonicClock {
     /// The identifier of the originating monotonic clock domain.
     domain: ClockDomain,
-    /// The mutable state of the manual clock.
-    state: Mutex<ManualMonotonicState>,
-    /// The condition variable used to notify time changes.
-    changed: Condvar,
-    /// The condition variable used to notify waiter changes.
-    waiters_changed: Condvar,
+    /// Shared mutable state of this manual time domain.
+    time_domain: Arc<ManualTimeDomain>,
 }
 
 impl ManualMonotonicClock {
@@ -69,16 +63,32 @@ impl ManualMonotonicClock {
     pub fn new() -> Self {
         Self {
             domain: ClockDomain::new(),
-            state: Mutex::new(ManualMonotonicState::new()),
-            changed: Condvar::new(),
-            waiters_changed: Condvar::new(),
+            time_domain: Arc::new(ManualTimeDomain::new()),
+        }
+    }
+
+    /// Creates a private handle retaining this exact manual time domain.
+    ///
+    /// This operation deliberately does not expose [`Clone`] publicly. It is
+    /// used by concrete time-domain components that must outlive the clock
+    /// value supplied to their constructors.
+    ///
+    /// # Returns
+    ///
+    /// A clock handle with the same domain identifier and shared state.
+    #[must_use]
+    #[inline]
+    pub(crate) fn same_domain_handle(&self) -> Self {
+        Self {
+            domain: self.domain,
+            time_domain: Arc::clone(&self.time_domain),
         }
     }
 
     /// Creates a shared manual clock at its zero-duration origin.
     ///
-    /// This is the preferred constructor when the clock will also create wall
-    /// clocks or sleepers that share its timeline.
+    /// This is the preferred constructor when timers, wall clocks, or test
+    /// drivers must share its timeline.
     ///
     /// # Returns
     ///
@@ -91,30 +101,6 @@ impl ManualMonotonicClock {
     #[inline]
     pub fn new_shared() -> Arc<Self> {
         Arc::new(Self::new())
-    }
-
-    /// Creates a shared asynchronous sleeper driven by this clock.
-    ///
-    /// # Returns
-    ///
-    /// An asynchronous sleeper paired with this exact clock instance.
-    #[must_use]
-    #[inline(always)]
-    pub fn new_async_sleeper(self: &Arc<Self>) -> Arc<ManualAsyncSleeper> {
-        Arc::new(ManualAsyncSleeper::from_clock(Arc::clone(self)))
-    }
-
-    /// Creates a shared blocking sleeper driven by this clock.
-    ///
-    /// # Returns
-    ///
-    /// A blocking sleeper paired with this exact clock instance.
-    #[must_use]
-    #[inline(always)]
-    pub fn new_blocking_sleeper(
-        self: &Arc<Self>,
-    ) -> Arc<ManualBlockingSleeper> {
-        Arc::new(ManualBlockingSleeper::from_clock(Arc::clone(self)))
     }
 
     /// Creates a shared wall clock projected from this clock's timeline.
@@ -222,54 +208,9 @@ impl ManualMonotonicClock {
         Ok(())
     }
 
-    /// Subscribes to successful forward changes of this manual clock.
+    /// Returns the number of registered timer deadline waiters.
     ///
-    /// This concrete-only hook lets test doubles such as a mock lock monitor
-    /// signal their own condition variable or task wakers whenever logical
-    /// time advances. The callback executes synchronously outside the clock
-    /// mutex and may overlap callbacks from concurrent advances. It must be
-    /// idempotent and should do no more than signal the subscriber's own
-    /// waiting primitive. Callback order is unspecified. If callbacks panic,
-    /// every callback collected for that advance is still attempted before
-    /// the first panic is resumed on the advancing thread.
-    ///
-    /// Dropping the returned handle prevents registration in later advances;
-    /// a callback already collected by an in-flight advance may still run once.
-    /// A callback that locks another synchronization object must establish a
-    /// consistent lock order: callers must not advance this clock while they
-    /// hold that same lock.
-    ///
-    /// The `self: &Arc<Self>` receiver makes shared-clock identity explicit and
-    /// lets the returned subscription keep only a weak reference to the clock.
-    ///
-    /// # Parameters
-    ///
-    /// * `callback` - Thread-safe notification callback invoked after advances.
-    ///
-    /// # Returns
-    ///
-    /// A handle that unregisters the callback when dropped.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the advance-subscriber identifier space is exhausted.
-    pub fn subscribe_advances<F>(
-        self: &Arc<Self>,
-        callback: F,
-    ) -> ManualAdvanceSubscription
-    where
-        F: Fn() + Send + Sync + 'static,
-    {
-        let subscriber_id = {
-            let mut state = self.lock_state();
-            state.advances.register(Arc::new(callback))
-        };
-        ManualAdvanceSubscription::new(Arc::downgrade(self), subscriber_id)
-    }
-
-    /// Returns the number of registered blocking and async deadline waiters.
-    ///
-    /// A reached async waiter remains registered and continues contributing to
+    /// A reached timer waiter remains registered and continues contributing to
     /// this count until its future is polled again or dropped. Use
     /// [`next_deadline()`](Self::next_deadline) when only future deadlines are
     /// relevant.
@@ -332,6 +273,7 @@ impl ManualMonotonicClock {
                 return None;
             }
             let (next_state, wait_result) = self
+                .time_domain
                 .waiters_changed
                 .wait_timeout(state, remaining)
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -368,15 +310,18 @@ impl ManualMonotonicClock {
     /// Coordinate an asynchronous producer with a manual-time driver:
     ///
     /// ```
-    /// use qubit_clock::{AsyncSleeper, ManualMonotonicClock};
+    /// use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
     /// use std::time::Duration;
     ///
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let clock = ManualMonotonicClock::new_shared();
-    /// let sleeper = clock.new_async_sleeper();
+    /// let timer = clock.new_timer();
     /// let task = tokio::spawn(async move {
-    ///     sleeper.sleep_for_async(Duration::from_secs(5)).await
+    ///     timer
+    ///         .after(Duration::from_secs(5))
+    ///         .expect("timer deadline should register")
+    ///         .await;
     /// });
     ///
     /// let observed = clock.wait_for_next_deadline_async().await;
@@ -385,7 +330,7 @@ impl ManualMonotonicClock {
     ///     .advance_to_next_deadline()
     ///     .expect("the observed waiter should remain active");
     /// assert_eq!(observed, reached);
-    /// task.await??;
+    /// task.await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -436,12 +381,12 @@ impl ManualMonotonicClock {
 
     /// Returns a future that completes after enough waiters are registered.
     ///
-    /// Blocking and asynchronous deadline waiters both contribute to the
-    /// count. Reaching the count is latched even if waiters unregister before
+    /// Timer deadline waiters contribute to the count. Reaching the count is
+    /// latched even if waiters unregister before
     /// the returned future is polled again. The `self: &Arc<Self>` receiver
     /// ensures the future keeps this exact clock instance alive. The observer
     /// is registered before this method returns, rather than on the first poll.
-    /// Reached async waiters remain counted until their futures are polled or
+    /// Reached timer waiters remain counted until their futures are polled or
     /// dropped, so a due registration can satisfy `expected_count`. Use
     /// [`wait_for_next_deadline_async()`](Self::wait_for_next_deadline_async)
     /// when coordinating a later stage that specifically requires an active
@@ -469,14 +414,14 @@ impl ManualMonotonicClock {
 
     /// Blocks in real time until enough deadline waiters are registered.
     ///
-    /// Blocking and asynchronous sleeper registrations both contribute to
-    /// `expected_count`. Reaching the count is latched even if waiters
+    /// Timer registrations contribute to `expected_count`. Reaching the count
+    /// is latched even if waiters
     /// unregister before this thread reacquires the clock state. `real_timeout`
     /// is only a test guard and never advances logical time. Returns `true`
     /// when the count is reached, including when it is already satisfied before
     /// an unrepresentable guard is evaluated. Returns `false` when an
     /// unsatisfied wait reaches a guard that expires or cannot be represented.
-    /// Reached async waiters remain counted until their futures are polled or
+    /// Reached timer waiters remain counted until their futures are polled or
     /// dropped, so a due registration can satisfy `expected_count`.
     ///
     /// # Parameters
@@ -517,6 +462,7 @@ impl ManualMonotonicClock {
             let remaining =
                 real_deadline.saturating_duration_since(Instant::now());
             let (next_state, wait_result) = self
+                .time_domain
                 .waiters_changed
                 .wait_timeout(state, remaining)
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -534,79 +480,7 @@ impl ManualMonotonicClock {
         }
     }
 
-    /// Unregisters an advance subscriber when its registration is dropped.
-    ///
-    /// # Parameters
-    ///
-    /// * `subscriber_id` - Identifier of the callback to unregister.
-    ///
-    /// # Panics
-    ///
-    /// Panics after releasing the clock state lock if destroying the callback
-    /// or one of its captured values panics.
-    #[inline]
-    pub(crate) fn unregister_advance_subscriber(&self, subscriber_id: u64) {
-        let removed_callback = {
-            let mut state = self.lock_state();
-            state.advances.unregister(subscriber_id)
-        };
-        drop(removed_callback);
-    }
-
-    /// Blocks until manual time reaches `deadline`.
-    ///
-    /// The deadline must already have been validated against this clock. If a
-    /// reached waiter-count observer waker panics, all reached wakers are
-    /// attempted before the first panic is resumed and this registration is
-    /// removed during unwinding.
-    ///
-    /// # Parameters
-    ///
-    /// * `deadline` - Domain-scoped instant to wait for.
-    ///
-    /// # Returns
-    ///
-    /// `Ok(())` after manual time reaches `deadline`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline.
-    ///
-    /// # Panics
-    ///
-    /// Panics after attempting every reached observer waker if one panics.
-    pub(crate) fn wait_until_blocking(
-        &self,
-        deadline: MonotonicInstant,
-    ) -> Result<(), TimeError> {
-        deadline.ensure_domain(self.domain)?;
-        let deadline_elapsed = deadline.elapsed_since_origin();
-        let mut state = self.lock_state();
-        if state.elapsed >= deadline_elapsed {
-            return Ok(());
-        }
-        let waiter_id = state.waiters.register_blocking(deadline_elapsed);
-        let registration = WaiterRegistrationGuard::blocking(self, waiter_id);
-        let elapsed = state.elapsed;
-        let observer_wakers = state.waiters.reached_observer_wakers(elapsed);
-        drop(state);
-        self.waiters_changed.notify_all();
-        let mut fanout = PanicFanout::new();
-        fanout.wake_all(observer_wakers);
-        fanout.resume_first_panic();
-        let mut state = self.lock_state();
-        while state.elapsed < deadline_elapsed {
-            state = self
-                .changed
-                .wait(state)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-        }
-        drop(state);
-        drop(registration);
-        Ok(())
-    }
-
-    /// Registers an async deadline at future creation time.
+    /// Registers a timer deadline at future creation time.
     ///
     /// Returns `Ok(None)` when the deadline has already been reached and a
     /// registration ID otherwise. A foreign deadline returns a domain error.
@@ -630,7 +504,7 @@ impl ManualMonotonicClock {
     ///
     /// Panics when waiter identifiers are exhausted or, after attempting all
     /// reached observer wakers, if one of those wakers panics.
-    pub(crate) fn register_async_waiter(
+    pub(crate) fn register_timer_waiter(
         &self,
         deadline: MonotonicInstant,
     ) -> Result<Option<u64>, TimeError> {
@@ -640,17 +514,16 @@ impl ManualMonotonicClock {
         if state.elapsed >= deadline_elapsed {
             return Ok(None);
         }
-        let waiter_id = state.waiters.register_async(deadline_elapsed);
-        let registration =
-            WaiterRegistrationGuard::asynchronous(self, waiter_id);
+        let waiter_id = state.waiters.register_timer(deadline_elapsed);
+        let registration = WaiterRegistrationGuard::new(self, waiter_id);
         let elapsed = state.elapsed;
         let observer_wakers = state.waiters.reached_observer_wakers(elapsed);
         drop(state);
-        self.waiters_changed.notify_all();
+        self.time_domain.waiters_changed.notify_all();
         let mut fanout = PanicFanout::new();
         fanout.wake_all(observer_wakers);
         fanout.resume_first_panic();
-        Ok(Some(registration.into_async_waiter_id()))
+        Ok(Some(registration.into_waiter_id()))
     }
 
     /// Registers an asynchronous observer of the total waiter count.
@@ -776,7 +649,7 @@ impl ManualMonotonicClock {
         drop(removed_waker);
     }
 
-    /// Polls a registered async waiter against current manual time.
+    /// Polls a registered timer waiter against current manual time.
     ///
     /// # Parameters
     ///
@@ -788,65 +661,49 @@ impl ManualMonotonicClock {
     /// [`Poll::Ready`] after the registered deadline is reached, or
     /// [`Poll::Pending`] while manual time remains before that deadline.
     ///
-    /// # Errors
-    ///
-    /// The ready result is currently always `Ok(())`; registration errors are
-    /// resolved before a waiter identifier is returned.
-    ///
     /// # Panics
     ///
-    /// Panics if `waiter_id` no longer identifies a registered async waiter or
+    /// Panics if `waiter_id` no longer identifies a registered timer waiter or
     /// if destroying a replaced custom task waker panics after unlocking.
-    pub(crate) fn poll_async_waiter(
+    pub(crate) fn poll_timer_waiter(
         &self,
         waiter_id: u64,
         context: &Context<'_>,
-    ) -> Poll<Result<(), TimeError>> {
+    ) -> Poll<()> {
         let (poll_result, replaced_waker) = {
             let mut state = self.lock_state();
             let elapsed = state.elapsed;
-            state.waiters.poll_async(waiter_id, elapsed, context)
+            state.waiters.poll_timer(waiter_id, elapsed, context)
         };
         drop(replaced_waker);
         if poll_result.is_ready() {
-            self.waiters_changed.notify_all();
-            return Poll::Ready(Ok(()));
+            self.time_domain.waiters_changed.notify_all();
+            return Poll::Ready(());
         }
         Poll::Pending
     }
 
-    /// Removes an async waiter after completion or future cancellation.
+    /// Removes a timer waiter after completion or future cancellation.
     ///
     /// # Parameters
     ///
-    /// * `waiter_id` - Identifier of the async waiter to remove.
+    /// * `waiter_id` - Identifier of the timer waiter to remove.
     ///
     /// # Panics
     ///
     /// Panics after releasing the clock state lock if destroying the waiter's
     /// custom task waker panics.
     #[inline]
-    pub(crate) fn unregister_async_waiter(&self, waiter_id: u64) {
+    pub(crate) fn unregister_timer_waiter(&self, waiter_id: u64) {
         let removed_waiter = {
             let mut state = self.lock_state();
-            state.waiters.unregister_async(waiter_id)
+            state.waiters.unregister_timer(waiter_id)
         };
         let was_registered = removed_waiter.is_some();
         drop(removed_waiter);
         if was_registered {
-            self.waiters_changed.notify_all();
+            self.time_domain.waiters_changed.notify_all();
         }
-    }
-
-    /// Removes a blocking waiter after completion or unwinding.
-    ///
-    /// # Parameters
-    ///
-    /// * `waiter_id` - Identifier of the blocking waiter to remove.
-    #[inline]
-    pub(super) fn unregister_blocking_waiter(&self, waiter_id: u64) {
-        self.lock_state().waiters.unregister_blocking(waiter_id);
-        self.waiters_changed.notify_all();
     }
 
     /// Returns the earliest future deadline represented in this clock domain.
@@ -876,12 +733,13 @@ impl ManualMonotonicClock {
     /// A guard granting mutable access to the manual clock state.
     #[inline]
     fn lock_state(&self) -> MutexGuard<'_, ManualMonotonicState> {
-        self.state
+        self.time_domain
+            .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    /// Collects due task wakers and current advance callbacks under the lock.
+    /// Collects due task wakers under the lock.
     ///
     /// # Parameters
     ///
@@ -895,34 +753,24 @@ impl ManualMonotonicClock {
         state: &mut ManualMonotonicState,
     ) -> AdvanceEffects {
         let elapsed = state.elapsed;
-        let due_wakers = state.waiters.take_due_async_wakers(elapsed);
-        let advance_callbacks = state.advances.callbacks();
-        AdvanceEffects {
-            due_wakers,
-            advance_callbacks,
-        }
+        let due_wakers = state.waiters.take_due_timer_wakers(elapsed);
+        AdvanceEffects { due_wakers }
     }
 
-    /// Wakes time observers and invokes every collected subscriber outside the
-    /// state lock, resuming the first panic after the full fanout completes.
+    /// Wakes time observers outside the state lock.
     ///
     /// # Parameters
     ///
-    /// * `effects` - Due task wakers and advance callbacks to notify.
+    /// * `effects` - Due task wakers to notify.
     ///
     /// # Panics
     ///
-    /// Resumes the first panic raised by a waker, callback, or their
-    /// destructors after every collected target has been attempted.
+    /// Resumes the first panic raised by a waker or its destructor after every
+    /// collected target has been attempted.
     fn notify_time_changed(&self, effects: AdvanceEffects) {
-        let AdvanceEffects {
-            due_wakers,
-            advance_callbacks,
-        } = effects;
-        self.changed.notify_all();
+        let AdvanceEffects { due_wakers } = effects;
         let mut fanout = PanicFanout::new();
         fanout.wake_all(due_wakers);
-        fanout.call_all(advance_callbacks);
         fanout.resume_first_panic();
     }
 }
@@ -976,5 +824,15 @@ impl MonotonicClock for ManualMonotonicClock {
     #[inline]
     fn now(&self) -> MonotonicInstant {
         MonotonicInstant::new(self.domain, self.lock_state().elapsed)
+    }
+
+    /// Creates a timer retaining this exact manual time domain.
+    ///
+    /// # Returns
+    ///
+    /// A shared timer driven by the same explicitly advanced timeline.
+    #[inline]
+    fn new_timer(&self) -> Arc<dyn Timer> {
+        Arc::new(ManualTimer::from_clock(self))
     }
 }

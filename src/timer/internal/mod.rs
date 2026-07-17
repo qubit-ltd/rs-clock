@@ -3,6 +3,9 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 // =============================================================================
-//! Private implementation details for deterministic sleep futures.
+//! Internal timer future implementations.
 
-pub(crate) mod manual_sleep_future;
+pub(crate) mod manual_timer_future;
+pub(crate) mod std_timer_future;
+pub(crate) mod std_timer_scheduler;
+pub(crate) mod std_timer_waiter;
