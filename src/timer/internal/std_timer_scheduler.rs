@@ -16,7 +16,13 @@ use std::sync::{
     Mutex,
     MutexGuard,
 };
-use std::time::Instant;
+use std::time::{
+    Duration,
+    Instant,
+};
+
+/// Grace period during which an idle worker can serve a new registration.
+const WORKER_IDLE_GRACE: Duration = Duration::from_millis(1);
 
 /// One lazily started worker shared by every future from a standard timer.
 pub(crate) struct StdTimerScheduler {
@@ -106,8 +112,16 @@ impl StdTimerScheduler {
         let mut state = self.lock_state();
         loop {
             if state.is_empty() {
-                state.mark_worker_stopped();
-                return;
+                let (next_state, _) = self
+                    .changed
+                    .wait_timeout(state, WORKER_IDLE_GRACE)
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                state = next_state;
+                if state.is_empty() {
+                    state.mark_worker_stopped();
+                    return;
+                }
+                continue;
             }
             let deadline = state.next_deadline().expect(
                 "active standard Timer registration must have a deadline",
