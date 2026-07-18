@@ -45,12 +45,13 @@ outstanding notification.
 
 Enable the `tokio` feature for `TokioMonotonicClock` and `TokioTimer`.
 Creating a future deadline must occur inside a runtime with time enabled. A
-missing or disabled driver returns `TimeError::TimerUnavailable` from `at` or
-`after`; an already reached deadline returns a ready future without runtime
-access. `TokioTimer` fixes the `Sleep` deadline during the call, while Tokio may
-enroll that sleep with its time driver on first poll. Create the clock and
-future, advance paused time, and poll the future under the same runtime time
-driver.
+missing runtime returns `TimeError::TimerUnavailable` with
+`TimerUnavailableReason::RuntimeNotEntered`; a disabled time driver reports
+`TimerUnavailableReason::TimeDriverDisabled`. An already reached deadline
+returns a ready future without runtime access. `TokioTimer` fixes the `Sleep`
+deadline during the call, while Tokio may enroll that sleep with its time
+driver on first poll. Create the clock and future, advance paused time, and poll
+the future under the same runtime time driver.
 
 <a id="manual-time-coordination"></a>
 
@@ -192,10 +193,15 @@ The process-wide standard timer scheduler benchmark is available with:
 cargo bench --bench std_timer_scheduler
 ```
 
+The benchmark reports registration/cancellation and deadline-completion
+throughput for 1, 2, 4, 8, and 16 concurrent caller threads.
+
 ## Errors
 
 - `ClockDomainMismatch`: a deadline came from another monotonic domain.
 - `InstantOverflow`: relative or native deadline conversion overflowed.
-- `TimerUnavailable`: the timer driver or scheduler could not be created.
+- `TimerUnavailable { reason }`: deadline registration failed because the
+  scheduler worker, async runtime, time driver, or custom backend was
+  unavailable. `TimerUnavailableReason` identifies the specific cause.
 - `CannotMoveBackward`: manual time was moved backward.
 - `InvalidInstantOrder`: instant arithmetic used an invalid order.

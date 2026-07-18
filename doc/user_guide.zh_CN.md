@@ -40,11 +40,12 @@ let _still_usable = clock.now();
 ## Tokio Timer
 
 `TokioMonotonicClock` 与 `TokioTimer` 需要启用 `tokio` feature。创建未来 deadline
-必须发生在启用 time 的 runtime 中；缺失或禁用 time driver 时，`at`/`after` 立即
-返回 `TimeError::TimerUnavailable`。已经到达的 deadline 无需访问 runtime，会直接
-返回 ready future。`TokioTimer` 在调用期间固定 `Sleep` 的 deadline，但 Tokio 可以
-到首次 poll 时才把 sleep 登记到 time driver。clock、future、paused time 推进和
-future poll 必须使用同一个 runtime time driver。
+必须发生在启用 time 的 runtime 中；未进入 runtime 时，`at`/`after` 返回带有
+`TimerUnavailableReason::RuntimeNotEntered` 的 `TimeError::TimerUnavailable`；runtime
+禁用 time driver 时 reason 为 `TimerUnavailableReason::TimeDriverDisabled`。已经到达
+的 deadline 无需访问 runtime，会直接返回 ready future。`TokioTimer` 在调用期间固定
+`Sleep` 的 deadline，但 Tokio 可以到首次 poll 时才把 sleep 登记到 time driver。
+clock、future、paused time 推进和 future poll 必须使用同一个 runtime time driver。
 
 <a id="manual-time-coordination"></a>
 
@@ -176,10 +177,13 @@ timer，因此阻塞式集成测试同样无需真实等待。
 cargo bench --bench std_timer_scheduler
 ```
 
+基准测试分别报告 1、2、4、8、16 个并发调用线程下的注册/取消与 deadline 完成吞吐。
+
 ## 错误
 
 - `ClockDomainMismatch`：deadline 来自另一个 monotonic domain。
 - `InstantOverflow`：相对 deadline 或原生 deadline 转换溢出。
-- `TimerUnavailable`：无法创建 timer driver 或调度器。
+- `TimerUnavailable { reason }`：scheduler worker、async runtime、time driver 或自定义
+  backend 不可用，导致 deadline 注册失败；`TimerUnavailableReason` 标识具体原因。
 - `CannotMoveBackward`：manual time 被要求倒退。
 - `InvalidInstantOrder`：instant 运算顺序无效。
