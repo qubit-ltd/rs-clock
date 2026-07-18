@@ -9,6 +9,7 @@
 use qubit_clock::{
     ClockDomain,
     TimeError,
+    TimerUnavailableReason,
 };
 
 #[test]
@@ -40,8 +41,11 @@ fn test_time_error_other_variants_display() {
         TimeError::InvalidInstantOrder.to_string(),
     );
     assert_eq!(
-        "monotonic timer driver is unavailable",
-        TimeError::TimerUnavailable.to_string(),
+        "monotonic timer is unavailable: the timer backend is unavailable",
+        TimeError::TimerUnavailable {
+            reason: TimerUnavailableReason::BackendUnavailable,
+        }
+        .to_string(),
     );
 }
 

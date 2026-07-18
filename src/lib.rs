@@ -48,7 +48,10 @@ pub mod sleep;
 pub mod timer;
 pub mod wall;
 
-pub use error::TimeError;
+pub use error::{
+    TimeError,
+    TimerUnavailableReason,
+};
 pub use monotonic::{
     ClockDomain,
     ManualDeadlineFuture,

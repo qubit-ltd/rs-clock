@@ -10,8 +10,11 @@
 use super::std_timer_scheduler_state::StdTimerSchedulerState;
 use super::std_timer_waiter::StdTimerWaiter;
 use super::std_timer_worker_guard::StdTimerWorkerGuard;
-use crate::TimeError;
 use crate::internal::PanicFanout;
+use crate::{
+    TimeError,
+    TimerUnavailableReason,
+};
 use std::sync::{
     Arc,
     Condvar,
@@ -70,8 +73,10 @@ impl StdTimerScheduler {
     ///
     /// # Errors
     ///
-    /// Returns [`TimeError::TimerUnavailable`] when the worker thread cannot be
-    /// started. The attempted registration is removed before returning.
+    /// Returns [`TimeError::TimerUnavailable`] with
+    /// [`TimerUnavailableReason::WorkerThreadSpawnFailed`] when the worker
+    /// thread cannot be started. The attempted registration is removed before
+    /// returning.
     ///
     /// # Panics
     ///
@@ -146,7 +151,9 @@ impl StdTimerScheduler {
     ///
     /// # Errors
     ///
-    /// Returns [`TimeError::TimerUnavailable`] when the worker cannot spawn.
+    /// Returns [`TimeError::TimerUnavailable`] with
+    /// [`TimerUnavailableReason::WorkerThreadSpawnFailed`] when the worker
+    /// cannot spawn.
     ///
     /// # Panics
     ///
@@ -171,7 +178,9 @@ impl StdTimerScheduler {
         if spawn_result.is_err() {
             drop(state.cancel(waiter_id));
             state.mark_worker_stopped(worker_generation);
-            return Err(TimeError::TimerUnavailable);
+            return Err(TimeError::TimerUnavailable {
+                reason: TimerUnavailableReason::WorkerThreadSpawnFailed,
+            });
         }
         drop(state);
         Ok(waiter_id)
