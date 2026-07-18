@@ -14,6 +14,7 @@ use qubit_clock::{
 };
 use std::sync::{
     Arc,
+    Barrier,
     Mutex,
     atomic::{
         AtomicBool,
@@ -30,6 +31,12 @@ use std::thread::{
     ThreadId,
 };
 use std::time::Duration;
+
+/// Number of caller threads used by shared-scheduler concurrency tests.
+const CONCURRENT_WORKER_COUNT: usize = 16;
+
+/// Long-lived registrations retained by each cancellation-churn worker.
+const REGISTRATIONS_PER_WORKER: usize = 64;
 
 /// Records the worker thread that wakes a synchronously polled Timer future.
 struct WakeThreadRecorder {
@@ -187,4 +194,76 @@ fn test_std_timer_scheduler_shares_and_retains_process_worker() {
     let retained_worker = observe_worker(first_timer.as_ref());
 
     assert_eq!(first_worker, retained_worker);
+}
+
+/// Verifies lock-style concurrent timeout cancellation leaves the shared
+/// scheduler responsive.
+#[test]
+fn test_std_timer_scheduler_handles_parallel_lock_style_cancellation_churn() {
+    let clock = StdMonotonicClock::new();
+    let timer = Arc::new(StdTimer::from_clock(&clock));
+    let start = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT));
+    let registered = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT));
+
+    std::thread::scope(|scope| {
+        let mut workers = Vec::with_capacity(CONCURRENT_WORKER_COUNT);
+        for _ in 0..CONCURRENT_WORKER_COUNT {
+            let timer = Arc::clone(&timer);
+            let start = Arc::clone(&start);
+            let registered = Arc::clone(&registered);
+            workers.push(scope.spawn(move || {
+                start.wait();
+                let mut futures = Vec::with_capacity(REGISTRATIONS_PER_WORKER);
+                for _ in 0..REGISTRATIONS_PER_WORKER {
+                    futures.push(
+                        timer
+                            .after(Duration::from_secs(60))
+                            .expect("lock-style deadline should register"),
+                    );
+                }
+                registered.wait();
+                drop(futures);
+            }));
+        }
+        for worker in workers {
+            worker.join().expect("cancellation worker should finish");
+        }
+    });
+
+    let survivor = timer
+        .after(Duration::from_millis(5))
+        .expect("post-cancellation deadline should register");
+    block_on_with_wake_thread(survivor);
+}
+
+/// Verifies concurrent deadlines are completed by one process worker.
+#[test]
+fn test_std_timer_scheduler_uses_one_worker_for_concurrent_deadlines() {
+    let clock = StdMonotonicClock::new();
+    let timer = Arc::new(StdTimer::from_clock(&clock));
+    let start = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT));
+
+    let worker_threads = std::thread::scope(|scope| {
+        let mut waiters = Vec::with_capacity(CONCURRENT_WORKER_COUNT);
+        for _ in 0..CONCURRENT_WORKER_COUNT {
+            let timer = Arc::clone(&timer);
+            let start = Arc::clone(&start);
+            waiters.push(scope.spawn(move || {
+                start.wait();
+                observe_worker(timer.as_ref())
+            }));
+        }
+        waiters
+            .into_iter()
+            .map(|waiter| waiter.join().expect("deadline waiter should finish"))
+            .collect::<Vec<_>>()
+    });
+
+    let first_worker = worker_threads
+        .first()
+        .expect("at least one worker thread should be observed");
+    assert!(
+        worker_threads.iter().all(|worker| worker == first_worker),
+        "all concurrent deadlines should use one scheduler worker",
+    );
 }
