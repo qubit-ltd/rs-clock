@@ -12,6 +12,7 @@ use qubit_clock::{
     MonotonicInstant,
     TimeError,
     Timer,
+    TimerUnavailableReason,
     TokioMonotonicClock,
     TokioTimer,
 };
@@ -40,7 +41,9 @@ fn test_tokio_timer_reports_missing_driver_at_registration() {
     let timer = TokioTimer::from_clock(&clock);
 
     assert_eq!(
-        Err(TimeError::TimerUnavailable),
+        Err(TimeError::TimerUnavailable {
+            reason: TimerUnavailableReason::RuntimeNotEntered,
+        }),
         timer.after(Duration::from_secs(1)).map(drop),
     );
 }
@@ -55,7 +58,9 @@ fn test_tokio_timer_reports_disabled_time_driver_at_registration() {
         let clock = TokioMonotonicClock::new();
         let timer = TokioTimer::from_clock(&clock);
         assert_eq!(
-            Err(TimeError::TimerUnavailable),
+            Err(TimeError::TimerUnavailable {
+                reason: TimerUnavailableReason::TimeDriverDisabled,
+            }),
             timer.after(Duration::from_secs(1)).map(drop),
         );
     });

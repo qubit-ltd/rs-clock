@@ -7,6 +7,7 @@
 // =============================================================================
 //! Defines errors produced by time-domain operations.
 
+use super::TimerUnavailableReason;
 use crate::ClockDomain;
 use thiserror::Error;
 
@@ -24,7 +25,7 @@ use thiserror::Error;
 ///         TimeError::InstantOverflow => "overflow",
 ///         TimeError::CannotMoveBackward => "backward move",
 ///         TimeError::InvalidInstantOrder => "invalid order",
-///         TimeError::TimerUnavailable => "timer unavailable",
+///         TimeError::TimerUnavailable { .. } => "timer unavailable",
 ///         _ => "other time error",
 ///     }
 /// }
@@ -44,7 +45,7 @@ use thiserror::Error;
 ///         TimeError::InstantOverflow => "overflow",
 ///         TimeError::CannotMoveBackward => "backward move",
 ///         TimeError::InvalidInstantOrder => "invalid order",
-///         TimeError::TimerUnavailable => "timer unavailable",
+///         TimeError::TimerUnavailable { .. } => "timer unavailable",
 ///     }
 /// }
 /// ```
@@ -71,6 +72,9 @@ pub enum TimeError {
     #[error("earlier monotonic instant is later than the current instant")]
     InvalidInstantOrder,
     /// A timer could not register a requested deadline.
-    #[error("monotonic timer driver is unavailable")]
-    TimerUnavailable,
+    #[error("monotonic timer is unavailable: {reason}")]
+    TimerUnavailable {
+        /// Resource or backend condition that prevented registration.
+        reason: TimerUnavailableReason,
+    },
 }
