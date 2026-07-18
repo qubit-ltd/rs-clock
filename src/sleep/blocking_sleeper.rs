@@ -79,6 +79,7 @@ impl BlockingSleeper {
     ///
     /// Panics when the composed timer panics during registration or its
     /// returned future panics while being polled.
+    #[inline(always)]
     pub fn sleep_until(
         &self,
         deadline: MonotonicInstant,
@@ -109,6 +110,7 @@ impl BlockingSleeper {
     ///
     /// Panics when the composed timer panics during registration or its
     /// returned future panics while being polled.
+    #[inline(always)]
     pub fn sleep_for(&self, duration: Duration) -> Result<(), TimeError> {
         let future = self.timer.after(duration)?;
         Self::block_on(future);

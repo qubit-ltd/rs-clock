@@ -237,6 +237,7 @@ impl ManualMonotonicClock {
     /// deadline exists and the real-time guard expires or cannot be
     /// represented.
     #[must_use]
+    #[inline(always)]
     pub fn wait_for_next_deadline(
         &self,
         real_timeout: Duration,
@@ -424,6 +425,7 @@ impl ManualMonotonicClock {
     ///
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
+    #[inline(always)]
     pub fn wait_for_waiters(
         &self,
         expected_count: usize,
