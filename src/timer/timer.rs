@@ -17,17 +17,21 @@ use std::time::Duration;
 
 /// Creates asynchronous notifications in one monotonic clock domain.
 ///
-/// Calling [`at()`](Self::at) or [`after()`](Self::after) fixes the deadline
-/// before returning. The returned future waits for that fixed deadline and
-/// remains ready after it has been reached, including when completion happens
-/// before the future is first polled. A backend may defer enrollment with its
-/// native scheduler until the future is polled. Dropping an incomplete future
-/// cancels the outstanding notification.
+/// Calling [`at()`](Self::at) or [`after()`](Self::after) fixes the logical
+/// deadline and cancellation ownership before returning. The returned future
+/// waits for that fixed deadline and remains ready after it has been reached,
+/// including when completion happens before the future is first polled. A
+/// backend may defer enrollment with its native scheduler until the future is
+/// polled. Dropping an incomplete future cancels the outstanding notification.
 ///
-/// Implementations must reject deadlines from a different clock domain with
-/// [`TimeError::ClockDomainMismatch`].
+/// Every call to [`clock()`](Self::clock) on one Timer must report the same
+/// clock domain for the Timer's lifetime. Implementations must reject deadlines
+/// from a different domain with [`TimeError::ClockDomainMismatch`].
 pub trait Timer: Send + Sync {
     /// Returns the monotonic clock whose domain this timer uses.
+    ///
+    /// Successive calls may return different handles, but every returned clock
+    /// must report the same domain for this Timer's lifetime.
     ///
     /// # Returns
     ///

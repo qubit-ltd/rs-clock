@@ -15,6 +15,7 @@ use qubit_clock::{
     TimeError,
     Timer,
     TimerFuture,
+    TimerUnavailableReason,
 };
 use std::future::Future;
 use std::pin::Pin;
@@ -131,7 +132,9 @@ impl Timer for FailingTimer {
         &self,
         _deadline: MonotonicInstant,
     ) -> Result<TimerFuture, TimeError> {
-        Err(TimeError::TimerUnavailable)
+        Err(TimeError::TimerUnavailable {
+            reason: TimerUnavailableReason::BackendUnavailable,
+        })
     }
 }
 
@@ -142,7 +145,9 @@ fn test_blocking_sleeper_returns_registration_error_without_parking() {
     let sleeper = BlockingSleeper::new(Arc::new(FailingTimer { clock }));
 
     assert_eq!(
-        Err(TimeError::TimerUnavailable),
+        Err(TimeError::TimerUnavailable {
+            reason: TimerUnavailableReason::BackendUnavailable,
+        }),
         sleeper.sleep_until(deadline),
     );
 }

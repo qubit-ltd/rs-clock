@@ -12,6 +12,8 @@ use std::pin::Pin;
 
 /// An owned future that becomes ready when a timer reaches its deadline.
 ///
-/// A timer registration is complete before this future is returned. Dropping
-/// the future cancels that registration when it has not yet completed.
+/// The logical deadline and cancellation ownership are fixed before this
+/// future is returned. A backend may defer enrollment with its native
+/// scheduler until the future is first polled. Dropping an incomplete future
+/// cancels its outstanding notification in either case.
 pub type TimerFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
