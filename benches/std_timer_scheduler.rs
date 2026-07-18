@@ -8,6 +8,7 @@
 
 use criterion::{
     BenchmarkGroup,
+    BenchmarkId,
     Criterion,
     Throughput,
     criterion_group,
@@ -34,8 +35,8 @@ use std::task::{
 };
 use std::time::Duration;
 
-/// Number of persistent caller threads used by concurrent benchmarks.
-const CONCURRENT_WORKER_COUNT: usize = 16;
+/// Persistent caller-thread counts used to expose scheduler scaling behavior.
+const CONCURRENT_WORKER_COUNTS: [usize; 5] = [1, 2, 4, 8, 16];
 
 /// Timeout futures retained by each lock-style cancellation worker.
 const REGISTRATIONS_PER_WORKER: usize = 64;
@@ -132,57 +133,62 @@ fn block_on_timer_future(mut future: TimerFuture) {
 fn benchmark_parallel_registration_and_cancellation(
     group: &mut BenchmarkGroup<'_, WallTime>,
 ) {
-    let timer = StdMonotonicClock::new().new_timer();
-    let start = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT + 1));
-    let registered = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT));
-    let finished = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT + 1));
-    let stopping = Arc::new(AtomicBool::new(false));
+    for worker_count in CONCURRENT_WORKER_COUNTS {
+        let timer = StdMonotonicClock::new().new_timer();
+        let start = Arc::new(Barrier::new(worker_count + 1));
+        let registered = Arc::new(Barrier::new(worker_count));
+        let finished = Arc::new(Barrier::new(worker_count + 1));
+        let stopping = Arc::new(AtomicBool::new(false));
 
-    std::thread::scope(|scope| {
-        for _ in 0..CONCURRENT_WORKER_COUNT {
-            let timer = Arc::clone(&timer);
-            let start = Arc::clone(&start);
-            let registered = Arc::clone(&registered);
-            let finished = Arc::clone(&finished);
-            let stopping = Arc::clone(&stopping);
-            scope.spawn(move || {
-                loop {
-                    start.wait();
-                    if stopping.load(Ordering::Acquire) {
-                        return;
+        std::thread::scope(|scope| {
+            for _ in 0..worker_count {
+                let timer = Arc::clone(&timer);
+                let start = Arc::clone(&start);
+                let registered = Arc::clone(&registered);
+                let finished = Arc::clone(&finished);
+                let stopping = Arc::clone(&stopping);
+                scope.spawn(move || {
+                    loop {
+                        start.wait();
+                        if stopping.load(Ordering::Acquire) {
+                            return;
+                        }
+                        let mut futures =
+                            Vec::with_capacity(REGISTRATIONS_PER_WORKER);
+                        for _ in 0..REGISTRATIONS_PER_WORKER {
+                            futures.push(
+                                timer.after(CANCELLATION_DEADLINE).expect(
+                                    "benchmark deadline should register",
+                                ),
+                            );
+                        }
+                        registered.wait();
+                        drop(futures);
+                        finished.wait();
                     }
-                    let mut futures =
-                        Vec::with_capacity(REGISTRATIONS_PER_WORKER);
-                    for _ in 0..REGISTRATIONS_PER_WORKER {
-                        futures.push(
-                            timer
-                                .after(CANCELLATION_DEADLINE)
-                                .expect("benchmark deadline should register"),
-                        );
-                    }
-                    registered.wait();
-                    drop(futures);
-                    finished.wait();
-                }
-            });
-        }
-
-        let elements =
-            (CONCURRENT_WORKER_COUNT * REGISTRATIONS_PER_WORKER) as u64;
-        group.throughput(Throughput::Elements(elements));
-        group.bench_function(
-            "lock_style_registration_and_cancellation",
-            |bencher| {
-                bencher.iter(|| {
-                    start.wait();
-                    finished.wait();
                 });
-            },
-        );
+            }
 
-        stopping.store(true, Ordering::Release);
-        start.wait();
-    });
+            let elements = (worker_count * REGISTRATIONS_PER_WORKER) as u64;
+            group.throughput(Throughput::Elements(elements));
+            group.bench_with_input(
+                BenchmarkId::new(
+                    "lock_style_registration_and_cancellation",
+                    worker_count,
+                ),
+                &worker_count,
+                |bencher, _worker_count| {
+                    bencher.iter(|| {
+                        start.wait();
+                        finished.wait();
+                    });
+                },
+            );
+
+            stopping.store(true, Ordering::Release);
+            start.wait();
+        });
+    }
 }
 
 /// Benchmarks concurrent deadline completion and Waker fanout.
@@ -197,43 +203,49 @@ fn benchmark_parallel_registration_and_cancellation(
 fn benchmark_parallel_deadline_completion(
     group: &mut BenchmarkGroup<'_, WallTime>,
 ) {
-    let timer = StdMonotonicClock::new().new_timer();
-    let start = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT + 1));
-    let finished = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT + 1));
-    let stopping = Arc::new(AtomicBool::new(false));
+    for worker_count in CONCURRENT_WORKER_COUNTS {
+        let timer = StdMonotonicClock::new().new_timer();
+        let start = Arc::new(Barrier::new(worker_count + 1));
+        let finished = Arc::new(Barrier::new(worker_count + 1));
+        let stopping = Arc::new(AtomicBool::new(false));
 
-    std::thread::scope(|scope| {
-        for _ in 0..CONCURRENT_WORKER_COUNT {
-            let timer = Arc::clone(&timer);
-            let start = Arc::clone(&start);
-            let finished = Arc::clone(&finished);
-            let stopping = Arc::clone(&stopping);
-            scope.spawn(move || {
-                loop {
-                    start.wait();
-                    if stopping.load(Ordering::Acquire) {
-                        return;
+        std::thread::scope(|scope| {
+            for _ in 0..worker_count {
+                let timer = Arc::clone(&timer);
+                let start = Arc::clone(&start);
+                let finished = Arc::clone(&finished);
+                let stopping = Arc::clone(&stopping);
+                scope.spawn(move || {
+                    loop {
+                        start.wait();
+                        if stopping.load(Ordering::Acquire) {
+                            return;
+                        }
+                        let future = timer
+                            .after(COMPLETION_DEADLINE)
+                            .expect("benchmark deadline should register");
+                        block_on_timer_future(future);
+                        finished.wait();
                     }
-                    let future = timer
-                        .after(COMPLETION_DEADLINE)
-                        .expect("benchmark deadline should register");
-                    block_on_timer_future(future);
-                    finished.wait();
-                }
-            });
-        }
+                });
+            }
 
-        group.throughput(Throughput::Elements(CONCURRENT_WORKER_COUNT as u64));
-        group.bench_function("parallel_deadline_completion", |bencher| {
-            bencher.iter(|| {
-                start.wait();
-                finished.wait();
-            });
+            group.throughput(Throughput::Elements(worker_count as u64));
+            group.bench_with_input(
+                BenchmarkId::new("parallel_deadline_completion", worker_count),
+                &worker_count,
+                |bencher, _worker_count| {
+                    bencher.iter(|| {
+                        start.wait();
+                        finished.wait();
+                    });
+                },
+            );
+
+            stopping.store(true, Ordering::Release);
+            start.wait();
         });
-
-        stopping.store(true, Ordering::Release);
-        start.wait();
-    });
+    }
 }
 
 /// Benchmarks shared standard Timer behavior under downstream-style
