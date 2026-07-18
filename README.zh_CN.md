@@ -78,31 +78,26 @@ let task = tokio::spawn(async move {
     Ok::<_, qubit_clock::TimeError>(())
 });
 
-let observed = clock.wait_for_next_deadline_async().await;
-assert_eq!(Duration::from_secs(5), observed.elapsed_since_origin());
-
-clock
-    .advance_to_next_deadline()
-    .expect("有效 timer 应存在未来 deadline");
+let reached = clock.advance_to_next_deadline_async().await;
+assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
 task.await??;
 Ok(())
 }
 ```
 
-`wait_for_next_deadline_async()` 是状态观察器。每次 poll 都返回当前最早、严格位于
-未来且仍然有效的 deadline；已取消和已到期 waiter 会被忽略。返回值只是快照，所以
-并发驱动应使用 `advance_to_next_deadline()` 原子完成选择和推进。
-[用户手册](doc/user_guide.zh_CN.md#11-wait_for_next_deadline_async-的精确语义)
-详细说明了完整协调契约、count 启动屏障、多阶段示例、Tokio runtime affinity、
-wall reanchor、trait object 注入和错误处理。
+`advance_to_next_deadline_async()` 会等待有效的未来 deadline，再原子推进到该时刻
+仍然存在的最早 deadline。取消竞争会触发重新等待，取消 driver future 不会移动
+manual time。[用户手册](doc/user_guide.zh_CN.md#manual-time-coordination)详细说明了
+快照、count barrier、多阶段协调、runtime affinity、wall reanchor、trait object
+注入和错误处理。
 
 ## 测试
 
 ```bash
-# 使用默认的空 feature 集测试核心 API
-cargo test --no-default-features
+# 使用默认 feature 集运行测试
+cargo test
 
-# 测试核心 API 和正则校验
+# 使用项目声明的全部 feature 运行测试
 cargo test --all-features
 
 # 运行项目 CI 检查
@@ -110,9 +105,6 @@ cargo test --all-features
 
 # 检查代码覆盖率
 ./coverage.sh
-
-# 对进程级标准 Timer scheduler 运行基准测试
-cargo bench --bench std_timer_scheduler
 ```
 
 ## 许可证

@@ -15,14 +15,14 @@ use crate::{
 };
 use std::time::Duration;
 
-/// Registers asynchronous notifications in one monotonic clock domain.
+/// Creates asynchronous notifications in one monotonic clock domain.
 ///
-/// Calling [`at()`](Self::at) or [`after()`](Self::after) performs timer
-/// registration before returning. The returned future therefore only
-/// represents completion, never deferred registration. It remains ready once
-/// the deadline has been reached, including when completion happens before the
-/// future is first polled. Dropping an incomplete future cancels its
-/// registration.
+/// Calling [`at()`](Self::at) or [`after()`](Self::after) fixes the deadline
+/// before returning. The returned future waits for that fixed deadline and
+/// remains ready after it has been reached, including when completion happens
+/// before the future is first polled. A backend may defer enrollment with its
+/// native scheduler until the future is polled. Dropping an incomplete future
+/// cancels the outstanding notification.
 ///
 /// Implementations must reject deadlines from a different clock domain with
 /// [`TimeError::ClockDomainMismatch`].
@@ -48,9 +48,9 @@ pub trait Timer: Send + Sync {
     #[must_use = "the Timer clock should be used to sample or validate deadlines"]
     fn clock(&self) -> &dyn MonotonicClock;
 
-    /// Registers a notification for an absolute monotonic deadline.
+    /// Creates a notification for an absolute monotonic deadline.
     ///
-    /// Registration is complete before this method returns. A deadline at or
+    /// The deadline is fixed before this method returns. A deadline at or
     /// before the current time produces a future that is already ready.
     ///
     /// # Parameters
@@ -64,8 +64,8 @@ pub trait Timer: Send + Sync {
     /// # Errors
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] when `deadline` belongs to a
-    /// different clock domain. Returns another [`TimeError`] when registration
-    /// cannot be completed.
+    /// different clock domain. Returns another [`TimeError`] when the
+    /// notification cannot be created.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError>;
 
     /// Registers a notification after a relative duration.
@@ -84,8 +84,8 @@ pub trait Timer: Send + Sync {
     /// # Errors
     ///
     /// Returns [`TimeError::InstantOverflow`] when the deadline cannot be
-    /// represented. Returns any error produced while registering that
-    /// deadline.
+    /// represented. Returns any error produced while creating the notification
+    /// for that deadline.
     #[inline]
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
         let deadline = self.clock().now().checked_add(duration)?;

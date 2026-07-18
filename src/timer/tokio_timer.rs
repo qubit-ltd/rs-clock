@@ -21,11 +21,13 @@ use tokio::time::Instant;
 
 /// An asynchronous timer backed by one Tokio runtime time driver.
 ///
-/// Native Tokio timer registration happens before [`Timer::at`] returns. The
-/// timer retains the source clock's exact domain and origin. Future deadlines
-/// must be created and polled under the same Tokio time driver; reached
-/// deadlines return an immediately ready future without accessing a runtime.
-/// Tokio does not expose a driver identity that this crate can validate.
+/// The timer fixes each native Tokio deadline before [`Timer::at`] returns;
+/// Tokio may enroll the resulting sleep with its time driver on first poll.
+/// The timer retains the source clock's exact domain and origin. Future
+/// deadlines must be created and polled under the same Tokio time driver;
+/// reached deadlines return an immediately ready future without accessing a
+/// runtime. Tokio does not expose a driver identity that this crate can
+/// validate.
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioTimer {
@@ -88,7 +90,7 @@ impl Timer for TokioTimer {
         self.clock.as_ref()
     }
 
-    /// Eagerly creates a Tokio sleep for an absolute deadline.
+    /// Creates a Tokio sleep with a fixed absolute deadline.
     ///
     /// # Parameters
     ///
@@ -96,8 +98,8 @@ impl Timer for TokioTimer {
     ///
     /// # Returns
     ///
-    /// A future whose Tokio timer registration is already active, or an
-    /// immediately ready future for a reached deadline.
+    /// A future waiting for the fixed deadline, or an immediately ready future
+    /// for a reached deadline. Tokio may register the sleep on first poll.
     ///
     /// # Errors
     ///
