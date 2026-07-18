@@ -28,7 +28,7 @@ use std::time::Instant;
 /// idle so later registrations do not need to create another native thread.
 pub struct StdTimer {
     /// Private clock handle retaining the source domain and native origin.
-    clock: Arc<StdMonotonicClock>,
+    clock: StdMonotonicClock,
     /// Process-wide scheduler shared by every standard Timer registration.
     scheduler: Arc<StdTimerScheduler>,
 }
@@ -47,7 +47,7 @@ impl StdTimer {
     #[inline]
     pub fn from_clock(clock: &StdMonotonicClock) -> Self {
         Self {
-            clock: Arc::new(clock.same_domain_handle()),
+            clock: clock.same_domain_handle(),
             scheduler: StdTimerScheduler::shared(),
         }
     }
@@ -108,7 +108,7 @@ impl Timer for StdTimer {
     /// The monotonic clock driving this timer.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
-        self.clock.as_ref()
+        &self.clock
     }
 
     /// Eagerly registers an absolute deadline with the shared scheduler.

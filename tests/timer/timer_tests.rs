@@ -13,6 +13,7 @@ use qubit_clock::{
     TimeError,
     Timer,
     TimerFuture,
+    TimerUnavailableReason,
 };
 use std::future;
 use std::sync::{
@@ -64,7 +65,9 @@ impl Timer for FailingTimer {
         &self,
         _deadline: MonotonicInstant,
     ) -> Result<TimerFuture, TimeError> {
-        Err(TimeError::TimerUnavailable)
+        Err(TimeError::TimerUnavailable {
+            reason: TimerUnavailableReason::BackendUnavailable,
+        })
     }
 }
 
@@ -107,7 +110,12 @@ fn test_timer_after_returns_registration_error_immediately() {
         Err(error) => error,
     };
 
-    assert_eq!(TimeError::TimerUnavailable, error);
+    assert_eq!(
+        TimeError::TimerUnavailable {
+            reason: TimerUnavailableReason::BackendUnavailable,
+        },
+        error,
+    );
 }
 
 #[test]
