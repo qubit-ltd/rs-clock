@@ -23,7 +23,7 @@ use std::task::{
 use std::time::Duration;
 
 #[tokio::test(start_paused = true)]
-async fn test_tokio_timer_latches_before_first_poll() {
+async fn test_tokio_timer_fixes_deadline_before_first_poll() {
     let clock = TokioMonotonicClock::new();
     let timer = TokioTimer::from_clock(&clock);
     let future = timer

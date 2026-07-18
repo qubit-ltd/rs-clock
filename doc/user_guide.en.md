@@ -35,19 +35,24 @@ let _still_usable = clock.now();
 ```
 
 `Timer::after` samples the clock and fixes its absolute deadline during the
-call. `Timer::at` accepts an absolute `MonotonicInstant`. Both methods register
-before returning. Registration failures are returned immediately; the returned
-`TimerFuture` has output `()` and only represents deadline completion. Dropping
-an incomplete future cancels its registration.
+call. `Timer::at` accepts an absolute `MonotonicInstant` and also fixes that
+deadline before returning. The returned `TimerFuture` has output `()` and waits
+only for the fixed deadline; a backend may enroll it with a native scheduler
+when the future is first polled. Dropping an incomplete future cancels the
+outstanding notification.
 
 ## Tokio timer
 
 Enable the `tokio` feature for `TokioMonotonicClock` and `TokioTimer`.
-Future-deadline registration must occur inside a runtime with time enabled. A
+Creating a future deadline must occur inside a runtime with time enabled. A
 missing or disabled driver returns `TimeError::TimerUnavailable` from `at` or
 `after`; an already reached deadline returns a ready future without runtime
-access. When time is paused, create the clock, register future deadlines,
-advance time, and poll futures under the same runtime time driver.
+access. `TokioTimer` fixes the `Sleep` deadline during the call, while Tokio may
+enroll that sleep with its time driver on first poll. Create the clock and
+future, advance paused time, and poll the future under the same runtime time
+driver.
+
+<a id="manual-time-coordination"></a>
 
 ## Deterministic manual time
 
@@ -67,19 +72,91 @@ let task = tokio::spawn(async move {
     Ok::<_, qubit_clock::TimeError>(())
 });
 
-let deadline = clock.wait_for_next_deadline_async().await;
-assert_eq!(Duration::from_secs(8), deadline.elapsed_since_origin());
-clock.advance_to_next_deadline().expect("deadline should remain active");
+let reached = clock.advance_to_next_deadline_async().await;
+assert_eq!(Duration::from_secs(8), reached.elapsed_since_origin());
 task.await??;
 # Ok(())
 # }
 ```
 
-Manual registrations are eager: `pending_waiters`, `next_deadline`,
-`wait_for_waiters`, and `wait_for_next_deadline_async` observe a returned future
-even before its first poll. Completion is latched if manual time reaches the
-deadline before polling. `advance_to_next_deadline` atomically selects and
-reaches the earliest strictly future active deadline.
+Manual timer registration is eager: `pending_waiters`, `next_deadline`, and
+the coordination APIs can observe a returned timer future before its first
+poll. Completion remains latched if manual time reaches the deadline first.
+
+- `pending_waiters()` and `next_deadline()` are immediate snapshots.
+- `wait_for_waiters()` and `wait_for_waiters_async()` are count barriers. Once
+  their threshold is observed, completion is latched even if a waiter is then
+  cancelled.
+- `wait_for_next_deadline()` and `wait_for_next_deadline_async()` observe the
+  earliest active deadline strictly later than current manual time. Their
+  return value is a snapshot and must not be used as an atomic advance target.
+- `advance_to_next_deadline()` atomically selects and reaches the current
+  earliest future deadline, returning `None` when none exists.
+- `advance_to_next_deadline_async()` waits until an active future deadline
+  exists, then performs that atomic advance. If cancellation wins the race, it
+  waits again. Cancelling the driver future does not advance manual time.
+
+### Driving multiple stages
+
+For a task that registers several deadlines in sequence, race its completion
+against the manual-time driver. This avoids guessing how many stages the task
+will execute and avoids waiting for another deadline after it has completed:
+
+```rust
+# use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
+# use std::time::Duration;
+# #[tokio::main(flavor = "current_thread")]
+# async fn main() -> Result<(), Box<dyn std::error::Error>> {
+let clock = ManualMonotonicClock::new_shared();
+let timer = clock.new_timer();
+let mut task = tokio::spawn(async move {
+    timer.after(Duration::from_secs(1))?.await;
+    timer.after(Duration::from_secs(2))?.await;
+    Ok::<_, qubit_clock::TimeError>(())
+});
+
+loop {
+    tokio::select! {
+        result = &mut task => {
+            result??;
+            break;
+        }
+        _ = clock.advance_to_next_deadline_async() => {}
+    }
+}
+# Ok(())
+# }
+```
+
+### Runtime affinity and cancellation
+
+Manual coordination futures are runtime-neutral: they use ordinary Rust
+futures and can be polled by any executor. Cancelling an observer or driver
+future removes only that observation; it does not cancel timer waiters.
+`TokioMonotonicClock` and `TokioTimer` are different: create their future
+deadlines and poll them under the same Tokio time driver that supplied the
+clock's origin.
+
+## Wall-clock projection and reanchoring
+
+A manual wall clock projects civil time from the shared monotonic timeline:
+
+```rust
+use qubit_clock::{ManualMonotonicClock, WallClock};
+use std::time::{Duration, UNIX_EPOCH};
+
+let clock = ManualMonotonicClock::new_shared();
+let wall_clock = clock.new_wall_clock(UNIX_EPOCH);
+clock.advance(Duration::from_secs(5))?;
+assert_eq!(UNIX_EPOCH + Duration::from_secs(5), wall_clock.now());
+
+wall_clock.reanchor(UNIX_EPOCH + Duration::from_secs(100));
+assert_eq!(UNIX_EPOCH + Duration::from_secs(100), wall_clock.now());
+# Ok::<_, qubit_clock::TimeError>(())
+```
+
+`reanchor` changes only the wall-time mapping. It does not move the monotonic
+timeline or alter deadlines and timer registrations.
 
 ## Blocking adaptation
 
@@ -106,6 +183,14 @@ Application components should depend on `Arc<dyn WallClock>`,
 Production assembly injects standard or Tokio implementations. Integration
 tests inject a manual clock's timer and drive that clock explicitly. No test
 mode or mock-specific branch is required in application code.
+
+## Benchmarking
+
+The process-wide standard timer scheduler benchmark is available with:
+
+```bash
+cargo bench --bench std_timer_scheduler
+```
 
 ## Errors
 

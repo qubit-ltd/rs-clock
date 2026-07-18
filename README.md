@@ -80,33 +80,27 @@ let task = tokio::spawn(async move {
     Ok::<_, qubit_clock::TimeError>(())
 });
 
-let observed = clock.wait_for_next_deadline_async().await;
-assert_eq!(Duration::from_secs(5), observed.elapsed_since_origin());
-
-clock
-    .advance_to_next_deadline()
-    .expect("the active timer should have a future deadline");
+let reached = clock.advance_to_next_deadline_async().await;
+assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
 task.await??;
 Ok(())
 }
 ```
 
-`wait_for_next_deadline_async()` is a state observer. At each poll it returns
-the current earliest strictly future active deadline; cancelled and already-due
-waiters are ignored. The returned value is a snapshot, so concurrent drivers
-should use `advance_to_next_deadline()` to select and advance atomically. The
-[user guide](doc/user_guide.en.md#11-exact-semantics-of-wait_for_next_deadline_async)
-documents the complete coordination contract, count-based barriers,
-multi-stage examples, Tokio runtime affinity, wall reanchoring, trait-object
-injection, and errors.
+`advance_to_next_deadline_async()` waits for an active future deadline and
+atomically advances to the earliest deadline still registered at that moment.
+Cancellation races are retried, and cancelling the driver future does not move
+manual time. The [user guide](doc/user_guide.en.md#manual-time-coordination)
+documents snapshots, count barriers, multi-stage coordination, runtime
+affinity, wall reanchoring, trait-object injection, and errors.
 
 ## Testing
 
 ```bash
-# Core API with the default empty feature set
-cargo test --no-default-features
+# Run tests with the default feature set
+cargo test
 
-# Core API plus regex validation
+# Run tests with all declared features
 cargo test --all-features
 
 # Project CI checks
@@ -114,9 +108,6 @@ cargo test --all-features
 
 # Check code coverage
 ./coverage.sh
-
-# Benchmark the process-wide standard Timer scheduler
-cargo bench --bench std_timer_scheduler
 ```
 
 ## License

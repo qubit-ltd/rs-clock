@@ -333,6 +333,37 @@ impl ManualMonotonicClock {
         Some(target)
     }
 
+    /// Waits for and advances to the earliest registered future deadline.
+    ///
+    /// Observation begins when the returned future is first polled. If the
+    /// observed deadline is cancelled before the clock can advance, this
+    /// method waits again. A concurrently registered earlier deadline may be
+    /// selected because
+    /// [`advance_to_next_deadline()`](Self::advance_to_next_deadline) performs
+    /// selection and advancement atomically.
+    ///
+    /// Cancelling the returned future does not advance the clock or alter any
+    /// timer registration.
+    ///
+    /// # Returns
+    ///
+    /// The same-domain instant actually reached by the clock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if waiter-observer identifiers are exhausted or if waking a
+    /// registered task panics.
+    pub async fn advance_to_next_deadline_async(
+        self: &Arc<Self>,
+    ) -> MonotonicInstant {
+        loop {
+            let _ = self.wait_for_next_deadline_async().await;
+            if let Some(deadline) = self.advance_to_next_deadline() {
+                return deadline;
+            }
+        }
+    }
+
     /// Returns a future that completes after enough waiters are registered.
     ///
     /// Timer deadline waiters contribute to the count. Reaching the count is

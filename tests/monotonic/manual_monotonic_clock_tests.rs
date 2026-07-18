@@ -146,6 +146,27 @@ fn test_manual_monotonic_clock_advance_to_current_is_noop() {
 }
 
 #[tokio::test]
+async fn test_manual_monotonic_clock_waits_and_advances_to_next_deadline_async()
+{
+    let clock = ManualMonotonicClock::new_shared();
+    let driver_clock = Arc::clone(&clock);
+    let driver = tokio::spawn(async move {
+        driver_clock.advance_to_next_deadline_async().await
+    });
+    tokio::task::yield_now().await;
+    assert!(!driver.is_finished());
+
+    let timer = clock.new_timer();
+    let timer_future = timer
+        .after(Duration::from_secs(5))
+        .expect("manual deadline should register");
+    let reached = driver.await.expect("manual-time driver should finish");
+
+    assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
+    timer_future.await;
+}
+
+#[tokio::test]
 async fn test_manual_monotonic_clock_drives_mixed_waiters_in_deadline_order() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let timer = clock.new_timer();
