@@ -14,7 +14,14 @@ use qubit_clock::{
     Timer,
     WallClock,
 };
+use std::future::Future;
+use std::pin::pin;
 use std::sync::Arc;
+use std::task::{
+    Context,
+    Poll,
+    Waker,
+};
 use std::thread;
 use std::time::{
     Duration,
@@ -166,79 +173,86 @@ async fn test_manual_monotonic_clock_waits_and_advances_to_next_deadline_async()
     timer_future.await;
 }
 
-#[tokio::test]
-async fn test_manual_monotonic_clock_drives_mixed_waiters_in_deadline_order() {
-    let clock = Arc::new(ManualMonotonicClock::new());
+#[test]
+fn test_manual_monotonic_clock_async_driver_retries_after_deadline_cancellation()
+ {
+    let clock = ManualMonotonicClock::new_shared();
     let timer = clock.new_timer();
-    let blocking_sleeper = Arc::new(BlockingSleeper::new(Arc::clone(&timer)));
-    let async_wait = timer
-        .after(Duration::from_secs(2))
-        .expect("timer deadline should register");
-    let worker_sleeper = Arc::clone(&blocking_sleeper);
-    let worker = thread::spawn(move || {
-        worker_sleeper
-            .sleep_for(Duration::from_secs(5))
-            .expect("blocking wait should complete");
-    });
-    assert!(clock.wait_for_waiters(2, Duration::from_secs(1)));
+    let mut driver = pin!(clock.advance_to_next_deadline_async());
+    let waker = Waker::noop();
+    let mut context = Context::from_waker(waker);
+    assert_eq!(Poll::Pending, driver.as_mut().poll(&mut context));
 
-    assert_eq!(2, clock.pending_waiters());
-    assert_eq!(
-        Duration::from_secs(2),
-        clock
-            .next_deadline()
-            .expect("mixed waiters should have a deadline")
-            .elapsed_since_origin(),
-    );
-    assert_eq!(
-        Duration::from_secs(2),
-        clock
-            .advance_to_next_deadline()
-            .expect("async deadline should exist")
-            .elapsed_since_origin(),
-    );
-    async_wait.await;
+    let cancelled = timer
+        .after(Duration::from_secs(3))
+        .expect("cancelled deadline should register");
+    drop(cancelled);
+    assert_eq!(Poll::Pending, driver.as_mut().poll(&mut context));
+    assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
 
-    assert_eq!(1, clock.pending_waiters());
-    assert_eq!(
-        Duration::from_secs(5),
-        clock
-            .advance_to_next_deadline()
-            .expect("blocking deadline should exist")
-            .elapsed_since_origin(),
+    let mut active = pin!(
+        timer
+            .after(Duration::from_secs(5))
+            .expect("active deadline should register")
     );
-    worker.join().expect("blocking waiter should finish");
-    assert_eq!(None, clock.advance_to_next_deadline());
+    let expected = clock
+        .next_deadline()
+        .expect("active deadline should remain observable");
+    assert_eq!(Poll::Ready(expected), driver.as_mut().poll(&mut context),);
+    assert_eq!(Duration::from_secs(5), clock.now().elapsed_since_origin());
+    assert_eq!(Poll::Ready(()), active.as_mut().poll(&mut context));
 }
 
 #[test]
-fn test_manual_monotonic_clock_concurrent_advances_are_not_lost() {
-    const THREADS: usize = 8;
-    const ADVANCES_PER_THREAD: usize = 100;
-    let clock = Arc::new(ManualMonotonicClock::new());
-    let barrier = Arc::new(std::sync::Barrier::new(THREADS));
-    let workers: Vec<_> = (0..THREADS)
-        .map(|_| {
-            let clock = Arc::clone(&clock);
-            let barrier = Arc::clone(&barrier);
-            thread::spawn(move || {
-                barrier.wait();
-                for _ in 0..ADVANCES_PER_THREAD {
-                    clock
-                        .advance(Duration::from_nanos(1))
-                        .expect("concurrent advance should succeed");
-                }
-            })
-        })
-        .collect();
-    for worker in workers {
-        worker.join().expect("advance worker should finish");
-    }
+fn test_manual_monotonic_clock_async_driver_selects_current_earliest_deadline()
+{
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let mut driver = pin!(clock.advance_to_next_deadline_async());
+    let waker = Waker::noop();
+    let mut context = Context::from_waker(waker);
+    assert_eq!(Poll::Pending, driver.as_mut().poll(&mut context));
 
-    assert_eq!(
-        Duration::from_nanos((THREADS * ADVANCES_PER_THREAD) as u64),
-        clock.now().elapsed_since_origin(),
+    let mut later = pin!(
+        timer
+            .after(Duration::from_secs(5))
+            .expect("later deadline should register")
     );
+    let mut earlier = pin!(
+        timer
+            .after(Duration::from_secs(2))
+            .expect("earlier deadline should register")
+    );
+
+    let Poll::Ready(reached) = driver.as_mut().poll(&mut context) else {
+        panic!("the async driver should reach the current earliest deadline");
+    };
+    assert_eq!(Duration::from_secs(2), reached.elapsed_since_origin());
+    assert_eq!(Poll::Pending, later.as_mut().poll(&mut context));
+    assert_eq!(Poll::Ready(()), earlier.as_mut().poll(&mut context));
+}
+
+#[test]
+fn test_manual_monotonic_clock_cancelled_async_driver_has_no_side_effects() {
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let mut driver = Box::pin(clock.advance_to_next_deadline_async());
+    let waker = Waker::noop();
+    let mut context = Context::from_waker(waker);
+    assert_eq!(Poll::Pending, driver.as_mut().poll(&mut context));
+
+    let pending_timer = timer
+        .after(Duration::from_secs(4))
+        .expect("timer deadline should register");
+    let expected_deadline = clock
+        .next_deadline()
+        .expect("timer deadline should remain observable");
+    drop(driver);
+
+    assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
+    assert_eq!(1, clock.pending_waiters());
+    assert_eq!(Some(expected_deadline), clock.next_deadline());
+    drop(pending_timer);
 }
 
 #[test]

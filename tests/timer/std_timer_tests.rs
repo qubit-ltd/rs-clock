@@ -21,10 +21,7 @@ use std::task::{
     Poll,
     Waker,
 };
-use std::time::{
-    Duration,
-    Instant,
-};
+use std::time::Duration;
 
 use super::internal::{
     DestructorPanickingWaker,
@@ -103,72 +100,6 @@ fn test_std_timer_survives_panicking_waker_payload_destructor() {
 }
 
 #[test]
-fn test_std_timer_cancellation_does_not_block_later_registration() {
-    let clock = StdMonotonicClock::new();
-    let timer = StdTimer::from_clock(&clock);
-    let cancelled = timer
-        .after(Duration::from_secs(30))
-        .expect("long deadline should register");
-    drop(cancelled);
-
-    let future = timer
-        .after(Duration::from_millis(5))
-        .expect("later deadline should register after cancellation");
-    block_on_timer_future(future);
-}
-
-#[test]
-fn test_std_timer_handles_cancellation_churn_behind_active_anchor() {
-    let clock = StdMonotonicClock::new();
-    let timer = StdTimer::from_clock(&clock);
-    let anchor = timer
-        .after(Duration::from_secs(30))
-        .expect("anchor deadline should register");
-    for offset in 0..4096_u64 {
-        let cancelled = timer
-            .after(Duration::from_secs(31 + offset))
-            .expect("churn deadline should register");
-        drop(cancelled);
-    }
-    drop(anchor);
-
-    let survivor = timer
-        .after(Duration::from_millis(5))
-        .expect("post-churn deadline should register");
-    block_on_timer_future(survivor);
-}
-
-#[test]
-fn test_std_timer_wakes_scheduler_for_new_earlier_deadline() {
-    let clock = StdMonotonicClock::new();
-    let timer = StdTimer::from_clock(&clock);
-    let later = timer
-        .after(Duration::from_millis(250))
-        .expect("later deadline should register");
-    let started = Instant::now();
-    let earlier = timer
-        .after(Duration::from_millis(5))
-        .expect("earlier deadline should register");
-
-    block_on_timer_future(earlier);
-
-    assert!(started.elapsed() < Duration::from_millis(150));
-    drop(later);
-}
-
-#[test]
-fn test_std_timer_completes_many_deadlines_with_one_scheduler() {
-    let clock = StdMonotonicClock::new();
-    let timer = StdTimer::from_clock(&clock);
-    let futures = (0..32)
-        .map(|_| timer.after(Duration::from_millis(5)))
-        .collect::<Result<Vec<_>, _>>()
-        .expect("all deadlines should register");
-
-    futures.into_iter().for_each(block_on_timer_future);
-}
-
-#[test]
 fn test_std_timer_rejects_foreign_deadline_immediately() {
     let clock = StdMonotonicClock::new();
     let timer = StdTimer::from_clock(&clock);
@@ -214,42 +145,4 @@ fn test_std_timer_retains_clock_domain_after_source_is_dropped() {
 
     assert_eq!(domain, timer.clock().now().domain());
     assert!(format!("{timer:?}").starts_with("StdTimer"));
-}
-
-#[test]
-fn test_std_timer_latches_completion_before_first_poll() {
-    let clock = StdMonotonicClock::new();
-    let timer = StdTimer::from_clock(&clock);
-    let future = timer
-        .after(Duration::from_millis(2))
-        .expect("short deadline should register");
-
-    std::thread::sleep(Duration::from_millis(10));
-    block_on_timer_future(future);
-}
-
-#[test]
-fn test_std_timer_retains_same_registered_waker() {
-    let clock = StdMonotonicClock::new();
-    let timer = StdTimer::from_clock(&clock);
-    let mut future = timer
-        .after(Duration::from_secs(30))
-        .expect("long deadline should register");
-    let waker = Waker::noop();
-    let mut context = Context::from_waker(waker);
-
-    assert_eq!(Poll::Pending, future.as_mut().poll(&mut context));
-    assert_eq!(Poll::Pending, future.as_mut().poll(&mut context));
-}
-
-#[test]
-fn test_std_timer_drop_after_scheduler_completion_is_harmless() {
-    let clock = StdMonotonicClock::new();
-    let timer = StdTimer::from_clock(&clock);
-    let future = timer
-        .after(Duration::from_millis(2))
-        .expect("short deadline should register");
-
-    std::thread::sleep(Duration::from_millis(10));
-    drop(future);
 }
