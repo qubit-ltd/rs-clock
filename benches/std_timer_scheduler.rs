@@ -7,16 +7,18 @@
 // =============================================================================
 
 use criterion::{
+    BenchmarkGroup,
     Criterion,
+    Throughput,
     criterion_group,
     criterion_main,
+    measurement::WallTime,
 };
 use qubit_clock::{
     MonotonicClock,
     StdMonotonicClock,
     TimerFuture,
 };
-use std::hint::black_box;
 use std::sync::{
     Arc,
     Barrier,
@@ -31,6 +33,18 @@ use std::task::{
     Waker,
 };
 use std::time::Duration;
+
+/// Number of persistent caller threads used by concurrent benchmarks.
+const CONCURRENT_WORKER_COUNT: usize = 16;
+
+/// Timeout futures retained by each lock-style cancellation worker.
+const REGISTRATIONS_PER_WORKER: usize = 64;
+
+/// Long deadline cancelled before it can complete.
+const CANCELLATION_DEADLINE: Duration = Duration::from_secs(60);
+
+/// Real deadline used to benchmark completion and Waker fanout.
+const COMPLETION_DEADLINE: Duration = Duration::from_millis(1);
 
 /// Notifies a thread that is synchronously polling one Timer future.
 struct ThreadWaker {
@@ -106,95 +120,133 @@ fn block_on_timer_future(mut future: TimerFuture) {
     }
 }
 
-/// Registers and cancels deadlines concurrently on independent standard Timers.
+/// Benchmarks lock-style concurrent registration and cancellation.
 ///
 /// # Parameters
 ///
-/// * `timer_count` - Number of independent Timers registering concurrently.
-/// * `registrations_per_timer` - Registrations cancelled by each Timer.
+/// * `group` - Criterion group receiving the throughput benchmark.
 ///
 /// # Panics
 ///
 /// Panics when a deadline cannot be registered or a benchmark worker panics.
-fn register_and_cancel_parallel_timers(
-    timer_count: usize,
-    registrations_per_timer: usize,
+fn benchmark_parallel_registration_and_cancellation(
+    group: &mut BenchmarkGroup<'_, WallTime>,
 ) {
-    let barrier = Arc::new(Barrier::new(timer_count));
+    let timer = StdMonotonicClock::new().new_timer();
+    let start = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT + 1));
+    let registered = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT));
+    let finished = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT + 1));
+    let stopping = Arc::new(AtomicBool::new(false));
+
     std::thread::scope(|scope| {
-        let mut workers = Vec::with_capacity(timer_count);
-        for _ in 0..timer_count {
-            let barrier = Arc::clone(&barrier);
-            workers.push(scope.spawn(move || {
-                let timer = StdMonotonicClock::new().new_timer();
-                barrier.wait();
-                for _ in 0..registrations_per_timer {
-                    let future = timer
-                        .after(Duration::from_secs(60))
-                        .expect("benchmark deadline should register");
-                    drop(future);
+        for _ in 0..CONCURRENT_WORKER_COUNT {
+            let timer = Arc::clone(&timer);
+            let start = Arc::clone(&start);
+            let registered = Arc::clone(&registered);
+            let finished = Arc::clone(&finished);
+            let stopping = Arc::clone(&stopping);
+            scope.spawn(move || {
+                loop {
+                    start.wait();
+                    if stopping.load(Ordering::Acquire) {
+                        return;
+                    }
+                    let mut futures =
+                        Vec::with_capacity(REGISTRATIONS_PER_WORKER);
+                    for _ in 0..REGISTRATIONS_PER_WORKER {
+                        futures.push(
+                            timer
+                                .after(CANCELLATION_DEADLINE)
+                                .expect("benchmark deadline should register"),
+                        );
+                    }
+                    registered.wait();
+                    drop(futures);
+                    finished.wait();
                 }
-            }));
+            });
         }
-        for worker in workers {
-            worker.join().expect("benchmark worker should finish");
-        }
+
+        let elements =
+            (CONCURRENT_WORKER_COUNT * REGISTRATIONS_PER_WORKER) as u64;
+        group.throughput(Throughput::Elements(elements));
+        group.bench_function(
+            "lock_style_registration_and_cancellation",
+            |bencher| {
+                bencher.iter(|| {
+                    start.wait();
+                    finished.wait();
+                });
+            },
+        );
+
+        stopping.store(true, Ordering::Release);
+        start.wait();
     });
 }
 
-/// Completes deadlines concurrently on independent standard Timers.
+/// Benchmarks concurrent deadline completion and Waker fanout.
 ///
 /// # Parameters
 ///
-/// * `timer_count` - Number of independent Timers completing concurrently.
+/// * `group` - Criterion group receiving the throughput benchmark.
 ///
 /// # Panics
 ///
 /// Panics when a deadline cannot be registered or a benchmark worker panics.
-fn complete_parallel_timers(timer_count: usize) {
-    let barrier = Arc::new(Barrier::new(timer_count));
+fn benchmark_parallel_deadline_completion(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+) {
+    let timer = StdMonotonicClock::new().new_timer();
+    let start = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT + 1));
+    let finished = Arc::new(Barrier::new(CONCURRENT_WORKER_COUNT + 1));
+    let stopping = Arc::new(AtomicBool::new(false));
+
     std::thread::scope(|scope| {
-        let mut workers = Vec::with_capacity(timer_count);
-        for _ in 0..timer_count {
-            let barrier = Arc::clone(&barrier);
-            workers.push(scope.spawn(move || {
-                let timer = StdMonotonicClock::new().new_timer();
-                barrier.wait();
-                let future = timer
-                    .after(Duration::from_millis(1))
-                    .expect("benchmark deadline should register");
-                block_on_timer_future(future);
-            }));
+        for _ in 0..CONCURRENT_WORKER_COUNT {
+            let timer = Arc::clone(&timer);
+            let start = Arc::clone(&start);
+            let finished = Arc::clone(&finished);
+            let stopping = Arc::clone(&stopping);
+            scope.spawn(move || {
+                loop {
+                    start.wait();
+                    if stopping.load(Ordering::Acquire) {
+                        return;
+                    }
+                    let future = timer
+                        .after(COMPLETION_DEADLINE)
+                        .expect("benchmark deadline should register");
+                    block_on_timer_future(future);
+                    finished.wait();
+                }
+            });
         }
-        for worker in workers {
-            worker.join().expect("benchmark worker should finish");
-        }
+
+        group.throughput(Throughput::Elements(CONCURRENT_WORKER_COUNT as u64));
+        group.bench_function("parallel_deadline_completion", |bencher| {
+            bencher.iter(|| {
+                start.wait();
+                finished.wait();
+            });
+        });
+
+        stopping.store(true, Ordering::Release);
+        start.wait();
     });
 }
 
-/// Benchmarks shared-scheduler contention during registration and cancellation.
-fn benchmark_parallel_registration_and_cancellation(criterion: &mut Criterion) {
-    criterion.bench_function(
-        "std_timer/parallel_registration_and_cancellation",
-        |bencher| {
-            bencher.iter(|| {
-                register_and_cancel_parallel_timers(
-                    black_box(8),
-                    black_box(32),
-                );
-            });
-        },
-    );
-}
-
-/// Benchmarks parallel deadline completion and Waker fanout.
-fn benchmark_parallel_deadline_completion(criterion: &mut Criterion) {
-    criterion.bench_function(
-        "std_timer/parallel_deadline_completion",
-        |bencher| {
-            bencher.iter(|| complete_parallel_timers(black_box(16)));
-        },
-    );
+/// Benchmarks shared standard Timer behavior under downstream-style
+/// concurrency.
+///
+/// # Parameters
+///
+/// * `criterion` - Criterion registry receiving the standard Timer group.
+fn benchmark_std_timer_scheduler(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("std_timer");
+    benchmark_parallel_registration_and_cancellation(&mut group);
+    benchmark_parallel_deadline_completion(&mut group);
+    group.finish();
 }
 
 criterion_group! {
@@ -203,8 +255,6 @@ criterion_group! {
         .sample_size(10)
         .warm_up_time(Duration::from_secs(1))
         .measurement_time(Duration::from_secs(2));
-    targets =
-        benchmark_parallel_registration_and_cancellation,
-        benchmark_parallel_deadline_completion
+    targets = benchmark_std_timer_scheduler
 }
 criterion_main!(benches);
