@@ -32,14 +32,14 @@ time 永不倒退，适合测量耗时、实现 retry 和 timeout。每个 clock
 
 ```toml
 [dependencies]
-qubit-clock = "0.9"
+qubit-clock = "0.10"
 ```
 
 需要 Tokio clock 和 timer 类型时启用对应 feature：
 
 ```toml
 [dependencies]
-qubit-clock = { version = "0.9", features = ["tokio"] }
+qubit-clock = { version = "0.10", features = ["tokio"] }
 ```
 
 该 feature 仅公开 `TokioMonotonicClock` 和 `TokioTimer`。Manual timer 与 manual
@@ -100,6 +100,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 manual time。[用户手册](doc/user_guide.zh_CN.md#manual-time-coordination)详细说明了
 快照、count barrier、多阶段协调、runtime affinity、wall reanchor、trait object
 注入和错误处理。
+
+同步 driver 线程可使用 `advance_to_next_deadline_after_waiters()`：它等待当前 waiter
+数量条件，并在同一个时钟状态锁内完成推进，从而消除观察与推进之间的取消窗口。
 
 ## 测试
 

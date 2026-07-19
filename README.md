@@ -33,14 +33,14 @@ directly with `clock.new_timer()`.
 
 ```toml
 [dependencies]
-qubit-clock = "0.9"
+qubit-clock = "0.10"
 ```
 
 Enable the Tokio-backed clock and timer when required:
 
 ```toml
 [dependencies]
-qubit-clock = { version = "0.9", features = ["tokio"] }
+qubit-clock = { version = "0.10", features = ["tokio"] }
 ```
 
 This feature exposes `TokioMonotonicClock` and `TokioTimer`. Manual timers and
@@ -105,6 +105,11 @@ Cancellation races are retried, and cancelling the driver future does not move
 manual time. The [user guide](doc/user_guide.en.md#manual-time-coordination)
 documents snapshots, count barriers, multi-stage coordination, runtime
 affinity, wall reanchoring, trait-object injection, and errors.
+
+Synchronous driver threads can use
+`advance_to_next_deadline_after_waiters()` to wait for a current waiter-count
+condition and advance under the same clock-state lock, avoiding a cancellation
+gap between observation and advancement.
 
 ## Testing
 

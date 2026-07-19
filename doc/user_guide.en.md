@@ -46,8 +46,8 @@ outstanding notification.
 Enable the `tokio` feature for `TokioMonotonicClock` and `TokioTimer`.
 Creating a future deadline must occur inside a runtime with time enabled. A
 missing runtime returns `TimeError::TimerUnavailable` with
-`TimerUnavailableReason::RuntimeNotEntered`; a disabled time driver reports
-`TimerUnavailableReason::TimeDriverDisabled`. An already reached deadline
+`TimerUnavailableError::RuntimeNotEntered`; a disabled time driver reports
+`TimerUnavailableError::TimeDriverDisabled`. An already reached deadline
 returns a ready future without runtime access. `TokioTimer` fixes the `Sleep`
 deadline during the call, while Tokio may enroll that sleep with its time
 driver on first poll. Create the clock and future, advance paused time, and poll
@@ -107,6 +107,10 @@ poll. Completion remains latched if manual time reaches the deadline first.
   return value is a snapshot and must not be used as an atomic advance target.
 - `advance_to_next_deadline()` atomically selects and reaches the current
   earliest future deadline, returning `None` when none exists.
+- `advance_to_next_deadline_after_waiters()` blocks until the current waiter
+  count reaches its threshold and a future deadline exists, then checks both
+  conditions and advances under the same clock-state lock. This avoids a
+  cancellation gap between a count observation and the advance.
 - `advance_to_next_deadline_async()` waits until an active future deadline
   exists, then performs that atomic advance. If cancellation wins the race, it
   waits again. Cancelling the driver future does not advance manual time.
@@ -214,8 +218,9 @@ throughput for 1, 2, 4, 8, and 16 concurrent caller threads.
 
 - `ClockDomainMismatch`: a deadline came from another monotonic domain.
 - `InstantOverflow`: relative or native deadline conversion overflowed.
-- `TimerUnavailable { reason }`: deadline registration failed because the
+- `TimerUnavailable { source }`: deadline registration failed because the
   scheduler worker, async runtime, time driver, or custom backend was
-  unavailable. `TimerUnavailableReason` identifies the specific cause.
+  unavailable. `TimerUnavailableError` identifies the backend and preserves
+  its available source error.
 - `CannotMoveBackward`: manual time was moved backward.
 - `InvalidInstantOrder`: instant arithmetic used an invalid order.
