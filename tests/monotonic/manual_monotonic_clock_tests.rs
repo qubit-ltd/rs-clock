@@ -16,7 +16,10 @@ use qubit_clock::{
 };
 use std::future::Future;
 use std::pin::pin;
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    mpsc,
+};
 use std::task::{
     Context,
     Poll,
@@ -82,7 +85,10 @@ fn test_manual_monotonic_clock_advance_to_rejects_backward_target() {
         .advance(Duration::from_secs(10))
         .expect("short advance should succeed");
 
-    assert_eq!(Err(TimeError::CannotMoveBackward), clock.advance_to(start),);
+    assert!(matches!(
+        clock.advance_to(start),
+        Err(TimeError::CannotMoveBackward),
+    ));
 }
 
 #[test]
@@ -91,13 +97,15 @@ fn test_manual_monotonic_clock_advance_to_rejects_foreign_domain() {
     let foreign = ManualMonotonicClock::new().now();
     let expected = clock.now().domain();
 
-    assert_eq!(
-        Err(TimeError::ClockDomainMismatch {
-            expected,
-            actual: foreign.domain(),
-        }),
-        clock.advance_to(foreign),
-    );
+    let Err(TimeError::ClockDomainMismatch {
+        expected: actual_expected,
+        actual,
+    }) = clock.advance_to(foreign)
+    else {
+        panic!("foreign target should report a domain mismatch");
+    };
+    assert_eq!(expected, actual_expected);
+    assert_eq!(foreign.domain(), actual);
 }
 
 #[test]
@@ -136,10 +144,10 @@ fn test_manual_monotonic_clock_reports_advance_overflow() {
     clock
         .advance(Duration::MAX)
         .expect("maximum duration should fit from zero");
-    assert_eq!(
-        Err(TimeError::InstantOverflow),
+    assert!(matches!(
         clock.advance(Duration::from_nanos(1)),
-    );
+        Err(TimeError::InstantOverflow),
+    ));
 }
 
 #[test]
@@ -150,6 +158,143 @@ fn test_manual_monotonic_clock_advance_to_current_is_noop() {
         .advance_to(current)
         .expect("advancing to current instant should succeed");
     assert_eq!(current, clock.now());
+}
+
+/// Verifies that an existing waiter advances before guard representation.
+#[test]
+fn test_manual_monotonic_clock_advances_after_existing_waiter() {
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let _pending = timer
+        .after(Duration::from_secs(5))
+        .expect("manual deadline should register");
+
+    let reached = clock
+        .advance_to_next_deadline_after_waiters(1, Duration::MAX)
+        .expect("existing waiter should advance immediately");
+
+    assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
+    assert_eq!(reached, clock.now());
+}
+
+/// Verifies that the synchronous driver waits for a waiter registration.
+#[test]
+fn test_manual_monotonic_clock_waits_then_advances_after_waiter() {
+    let clock = ManualMonotonicClock::new_shared();
+    let driver_clock = Arc::clone(&clock);
+    let (started_sender, started_receiver) = mpsc::channel();
+    let driver = thread::spawn(move || {
+        started_sender
+            .send(())
+            .expect("driver start should be observable");
+        driver_clock
+            .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
+    });
+    started_receiver
+        .recv()
+        .expect("driver should start before registration");
+
+    let timer = clock.new_timer();
+    let _pending = timer
+        .after(Duration::from_secs(4))
+        .expect("manual deadline should register");
+    let reached = driver
+        .join()
+        .expect("manual-time driver should finish")
+        .expect("registered waiter should satisfy the driver");
+
+    assert_eq!(Duration::from_secs(4), reached.elapsed_since_origin());
+}
+
+/// Verifies that the synchronous driver selects the earliest active deadline.
+#[test]
+fn test_manual_monotonic_clock_waiter_driver_selects_earliest_deadline() {
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let _later = timer
+        .after(Duration::from_secs(7))
+        .expect("later deadline should register");
+    let _earlier = timer
+        .after(Duration::from_secs(3))
+        .expect("earlier deadline should register");
+
+    let reached = clock
+        .advance_to_next_deadline_after_waiters(2, Duration::ZERO)
+        .expect("two existing waiters should satisfy the driver");
+
+    assert_eq!(Duration::from_secs(3), reached.elapsed_since_origin());
+}
+
+/// Verifies that cancelled waiters do not satisfy the active-count condition.
+#[test]
+fn test_manual_monotonic_clock_waiter_driver_ignores_cancelled_waiters() {
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let cancelled = timer
+        .after(Duration::from_secs(2))
+        .expect("cancelled deadline should register");
+    drop(cancelled);
+    assert_eq!(0, clock.pending_waiters());
+
+    let _first = timer
+        .after(Duration::from_secs(5))
+        .expect("first active deadline should register");
+    assert_eq!(
+        None,
+        clock.advance_to_next_deadline_after_waiters(2, Duration::ZERO),
+    );
+    let _second = timer
+        .after(Duration::from_secs(8))
+        .expect("second active deadline should register");
+    let reached = clock
+        .advance_to_next_deadline_after_waiters(2, Duration::ZERO)
+        .expect("two active waiters should satisfy the driver");
+
+    assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
+}
+
+/// Verifies that the synchronous driver returns without changing manual time.
+#[test]
+fn test_manual_monotonic_clock_waiter_driver_times_out() {
+    let clock = ManualMonotonicClock::new();
+
+    assert_eq!(
+        None,
+        clock.advance_to_next_deadline_after_waiters(1, Duration::ZERO),
+    );
+    assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
+}
+
+/// Verifies that an unrepresentable real-time guard is rejected.
+#[test]
+fn test_manual_monotonic_clock_waiter_driver_rejects_unrepresentable_guard() {
+    let clock = ManualMonotonicClock::new();
+
+    assert_eq!(
+        None,
+        clock.advance_to_next_deadline_after_waiters(1, Duration::MAX),
+    );
+    assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
+}
+
+/// Verifies that a zero count still requires an active future deadline.
+#[test]
+fn test_manual_monotonic_clock_zero_waiter_count_requires_deadline() {
+    let clock = ManualMonotonicClock::new_shared();
+    assert_eq!(
+        None,
+        clock.advance_to_next_deadline_after_waiters(0, Duration::ZERO),
+    );
+
+    let timer = clock.new_timer();
+    let _pending = timer
+        .after(Duration::from_secs(6))
+        .expect("manual deadline should register");
+    let reached = clock
+        .advance_to_next_deadline_after_waiters(0, Duration::ZERO)
+        .expect("zero count should advance once a deadline exists");
+
+    assert_eq!(Duration::from_secs(6), reached.elapsed_since_origin());
 }
 
 #[tokio::test]

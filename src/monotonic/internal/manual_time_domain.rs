@@ -201,6 +201,58 @@ impl ManualTimeDomain {
         Some((target_elapsed, effects))
     }
 
+    /// Waits for enough timer waiters and advances to the earliest deadline.
+    ///
+    /// The waiter-count check, future-deadline selection, and logical-time
+    /// update occur while one state lock is held. Registrations that are
+    /// already due may contribute to `expected_count`, but a future deadline
+    /// must still exist before the clock advances.
+    ///
+    /// # Parameters
+    ///
+    /// * `expected_count` - Minimum active timer waiter count.
+    /// * `real_timeout` - Maximum native time spent waiting for both
+    ///   conditions.
+    ///
+    /// # Returns
+    ///
+    /// The reached elapsed duration and due effects. Returns `None` when the
+    /// conditions remain unsatisfied until the real-time guard expires or the
+    /// guard cannot be represented.
+    pub(crate) fn advance_to_next_deadline_after_waiters(
+        &self,
+        expected_count: usize,
+        real_timeout: Duration,
+    ) -> Option<(Duration, AdvanceEffects)> {
+        let mut state = self.lock_state();
+        if let Some(advance) =
+            Self::advance_if_waiters_ready(&mut state, expected_count)
+        {
+            return Some(advance);
+        }
+        let real_deadline = Instant::now().checked_add(real_timeout)?;
+        loop {
+            let remaining =
+                real_deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return None;
+            }
+            let (next_state, wait_result) = self
+                .waiters_changed
+                .wait_timeout(state, remaining)
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            state = next_state;
+            if let Some(advance) =
+                Self::advance_if_waiters_ready(&mut state, expected_count)
+            {
+                return Some(advance);
+            }
+            if wait_result.timed_out() {
+                return None;
+            }
+        }
+    }
+
     /// Waits in real time for the timer waiter count to reach `expected_count`.
     ///
     /// # Parameters
@@ -448,6 +500,32 @@ impl ManualTimeDomain {
         self.state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Advances locked state when its waiter and deadline conditions are met.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Locked mutable state to inspect and possibly advance.
+    /// * `expected_count` - Minimum active timer waiter count.
+    ///
+    /// # Returns
+    ///
+    /// The reached elapsed duration and due effects, or `None` while either
+    /// condition remains unsatisfied.
+    #[inline]
+    fn advance_if_waiters_ready(
+        state: &mut ManualMonotonicState,
+        expected_count: usize,
+    ) -> Option<(Duration, AdvanceEffects)> {
+        if state.waiter_count() < expected_count {
+            return None;
+        }
+        let target_elapsed =
+            state.waiters.next_future_deadline(state.elapsed)?;
+        state.elapsed = target_elapsed;
+        let effects = Self::collect_advance_effects(state);
+        Some((target_elapsed, effects))
     }
 
     /// Collects due task wakers while state remains locked.

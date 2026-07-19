@@ -334,6 +334,53 @@ impl ManualMonotonicClock {
         Some(target)
     }
 
+    /// Waits for enough timer waiters and advances to the earliest deadline.
+    ///
+    /// The current waiter count, earliest future deadline, and logical-time
+    /// update are selected atomically under one clock-state lock. This avoids
+    /// the cancellation gap created by separately calling
+    /// [`wait_for_waiters()`](Self::wait_for_waiters) and
+    /// [`advance_to_next_deadline()`](Self::advance_to_next_deadline).
+    /// Registrations whose deadlines are already due may contribute to the
+    /// count, but the clock advances only when a future deadline exists. A zero
+    /// `expected_count` removes the count requirement without removing the
+    /// future-deadline requirement. An already satisfied call advances before
+    /// `real_timeout` is checked for representability.
+    ///
+    /// # Parameters
+    ///
+    /// * `expected_count` - Minimum active timer waiter count.
+    /// * `real_timeout` - Maximum real time spent waiting for the count and a
+    ///   future deadline.
+    ///
+    /// # Returns
+    ///
+    /// The same-domain instant reached by the clock. Returns `None` when the
+    /// conditions remain unsatisfied until the real-time guard expires or the
+    /// guard cannot be represented.
+    ///
+    /// # Panics
+    ///
+    /// Panics if waking a registered task panics. Every waker collected for
+    /// this advance is attempted before the first panic is resumed. The
+    /// logical-time update is already committed and is not rolled back during
+    /// unwinding.
+    #[inline]
+    pub fn advance_to_next_deadline_after_waiters(
+        &self,
+        expected_count: usize,
+        real_timeout: Duration,
+    ) -> Option<MonotonicInstant> {
+        let (target_elapsed, effects) =
+            self.time_domain.advance_to_next_deadline_after_waiters(
+                expected_count,
+                real_timeout,
+            )?;
+        let target = MonotonicInstant::new(self.domain, target_elapsed);
+        Self::notify_time_changed(effects);
+        Some(target)
+    }
+
     /// Waits for and advances to the earliest registered future deadline.
     ///
     /// Observation begins when the returned future is first polled. If the
