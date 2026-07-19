@@ -41,8 +41,8 @@ let _still_usable = clock.now();
 
 `TokioMonotonicClock` 与 `TokioTimer` 需要启用 `tokio` feature。创建未来 deadline
 必须发生在启用 time 的 runtime 中；未进入 runtime 时，`at`/`after` 返回带有
-`TimerUnavailableReason::RuntimeNotEntered` 的 `TimeError::TimerUnavailable`；runtime
-禁用 time driver 时 reason 为 `TimerUnavailableReason::TimeDriverDisabled`。已经到达
+`TimerUnavailableError::RuntimeNotEntered` 的 `TimeError::TimerUnavailable`；runtime
+禁用 time driver 时 source 为 `TimerUnavailableError::TimeDriverDisabled`。已经到达
 的 deadline 无需访问 runtime，会直接返回 ready future。`TokioTimer` 在调用期间固定
 `Sleep` 的 deadline，但 Tokio 可以到首次 poll 时才把 sleep 登记到 time driver。
 clock、future、paused time 推进和 future poll 必须使用同一个 runtime time driver。
@@ -96,6 +96,9 @@ Manual timer 的注册是 eager 的：timer future 尚未首次 poll，`pending_
   manual time 的最早有效 deadline。返回值只是快照，不能直接充当原子推进目标。
 - `advance_to_next_deadline()` 原子选择并到达当前最早未来 deadline；不存在时返回
   `None`。
+- `advance_to_next_deadline_after_waiters()` 会阻塞至当前 waiter 数达到阈值且存在未来
+  deadline，并在同一个时钟状态锁内检查两个条件和推进，从而消除 count 观察与推进
+  之间的取消窗口。
 - `advance_to_next_deadline_async()` 先等待有效未来 deadline，再执行原子推进；若
   取消操作赢得竞争，它会重新等待。取消 driver future 不会推进 manual time。
 
@@ -195,7 +198,8 @@ cargo bench --bench std_timer_scheduler
 
 - `ClockDomainMismatch`：deadline 来自另一个 monotonic domain。
 - `InstantOverflow`：相对 deadline 或原生 deadline 转换溢出。
-- `TimerUnavailable { reason }`：scheduler worker、async runtime、time driver 或自定义
-  backend 不可用，导致 deadline 注册失败；`TimerUnavailableReason` 标识具体原因。
+- `TimerUnavailable { source }`：scheduler worker、async runtime、time driver 或自定义
+  backend 不可用，导致 deadline 注册失败；`TimerUnavailableError` 标识 backend
+  并保留可用的原始错误。
 - `CannotMoveBackward`：manual time 被要求倒退。
 - `InvalidInstantOrder`：instant 运算顺序无效。
