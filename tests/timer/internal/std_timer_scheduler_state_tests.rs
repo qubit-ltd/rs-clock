@@ -11,31 +11,51 @@ use qubit_clock::{
     StdTimer,
     Timer,
 };
-use std::time::{
-    Duration,
-    Instant,
+use std::sync::mpsc::sync_channel;
+use std::{
+    thread,
+    time::Duration,
 };
 
 use super::block_on_timer_future;
 
+/// Delay retained by the scheduler before the earlier registration arrives.
+const LATER_DEADLINE_DELAY: Duration = Duration::from_secs(30);
+
+/// Delay used by the registration that must interrupt the worker wait.
+const EARLIER_DEADLINE_DELAY: Duration = Duration::from_millis(10);
+
+/// Generous real-time guard that detects a worker left on the later deadline.
+const EARLIER_COMPLETION_GUARD: Duration = Duration::from_secs(5);
+
+/// Verifies that a newly registered earlier deadline interrupts the worker's
+/// existing wait for a much later deadline.
 #[test]
 fn test_std_timer_scheduler_state_wakes_for_new_earlier_deadline() {
     let clock = StdMonotonicClock::new();
     let timer = StdTimer::from_clock(&clock);
     let later = timer
-        .after(Duration::from_millis(250))
+        .after(LATER_DEADLINE_DELAY)
         .expect("later deadline should register");
-    let started = Instant::now();
     let earlier = timer
-        .after(Duration::from_millis(5))
+        .after(EARLIER_DEADLINE_DELAY)
         .expect("earlier deadline should register");
+    let (completion_sender, completion_receiver) = sync_channel(1);
+    let waiter = thread::spawn(move || {
+        block_on_timer_future(earlier);
+        let _ = completion_sender.send(());
+    });
 
-    block_on_timer_future(earlier);
-
-    assert!(started.elapsed() < Duration::from_millis(150));
+    let completion = completion_receiver.recv_timeout(EARLIER_COMPLETION_GUARD);
     drop(later);
+
+    completion.expect("earlier deadline should complete before liveness guard");
+    waiter
+        .join()
+        .expect("earlier deadline waiter should finish");
 }
 
+/// Verifies that the shared scheduler completes a batch of equal deadlines.
 #[test]
 fn test_std_timer_scheduler_state_completes_many_deadlines() {
     let clock = StdMonotonicClock::new();
