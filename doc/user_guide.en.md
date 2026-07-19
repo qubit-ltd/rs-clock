@@ -60,6 +60,20 @@ the future under the same runtime time driver.
 Keep the manual clock as the test control plane and inject its timer into the
 component under test:
 
+Manual timers and their coordination futures are executor-neutral and do not
+require the `qubit-clock/tokio` feature. The examples in this section choose
+Tokio only to run, spawn, and select tasks. To run them in tests, declare Tokio
+as a direct development dependency:
+
+```toml
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+```
+
+Deterministic manual time controls logical time, deadline selection, and
+deadline completion. It does not define the wake order of waiters sharing one
+deadline or the order in which an executor polls ready tasks.
+
 ```rust
 use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
 use std::time::Duration;

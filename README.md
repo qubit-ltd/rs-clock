@@ -43,7 +43,15 @@ Enable the Tokio-backed clock and timer when required:
 qubit-clock = { version = "0.9", features = ["tokio"] }
 ```
 
-Manual timers and manual coordination are runtime-neutral.
+This feature exposes `TokioMonotonicClock` and `TokioTimer`. Manual timers and
+manual coordination futures are executor-neutral and do not require it. The
+async examples below choose Tokio only to run and spawn tasks. To copy them
+into tests, declare Tokio directly:
+
+```toml
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+```
 
 ## Real-time use
 
@@ -67,23 +75,27 @@ println!("started at {started_at:?}");
 Keep one shared manual clock as the test control plane and derive all consumer
 capabilities from it:
 
+Here, deterministic means that logical time, deadline selection, and deadline
+completion are controlled explicitly. The wake order of waiters sharing one
+deadline and the order in which an executor polls ready tasks are unspecified.
+
 ```rust
 use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
 use std::time::Duration;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-let clock = ManualMonotonicClock::new_shared();
-let timer = clock.new_timer();
-let task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(5))?.await;
-    Ok::<_, qubit_clock::TimeError>(())
-});
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let task = tokio::spawn(async move {
+        timer.after(Duration::from_secs(5))?.await;
+        Ok::<_, qubit_clock::TimeError>(())
+    });
 
-let reached = clock.advance_to_next_deadline_async().await;
-assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
-task.await??;
-Ok(())
+    let reached = clock.advance_to_next_deadline_async().await;
+    assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
+    task.await??;
+    Ok(())
 }
 ```
 

@@ -42,7 +42,14 @@ qubit-clock = "0.9"
 qubit-clock = { version = "0.9", features = ["tokio"] }
 ```
 
-Manual timer 和 manual 协调与 runtime 无关。
+该 feature 仅公开 `TokioMonotonicClock` 和 `TokioTimer`。Manual timer 与 manual
+协调 future 不绑定 executor，也不需要启用该 feature。下文异步示例只选择 Tokio
+来运行和派生任务；复制到测试中时，需要直接声明 Tokio：
+
+```toml
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+```
 
 ## 使用真实时间
 
@@ -65,23 +72,26 @@ println!("started at {started_at:?}");
 
 保留一个共享 manual clock 作为测试控制面，并从它派生所有消费能力：
 
+这里的“确定性”是指逻辑时间、deadline 选择和 deadline 完成都由测试显式控制；
+相同 deadline 的 waiter 唤醒顺序，以及 executor poll 就绪任务的顺序均不作保证。
+
 ```rust
 use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
 use std::time::Duration;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-let clock = ManualMonotonicClock::new_shared();
-let timer = clock.new_timer();
-let task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(5))?.await;
-    Ok::<_, qubit_clock::TimeError>(())
-});
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let task = tokio::spawn(async move {
+        timer.after(Duration::from_secs(5))?.await;
+        Ok::<_, qubit_clock::TimeError>(())
+    });
 
-let reached = clock.advance_to_next_deadline_async().await;
-assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
-task.await??;
-Ok(())
+    let reached = clock.advance_to_next_deadline_async().await;
+    assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
+    task.await??;
+    Ok(())
 }
 ```
 
