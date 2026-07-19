@@ -73,8 +73,12 @@ impl Drop for ReentrantDropWaker {
 fn test_manual_deadline_future_returns_earliest_existing_deadline() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let timer = clock.new_timer();
-    let _later = timer.after(Duration::from_secs(5)).unwrap();
-    let _earlier = timer.after(Duration::from_secs(2)).unwrap();
+    let _later = timer
+        .after(Duration::from_secs(5))
+        .expect("later deadline should register");
+    let _earlier = timer
+        .after(Duration::from_secs(2))
+        .expect("earlier deadline should register");
     let mut observer = pin!(clock.wait_for_next_deadline_async());
     let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
@@ -90,14 +94,18 @@ fn test_manual_deadline_future_ignores_cancelled_deadline_before_poll() {
     let clock = ManualMonotonicClock::new_shared();
     let timer = clock.new_timer();
     let mut observer = pin!(clock.wait_for_next_deadline_async());
-    let cancelled = timer.after(Duration::from_secs(3)).unwrap();
+    let cancelled = timer
+        .after(Duration::from_secs(3))
+        .expect("cancelled deadline should register");
     drop(cancelled);
     let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
 
     assert_eq!(Poll::Pending, observer.as_mut().poll(&mut context));
 
-    let _active = timer.after(Duration::from_secs(2)).unwrap();
+    let _active = timer
+        .after(Duration::from_secs(2))
+        .expect("active deadline should register");
     let Poll::Ready(deadline) = observer.as_mut().poll(&mut context) else {
         panic!("the active future deadline should be ready");
     };
@@ -108,7 +116,9 @@ fn test_manual_deadline_future_ignores_cancelled_deadline_before_poll() {
 fn test_manual_deadline_future_ignores_already_due_waiters() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let timer = clock.new_timer();
-    let due = timer.after(Duration::from_secs(1)).unwrap();
+    let due = timer
+        .after(Duration::from_secs(1))
+        .expect("due deadline should register");
     clock
         .advance(Duration::from_secs(1))
         .expect("short manual advance should succeed");
@@ -117,7 +127,9 @@ fn test_manual_deadline_future_ignores_already_due_waiters() {
     let mut context = Context::from_waker(waker);
     assert_eq!(Poll::Pending, observer.as_mut().poll(&mut context));
 
-    let _future = timer.after(Duration::from_secs(2)).unwrap();
+    let _future = timer
+        .after(Duration::from_secs(2))
+        .expect("future deadline should register");
 
     let Poll::Ready(deadline) = observer.as_mut().poll(&mut context) else {
         panic!("new future deadline should be ready");
@@ -136,7 +148,9 @@ fn test_manual_deadline_future_wakes_when_deadline_registers() {
     let mut context = Context::from_waker(&waker);
     assert_eq!(Poll::Pending, observer.as_mut().poll(&mut context));
 
-    let _future = timer.after(Duration::from_secs(2)).unwrap();
+    let _future = timer
+        .after(Duration::from_secs(2))
+        .expect("wake-triggering deadline should register");
 
     assert_eq!(1, wake_counter.wakes.load(Ordering::SeqCst));
     assert!(observer.as_mut().poll(&mut context).is_ready());
@@ -189,8 +203,12 @@ fn test_manual_deadline_future_returns_earliest_deadline_at_poll() {
     let clock = ManualMonotonicClock::new_shared();
     let timer = clock.new_timer();
     let mut observer = pin!(clock.wait_for_next_deadline_async());
-    let _later = timer.after(Duration::from_secs(4)).unwrap();
-    let _earlier = timer.after(Duration::from_secs(1)).unwrap();
+    let _later = timer
+        .after(Duration::from_secs(4))
+        .expect("later deadline should register");
+    let _earlier = timer
+        .after(Duration::from_secs(1))
+        .expect("earlier deadline should register");
     let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
 
@@ -211,7 +229,9 @@ fn test_manual_deadline_future_unregisters_on_drop() {
     assert_eq!(Poll::Pending, observer.as_mut().poll(&mut context));
     drop(observer);
 
-    let _future = timer.after(Duration::from_secs(2)).unwrap();
+    let _future = timer
+        .after(Duration::from_secs(2))
+        .expect("post-drop deadline should register");
 
     assert_eq!(0, wake_counter.wakes.load(Ordering::SeqCst));
 }
