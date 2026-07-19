@@ -15,9 +15,10 @@ use qubit_clock::{
     TimeError,
     Timer,
     TimerFuture,
-    TimerUnavailableReason,
+    TimerUnavailableError,
 };
 use std::future::Future;
+use std::io;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{
@@ -133,7 +134,10 @@ impl Timer for FailingTimer {
         _deadline: MonotonicInstant,
     ) -> Result<TimerFuture, TimeError> {
         Err(TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::BackendUnavailable,
+            source: TimerUnavailableError::BackendUnavailable {
+                backend: "test",
+                source: Box::new(io::Error::other("test backend unavailable")),
+            },
         })
     }
 }
@@ -144,10 +148,12 @@ fn test_blocking_sleeper_returns_registration_error_without_parking() {
     let deadline = clock.now();
     let sleeper = BlockingSleeper::new(Arc::new(FailingTimer { clock }));
 
-    assert_eq!(
-        Err(TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::BackendUnavailable,
-        }),
-        sleeper.sleep_until(deadline),
-    );
+    let Err(TimeError::TimerUnavailable {
+        source: TimerUnavailableError::BackendUnavailable { backend, source },
+    }) = sleeper.sleep_until(deadline)
+    else {
+        panic!("failing timer should report backend unavailability");
+    };
+    assert_eq!("test", backend);
+    assert_eq!("test backend unavailable", source.to_string());
 }

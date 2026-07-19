@@ -7,7 +7,7 @@
 // =============================================================================
 //! Defines errors produced by time-domain operations.
 
-use super::TimerUnavailableReason;
+use super::TimerUnavailableError;
 use crate::ClockDomain;
 use thiserror::Error;
 
@@ -50,7 +50,7 @@ use thiserror::Error;
 /// }
 /// ```
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Error)]
 pub enum TimeError {
     /// Two monotonic instants belong to different clock domains.
     #[error(
@@ -72,9 +72,10 @@ pub enum TimeError {
     #[error("earlier monotonic instant is later than the current instant")]
     InvalidInstantOrder,
     /// A timer could not register a requested deadline.
-    #[error("monotonic timer is unavailable: {reason}")]
+    #[error("monotonic timer is unavailable: {source}")]
     TimerUnavailable {
-        /// Resource or backend condition that prevented registration.
-        reason: TimerUnavailableReason,
+        /// Backend error that prevented timer registration.
+        #[source]
+        source: TimerUnavailableError,
     },
 }

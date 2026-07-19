@@ -12,7 +12,7 @@ use qubit_clock::{
     MonotonicInstant,
     TimeError,
     Timer,
-    TimerUnavailableReason,
+    TimerUnavailableError,
     TokioMonotonicClock,
     TokioTimer,
 };
@@ -40,12 +40,13 @@ fn test_tokio_timer_reports_missing_driver_at_registration() {
     let clock = TokioMonotonicClock::new();
     let timer = TokioTimer::from_clock(&clock);
 
-    assert_eq!(
-        Err(TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::RuntimeNotEntered,
-        }),
-        timer.after(Duration::from_secs(1)).map(drop),
-    );
+    let Err(TimeError::TimerUnavailable {
+        source: TimerUnavailableError::RuntimeNotEntered { source },
+    }) = timer.after(Duration::from_secs(1))
+    else {
+        panic!("future deadline should require an entered runtime");
+    };
+    assert!(source.is_missing_context());
 }
 
 #[test]
@@ -57,12 +58,12 @@ fn test_tokio_timer_reports_disabled_time_driver_at_registration() {
     runtime.block_on(async {
         let clock = TokioMonotonicClock::new();
         let timer = TokioTimer::from_clock(&clock);
-        assert_eq!(
+        assert!(matches!(
+            timer.after(Duration::from_secs(1)),
             Err(TimeError::TimerUnavailable {
-                reason: TimerUnavailableReason::TimeDriverDisabled,
+                source: TimerUnavailableError::TimeDriverDisabled,
             }),
-            timer.after(Duration::from_secs(1)).map(drop),
-        );
+        ));
     });
 }
 
@@ -92,7 +93,7 @@ fn test_tokio_timer_reports_native_instant_overflow() {
         Err(error) => error,
     };
 
-    assert_eq!(TimeError::InstantOverflow, error);
+    assert!(matches!(error, TimeError::InstantOverflow));
 }
 
 #[tokio::test]
@@ -119,13 +120,15 @@ async fn test_tokio_timer_rejects_foreign_deadline_immediately() {
         Err(error) => error,
     };
 
-    assert_eq!(
-        TimeError::ClockDomainMismatch {
-            expected,
-            actual: foreign.domain(),
-        },
-        error,
-    );
+    let TimeError::ClockDomainMismatch {
+        expected: actual_expected,
+        actual,
+    } = error
+    else {
+        panic!("foreign deadline should report a domain mismatch");
+    };
+    assert_eq!(expected, actual_expected);
+    assert_eq!(foreign.domain(), actual);
 }
 
 #[tokio::test]

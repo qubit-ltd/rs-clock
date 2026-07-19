@@ -48,13 +48,15 @@ fn test_manual_timer_rejects_foreign_deadline_at_registration() {
         Err(error) => error,
     };
 
-    assert_eq!(
-        TimeError::ClockDomainMismatch {
-            expected,
-            actual: foreign.domain(),
-        },
-        error,
-    );
+    let TimeError::ClockDomainMismatch {
+        expected: actual_expected,
+        actual,
+    } = error
+    else {
+        panic!("foreign deadline should report a domain mismatch");
+    };
+    assert_eq!(expected, actual_expected);
+    assert_eq!(foreign.domain(), actual);
     assert_eq!(0, clock.pending_waiters());
 }
 

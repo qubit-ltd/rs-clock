@@ -7,13 +7,21 @@
 // =============================================================================
 //! Schedules all standard Timer registrations on one process-wide worker.
 
+// qubit-style: allow coverage-cfg
+
 use super::std_timer_scheduler_state::StdTimerSchedulerState;
 use super::std_timer_waiter::StdTimerWaiter;
 use super::std_timer_worker_guard::StdTimerWorkerGuard;
 use crate::internal::PanicFanout;
 use crate::{
     TimeError,
-    TimerUnavailableReason,
+    TimerUnavailableError,
+};
+use std::io;
+#[cfg(coverage)]
+use std::sync::atomic::{
+    AtomicBool,
+    Ordering,
 };
 use std::sync::{
     Arc,
@@ -23,6 +31,18 @@ use std::sync::{
     OnceLock,
 };
 use std::time::Instant;
+
+#[cfg(coverage)]
+static FAIL_NEXT_WORKER_SPAWN: AtomicBool = AtomicBool::new(false);
+
+/// Makes the next standard Timer worker startup fail deterministically.
+///
+/// This coverage-only hook is public solely so the external integration suite
+/// can exercise native spawn-failure recovery in an isolated test process.
+#[cfg(coverage)]
+pub fn fail_next_std_timer_worker_spawn() {
+    FAIL_NEXT_WORKER_SPAWN.store(true, Ordering::Release);
+}
 
 /// One lazily started worker shared by every standard Timer in the process.
 pub(crate) struct StdTimerScheduler {
@@ -74,7 +94,7 @@ impl StdTimerScheduler {
     /// # Errors
     ///
     /// Returns [`TimeError::TimerUnavailable`] with
-    /// [`TimerUnavailableReason::WorkerThreadSpawnFailed`] when the worker
+    /// [`TimerUnavailableError::WorkerThreadSpawnFailed`] when the worker
     /// thread cannot be started. The attempted registration is removed before
     /// returning.
     ///
@@ -134,10 +154,9 @@ impl StdTimerScheduler {
 
     /// Starts the native worker after its running state is committed.
     ///
-    /// Native thread-spawn failure depends on operating-system failure
-    /// injection that cannot be made deterministic in the integration suite.
-    /// Observable registration behavior is exercised through the public Timer
-    /// tests.
+    /// Production failures originate from the operating system. Instrumented
+    /// coverage builds can inject the same failure before the native call so
+    /// rollback and source preservation remain deterministic to test.
     ///
     /// # Parameters
     ///
@@ -152,7 +171,7 @@ impl StdTimerScheduler {
     /// # Errors
     ///
     /// Returns [`TimeError::TimerUnavailable`] with
-    /// [`TimerUnavailableReason::WorkerThreadSpawnFailed`] when the worker
+    /// [`TimerUnavailableError::WorkerThreadSpawnFailed`] when the worker
     /// cannot spawn.
     ///
     /// # Panics
@@ -165,7 +184,46 @@ impl StdTimerScheduler {
         worker_generation: u64,
     ) -> Result<u64, TimeError> {
         let scheduler = Arc::clone(self);
-        let spawn_result = std::thread::Builder::new()
+        let spawn_result =
+            Self::spawn_native_worker(scheduler, worker_generation);
+        if let Err(source) = spawn_result {
+            return Err(Self::rollback_failed_worker_start(
+                &mut state,
+                waiter_id,
+                worker_generation,
+                source,
+            ));
+        }
+        drop(state);
+        Ok(waiter_id)
+    }
+
+    /// Starts one native scheduler worker.
+    ///
+    /// # Parameters
+    ///
+    /// * `scheduler` - Shared scheduler owned by the worker.
+    /// * `worker_generation` - Generation assigned to the worker.
+    ///
+    /// # Returns
+    ///
+    /// The native worker handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns the operating-system thread-spawn error. Coverage builds can
+    /// also inject the same failure before invoking the operating system.
+    fn spawn_native_worker(
+        scheduler: Arc<Self>,
+        worker_generation: u64,
+    ) -> io::Result<std::thread::JoinHandle<()>> {
+        #[cfg(coverage)]
+        if FAIL_NEXT_WORKER_SPAWN.swap(false, Ordering::AcqRel) {
+            return Err(io::Error::other(
+                "injected standard Timer worker spawn failure",
+            ));
+        }
+        std::thread::Builder::new()
             .name("qubit-clock-timer".to_owned())
             .spawn(move || {
                 let startup_guard = StdTimerWorkerGuard::new(
@@ -174,16 +232,32 @@ impl StdTimerScheduler {
                 );
                 let _worker_guard = startup_guard.handoff();
                 scheduler.run();
-            });
-        if spawn_result.is_err() {
-            drop(state.cancel(waiter_id));
-            state.mark_worker_stopped(worker_generation);
-            return Err(TimeError::TimerUnavailable {
-                reason: TimerUnavailableReason::WorkerThreadSpawnFailed,
-            });
+            })
+    }
+
+    /// Rolls back state after the operating system rejects a worker spawn.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Locked scheduler state to restore.
+    /// * `waiter_id` - Registration created for the failed worker.
+    /// * `worker_generation` - Worker generation to mark as stopped.
+    /// * `source` - Native thread-spawn error.
+    ///
+    /// # Returns
+    ///
+    /// A Timer-unavailable error retaining `source`.
+    fn rollback_failed_worker_start(
+        state: &mut StdTimerSchedulerState,
+        waiter_id: u64,
+        worker_generation: u64,
+        source: io::Error,
+    ) -> TimeError {
+        drop(state.cancel(waiter_id));
+        state.mark_worker_stopped(worker_generation);
+        TimeError::TimerUnavailable {
+            source: TimerUnavailableError::WorkerThreadSpawnFailed { source },
         }
-        drop(state);
-        Ok(waiter_id)
     }
 
     /// Runs deadline selection and completion for the process lifetime.

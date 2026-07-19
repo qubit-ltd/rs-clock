@@ -111,13 +111,15 @@ fn test_std_timer_rejects_foreign_deadline_immediately() {
         Err(error) => error,
     };
 
-    assert_eq!(
-        TimeError::ClockDomainMismatch {
-            expected,
-            actual: foreign.domain(),
-        },
-        error,
-    );
+    let TimeError::ClockDomainMismatch {
+        expected: actual_expected,
+        actual,
+    } = error
+    else {
+        panic!("foreign deadline should report a domain mismatch");
+    };
+    assert_eq!(expected, actual_expected);
+    assert_eq!(foreign.domain(), actual);
 }
 
 /// Verifies that an unrepresentable native deadline reports exact overflow.
@@ -132,7 +134,7 @@ fn test_std_timer_reports_native_instant_overflow() {
         Err(error) => error,
     };
 
-    assert_eq!(TimeError::InstantOverflow, error);
+    assert!(matches!(error, TimeError::InstantOverflow));
 }
 
 #[test]

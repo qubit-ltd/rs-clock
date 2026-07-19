@@ -37,10 +37,10 @@ fn test_monotonic_instant_checked_add_reports_overflow() {
         .checked_add(Duration::MAX)
         .expect("duration maximum should fit from zero");
 
-    assert_eq!(
-        Err(TimeError::InstantOverflow),
+    assert!(matches!(
         maximum.checked_add(Duration::from_nanos(1)),
-    );
+        Err(TimeError::InstantOverflow),
+    ));
 }
 
 #[test]
@@ -48,13 +48,13 @@ fn test_monotonic_instant_rejects_foreign_domain() {
     let first = ManualMonotonicClock::new().now();
     let second = ManualMonotonicClock::new().now();
 
-    assert_eq!(
-        Err(TimeError::ClockDomainMismatch {
-            expected: first.domain(),
-            actual: second.domain(),
-        }),
-        first.duration_since(second),
-    );
+    let Err(TimeError::ClockDomainMismatch { expected, actual }) =
+        first.duration_since(second)
+    else {
+        panic!("cross-domain duration should report a domain mismatch");
+    };
+    assert_eq!(first.domain(), expected);
+    assert_eq!(second.domain(), actual);
     assert_eq!(None, first.partial_cmp(&second));
 }
 
@@ -66,10 +66,10 @@ fn test_monotonic_instant_reports_backward_duration() {
         .checked_add(Duration::from_secs(1))
         .expect("short duration should be representable");
 
-    assert_eq!(
-        Err(TimeError::InvalidInstantOrder),
+    assert!(matches!(
         start.duration_since(end),
-    );
+        Err(TimeError::InvalidInstantOrder),
+    ));
 }
 
 #[test]

@@ -1,0 +1,3 @@
+coverage-cfg | src/lib.rs | Re-export the isolated native thread-spawn failure hook only for coverage integration tests.
+coverage-cfg | src/timer/internal/std_timer_scheduler.rs | Inject native thread-spawn failure so rollback and source preservation can be tested deterministically in an isolated process.
+coverage-cfg | tests/timer/internal/std_timer_spawn_failure_tests.rs | Exercise the native thread-spawn failure hook only in instrumented coverage builds.
