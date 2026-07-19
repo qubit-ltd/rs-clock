@@ -13,7 +13,7 @@ use crate::{
     TimeError,
     Timer,
     TimerFuture,
-    TimerUnavailableReason,
+    TimerUnavailableError,
     TokioMonotonicClock,
 };
 use tokio::runtime::Handle;
@@ -105,8 +105,8 @@ impl Timer for TokioTimer {
     ///
     /// Returns a domain mismatch or instant overflow before runtime access.
     /// For future deadlines, returns [`TimeError::TimerUnavailable`] with
-    /// [`TimerUnavailableReason::RuntimeNotEntered`] when no runtime is
-    /// entered, or [`TimerUnavailableReason::TimeDriverDisabled`] when its
+    /// [`TimerUnavailableError::RuntimeNotEntered`] when no runtime is
+    /// entered, or [`TimerUnavailableError::TimeDriverDisabled`] when its
     /// time driver is disabled. Reached deadlines do not require runtime
     /// access.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
@@ -114,15 +114,17 @@ impl Timer for TokioTimer {
         if deadline <= Instant::now() {
             return Ok(Box::pin(std::future::ready(())));
         }
-        Handle::try_current().map_err(|_| TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::RuntimeNotEntered,
+        Handle::try_current().map_err(|source| {
+            TimeError::TimerUnavailable {
+                source: TimerUnavailableError::RuntimeNotEntered { source },
+            }
         })?;
         let sleep =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 tokio::time::sleep_until(deadline)
             }))
             .map_err(|_| TimeError::TimerUnavailable {
-                reason: TimerUnavailableReason::TimeDriverDisabled,
+                source: TimerUnavailableError::TimeDriverDisabled,
             })?;
         Ok(Box::pin(async move {
             sleep.await;

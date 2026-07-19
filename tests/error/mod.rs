@@ -7,4 +7,4 @@
 // =============================================================================
 
 mod time_error_tests;
-mod timer_unavailable_reason_tests;
+mod timer_unavailable_error_tests;

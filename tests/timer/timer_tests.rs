@@ -13,14 +13,17 @@ use qubit_clock::{
     TimeError,
     Timer,
     TimerFuture,
-    TimerUnavailableReason,
+    TimerUnavailableError,
 };
-use std::future;
 use std::sync::{
     Arc,
     Mutex,
 };
 use std::time::Duration;
+use std::{
+    future,
+    io,
+};
 
 struct RecordingTimer {
     clock: Arc<ManualMonotonicClock>,
@@ -66,7 +69,10 @@ impl Timer for FailingTimer {
         _deadline: MonotonicInstant,
     ) -> Result<TimerFuture, TimeError> {
         Err(TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::BackendUnavailable,
+            source: TimerUnavailableError::BackendUnavailable {
+                backend: "test",
+                source: Box::new(io::Error::other("test backend unavailable")),
+            },
         })
     }
 }
@@ -110,12 +116,14 @@ fn test_timer_after_returns_registration_error_immediately() {
         Err(error) => error,
     };
 
-    assert_eq!(
-        TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::BackendUnavailable,
-        },
-        error,
-    );
+    let TimeError::TimerUnavailable {
+        source: TimerUnavailableError::BackendUnavailable { backend, source },
+    } = error
+    else {
+        panic!("failing timer should report backend unavailability");
+    };
+    assert_eq!("test", backend);
+    assert_eq!("test backend unavailable", source.to_string());
 }
 
 #[test]

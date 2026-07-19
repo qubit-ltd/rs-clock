@@ -8,7 +8,7 @@
 //! Error types exposed by this crate.
 
 mod time_error;
-mod timer_unavailable_reason;
+mod timer_unavailable_error;
 
 pub use time_error::TimeError;
-pub use timer_unavailable_reason::TimerUnavailableReason;
+pub use timer_unavailable_error::TimerUnavailableError;

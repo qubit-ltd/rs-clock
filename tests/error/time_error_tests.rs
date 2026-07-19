@@ -9,8 +9,9 @@
 use qubit_clock::{
     ClockDomain,
     TimeError,
-    TimerUnavailableReason,
+    TimerUnavailableError,
 };
+use std::io;
 
 #[test]
 fn test_time_error_clock_domain_mismatch_display() {
@@ -41,9 +42,13 @@ fn test_time_error_other_variants_display() {
         TimeError::InvalidInstantOrder.to_string(),
     );
     assert_eq!(
-        "monotonic timer is unavailable: the timer backend is unavailable",
+        "monotonic timer is unavailable: timer backend 'test' is unavailable: \
+         offline",
         TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::BackendUnavailable,
+            source: TimerUnavailableError::BackendUnavailable {
+                backend: "test",
+                source: Box::new(io::Error::other("offline")),
+            },
         }
         .to_string(),
     );

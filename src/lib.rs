@@ -50,7 +50,7 @@ pub mod wall;
 
 pub use error::{
     TimeError,
-    TimerUnavailableReason,
+    TimerUnavailableError,
 };
 pub use monotonic::{
     ClockDomain,
@@ -74,6 +74,11 @@ pub use wall::{
     StdWallClock,
     WallClock,
 };
+
+// qubit-style: allow coverage-cfg
+#[doc(hidden)]
+#[cfg(coverage)]
+pub use timer::internal::std_timer_scheduler::fail_next_std_timer_worker_spawn;
 
 #[cfg(feature = "tokio")]
 pub use monotonic::TokioMonotonicClock;
