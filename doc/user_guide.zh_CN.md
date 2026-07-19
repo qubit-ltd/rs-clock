@@ -53,6 +53,18 @@ clock、future、paused time 推进和 future poll 必须使用同一个 runtime
 
 保留 manual clock 作为测试控制面，把它创建的 timer 注入被测组件：
 
+Manual timer 及其协调 future 不绑定 executor，也不需要启用
+`qubit-clock/tokio` feature。本节示例只选择 Tokio 来运行、派生和选择任务；在测试中
+运行这些示例时，需要直接声明 Tokio 开发依赖：
+
+```toml
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+```
+
+确定性 manual time 控制逻辑时间、deadline 选择和 deadline 完成，但不定义相同
+deadline 的 waiter 唤醒顺序，也不定义 executor poll 就绪任务的顺序。
+
 ```rust
 use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
 use std::time::Duration;
