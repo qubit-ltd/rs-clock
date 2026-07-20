@@ -41,6 +41,11 @@ only for the fixed deadline; a backend may enroll it with a native scheduler
 when the future is first polled. Dropping an incomplete future cancels the
 outstanding notification.
 
+`StdTimer` treats an unexpected scheduler-worker exit as a fail-fast condition.
+It wakes futures owned by the exited worker generation; their next poll panics
+instead of remaining pending or reporting that their deadlines completed. A
+later registration starts a replacement worker generation.
+
 ## Tokio timer
 
 Enable the `tokio` feature for `TokioMonotonicClock` and `TokioTimer`.
@@ -238,6 +243,14 @@ cargo bench --bench std_timer_scheduler
 
 The benchmark reports registration/cancellation and deadline-completion
 throughput for 1, 2, 4, 8, and 16 concurrent caller threads.
+
+The small synchronization state machines used by `BlockingSleeper` and
+`StdTimer` also have Loom model checks. Run them with:
+
+```bash
+RUSTFLAGS="--cfg loom" cargo test --release --test sleep_tests notification_latch_model
+RUSTFLAGS="--cfg loom" cargo test --release --test timer_tests std_timer_waiter_model
+```
 
 ## Errors
 
