@@ -219,6 +219,37 @@ impl StdTimerSchedulerState {
         }
     }
 
+    /// Stops a matching worker and removes every registration it owned.
+    ///
+    /// The running flag and both registration indexes change under the same
+    /// scheduler lock. A zero or stale generation leaves the active generation
+    /// untouched.
+    ///
+    /// # Parameters
+    ///
+    /// * `generation` - Generation of the worker that exited.
+    ///
+    /// # Returns
+    ///
+    /// Waiters removed from the exited generation, to be failed outside the
+    /// scheduler lock. Returns an empty collection for zero or stale
+    /// generations.
+    #[must_use]
+    pub(super) fn stop_worker_and_take_waiters(
+        &mut self,
+        generation: u64,
+    ) -> Vec<Arc<StdTimerWaiter>> {
+        if generation == 0 || self.worker_generation != generation {
+            return Vec::new();
+        }
+        self.worker_running = false;
+        self.deadlines.clear();
+        self.registrations
+            .drain()
+            .map(|(_, registration)| registration.into_waiter())
+            .collect()
+    }
+
     /// Allocates a nonzero waiter identifier without reuse after exhaustion.
     ///
     /// # Returns
