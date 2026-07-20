@@ -9,8 +9,8 @@
 
 use super::std_timer_scheduler::StdTimerScheduler;
 
-/// Restores the running state whenever a standard Timer worker exits.
-#[must_use = "dropping an active worker guard clears its scheduler generation"]
+/// Restores scheduler state whenever a standard Timer worker exits.
+#[must_use = "dropping an active worker guard fails its active registrations"]
 pub(super) struct StdTimerWorkerGuard<'a> {
     /// Scheduler whose worker state must be restored during exit.
     scheduler: &'a StdTimerScheduler,
@@ -60,13 +60,14 @@ impl<'a> StdTimerWorkerGuard<'a> {
 }
 
 impl Drop for StdTimerWorkerGuard<'_> {
-    /// Restores scheduler state after normal exit or unwinding.
+    /// Restores scheduler state and fails registrations after worker exit.
     ///
-    /// A handed-off guard carries generation zero, so its drop only performs a
-    /// no-op generation check. The check may briefly block while acquiring the
+    /// A handed-off startup guard carries generation zero, so its drop performs
+    /// only a no-op generation check. An active guard atomically detaches the
+    /// exited generation before failing and waking its waiters outside the
     /// scheduler state mutex.
     #[inline(always)]
     fn drop(&mut self) {
-        self.scheduler.mark_worker_stopped(self.worker_generation);
+        self.scheduler.handle_worker_exit(self.worker_generation);
     }
 }

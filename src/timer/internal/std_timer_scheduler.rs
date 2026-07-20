@@ -35,6 +35,9 @@ use std::time::Instant;
 #[cfg(coverage)]
 static FAIL_NEXT_WORKER_SPAWN: AtomicBool = AtomicBool::new(false);
 
+#[cfg(coverage)]
+static PANIC_NEXT_WORKER_RUN: AtomicBool = AtomicBool::new(false);
+
 /// Makes the next standard Timer worker startup fail deterministically.
 ///
 /// This coverage-only hook is public solely so the external integration suite
@@ -42,6 +45,18 @@ static FAIL_NEXT_WORKER_SPAWN: AtomicBool = AtomicBool::new(false);
 #[cfg(coverage)]
 pub fn fail_next_std_timer_worker_spawn() {
     FAIL_NEXT_WORKER_SPAWN.store(true, Ordering::Release);
+}
+
+/// Makes the next standard Timer worker panic after locking scheduler state.
+///
+/// This coverage-only hook is public solely so the external integration suite
+/// can reproduce an unexpected worker exit in an isolated test process.
+#[cfg(coverage)]
+pub fn panic_next_std_timer_worker() {
+    let scheduler = StdTimerScheduler::shared();
+    let _state = scheduler.lock_state();
+    PANIC_NEXT_WORKER_RUN.store(true, Ordering::Release);
+    scheduler.changed.notify_one();
 }
 
 /// One lazily started worker shared by every standard Timer in the process.
@@ -138,18 +153,28 @@ impl StdTimerScheduler {
         }
     }
 
-    /// Clears the worker-running flag after a worker exits.
+    /// Fails registrations owned by a worker that has exited.
     ///
-    /// A disarmed startup guard passes generation zero, which cannot match an
-    /// active worker generation and therefore leaves the flag unchanged.
+    /// Scheduler state is restored atomically under its lock. Waiter
+    /// transitions, Waker destruction, and Waker invocation occur only
+    /// after that lock is released. A disarmed startup guard passes
+    /// generation zero and therefore leaves the active worker generation
+    /// unchanged.
     ///
     /// # Parameters
     ///
-    /// * `worker_generation` - Exited worker generation, or zero after a guard
-    ///   handoff.
-    #[inline(always)]
-    pub(super) fn mark_worker_stopped(&self, worker_generation: u64) {
-        self.lock_state().mark_worker_stopped(worker_generation);
+    /// * `worker_generation` - Exited worker generation, or zero for a disarmed
+    ///   startup guard.
+    pub(super) fn handle_worker_exit(&self, worker_generation: u64) {
+        let waiters = self
+            .lock_state()
+            .stop_worker_and_take_waiters(worker_generation);
+        let wakers =
+            waiters.iter().filter_map(|waiter| waiter.fail()).collect();
+        drop(waiters);
+        let mut fanout = PanicFanout::new();
+        fanout.wake_all(wakers);
+        fanout.discard_panics();
     }
 
     /// Starts the native worker after its running state is committed.
@@ -273,6 +298,10 @@ impl StdTimerScheduler {
     fn run(&self) {
         let mut state = self.lock_state();
         loop {
+            #[cfg(coverage)]
+            if PANIC_NEXT_WORKER_RUN.swap(false, Ordering::AcqRel) {
+                panic!("injected standard Timer worker failure");
+            }
             if state.is_empty() {
                 state = self
                     .changed

@@ -26,6 +26,10 @@ use std::time::Instant;
 /// Every standard Timer in the process shares one scheduler worker. The worker
 /// starts lazily with the first future registration and remains parked while
 /// idle so later registrations do not need to create another native thread.
+/// If that worker exits unexpectedly, its active futures are awakened and
+/// panic when next polled instead of remaining pending or reporting false
+/// deadline completion. A later registration starts a replacement worker
+/// generation.
 pub struct StdTimer {
     /// Private clock handle retaining the source domain and native origin.
     clock: StdMonotonicClock,
@@ -120,7 +124,8 @@ impl Timer for StdTimer {
     /// # Returns
     ///
     /// A cancellation-safe future whose registration is already active, or an
-    /// immediately ready future for a reached deadline.
+    /// immediately ready future for a reached deadline. The registered future
+    /// panics when polled after its scheduler worker exits unexpectedly.
     ///
     /// # Errors
     ///

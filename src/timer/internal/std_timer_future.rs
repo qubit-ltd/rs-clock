@@ -66,16 +66,29 @@ impl Future for StdTimerFuture {
     /// # Returns
     ///
     /// [`Poll::Ready`] after the native deadline, otherwise [`Poll::Pending`].
+    ///
+    /// # Panics
+    ///
+    /// Panics when the scheduler worker serving this registration exits before
+    /// reaching the deadline.
     fn poll(
         self: Pin<&mut Self>,
         context: &mut Context<'_>,
     ) -> Poll<Self::Output> {
         let this = self.get_mut();
-        let result = this.waiter.poll(context);
-        if result.is_ready() {
-            this.waiter_id = None;
+        match this.waiter.poll(context) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Ok(())) => {
+                this.waiter_id = None;
+                Poll::Ready(())
+            }
+            Poll::Ready(Err(())) => {
+                this.waiter_id = None;
+                panic!(
+                    "standard Timer scheduler worker terminated unexpectedly"
+                );
+            }
         }
-        result
     }
 }
 

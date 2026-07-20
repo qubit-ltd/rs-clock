@@ -35,6 +35,10 @@ path = "tests/timer/internal/std_timer_scheduler_tests.rs"
 name = "std_timer_spawn_failure_tests"
 path = "tests/timer/internal/std_timer_spawn_failure_tests.rs"
 
+[[test]]
+name = "std_timer_worker_failure_tests"
+path = "tests/timer/internal/std_timer_worker_failure_tests.rs"
+
 [[bench]]
 name = "std_timer_scheduler"
 harness = false
@@ -51,9 +55,12 @@ tokio = { version = "1.52", optional = true, features = ["rt", "time"] }
 criterion = { version = "0.8.2", default-features = false }
 tokio = { version = "1.52", features = ["macros", "rt", "sync", "test-util", "time"] }
 
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(loom)'] }
