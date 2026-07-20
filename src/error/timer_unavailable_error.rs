@@ -14,15 +14,13 @@ use std::{
 
 use thiserror::Error;
 
-#[cfg(feature = "tokio")]
-use super::TokioRuntimeError;
-
 /// Describes the backend failure that prevented timer registration.
 ///
 /// Each variant preserves the most specific stable source exposed by its
 /// backend. Custom [`Timer`](crate::Timer) implementations should use
 /// [`BackendUnavailable`](Self::BackendUnavailable) to retain their own error
-/// rather than reducing it to display text.
+/// rather than reducing it to display text. The enum is non-exhaustive; callers
+/// must retain a fallback arm when matching it.
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum TimerUnavailableError {
@@ -33,16 +31,7 @@ pub enum TimerUnavailableError {
         #[source]
         source: io::Error,
     },
-    /// The current Tokio runtime cannot drive the bound timer.
-    #[cfg(feature = "tokio")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    #[error("the Tokio runtime cannot drive the bound timer: {source}")]
-    TokioRuntime {
-        /// Missing or mismatched Tokio runtime context.
-        #[source]
-        source: TokioRuntimeError,
-    },
-    /// The entered asynchronous runtime has no enabled time driver.
+    /// The target asynchronous runtime has no enabled time driver.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     #[error("the asynchronous runtime time driver is disabled")]

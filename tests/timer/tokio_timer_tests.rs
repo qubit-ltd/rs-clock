@@ -69,91 +69,68 @@ async fn test_tokio_timer_try_current_creates_independent_timer() {
     assert_ne!(timer.clock().now().domain(), other.clock().now().domain());
 }
 
-/// Verifies that future deadlines require the timer's bound runtime.
+/// Verifies that a future deadline can be registered without an ambient
+/// runtime and is driven by the retained handle.
 #[test]
-fn test_tokio_timer_reports_missing_runtime_for_future_deadline() {
+fn test_tokio_timer_registers_future_deadline_outside_runtime() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_time()
+        .start_paused(true)
         .build()
         .expect("runtime should build");
-    let (timer, deadline) = runtime.block_on(async {
-        let clock = TokioMonotonicClock::current();
-        let deadline = clock
-            .now()
-            .checked_add(Duration::from_secs(1))
-            .expect("deadline should fit");
-        (TokioTimer::from_clock(&clock), deadline)
+    let timer = TokioTimer::from_handle(runtime.handle().clone());
+    let future = timer
+        .after(Duration::from_secs(1))
+        .expect("future deadline should register outside the runtime");
+
+    runtime.block_on(async {
+        tokio::time::advance(Duration::from_secs(1)).await;
+        future.await;
     });
-
-    let Err(TimeError::TimerUnavailable {
-        source:
-            TimerUnavailableError::TokioRuntime {
-                source: TokioRuntimeError::NotEntered { source },
-            },
-    }) = timer.at(deadline)
-    else {
-        panic!("future deadline should require an entered runtime");
-    };
-    assert!(source.is_missing_context());
 }
 
-/// Verifies that relative deadlines report a missing bound runtime.
+/// Verifies that relative reached deadlines need no ambient runtime.
 #[test]
-fn test_tokio_timer_after_reports_missing_runtime() {
+fn test_tokio_timer_after_zero_succeeds_outside_runtime() {
     let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
         .build()
         .expect("runtime should build");
-    let timer = runtime.block_on(async { TokioTimer::current() });
+    let timer = TokioTimer::from_handle(runtime.handle().clone());
+    let future = timer
+        .after(Duration::ZERO)
+        .expect("zero delay should be ready without a time driver");
 
-    assert!(matches!(
-        timer.after(Duration::from_secs(1)),
-        Err(TimeError::TimerUnavailable {
-            source: TimerUnavailableError::TokioRuntime {
-                source: TokioRuntimeError::NotEntered { .. },
-            },
-        }),
-    ));
+    runtime.block_on(future);
 }
 
-/// Verifies that an Arc Timer preserves the concrete relative-time error.
+/// Verifies that Arc delegation preserves retained-runtime registration.
 #[test]
-fn test_tokio_timer_arc_after_preserves_runtime_error() {
+fn test_tokio_timer_arc_after_uses_retained_runtime() {
     let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
         .build()
         .expect("runtime should build");
     let timer: Arc<dyn Timer> =
-        runtime.block_on(async { Arc::new(TokioTimer::current()) });
+        Arc::new(TokioTimer::from_handle(runtime.handle().clone()));
+    let future = timer
+        .after(Duration::ZERO)
+        .expect("Arc timer should register through its retained runtime");
 
-    assert!(matches!(
-        timer.after(Duration::from_secs(1)),
-        Err(TimeError::TimerUnavailable {
-            source: TimerUnavailableError::TokioRuntime {
-                source: TokioRuntimeError::NotEntered { .. },
-            },
-        }),
-    ));
+    runtime.block_on(future);
 }
 
-/// Verifies that a boxed Timer preserves the concrete relative-time error.
+/// Verifies that Box delegation preserves retained-runtime registration.
 #[test]
-fn test_tokio_timer_box_after_preserves_runtime_error() {
+fn test_tokio_timer_box_after_uses_retained_runtime() {
     let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
         .build()
         .expect("runtime should build");
     let timer: Box<dyn Timer> =
-        runtime.block_on(async { Box::new(TokioTimer::current()) });
+        Box::new(TokioTimer::from_handle(runtime.handle().clone()));
+    let future = timer
+        .after(Duration::ZERO)
+        .expect("boxed timer should register through its retained runtime");
 
-    assert!(matches!(
-        timer.after(Duration::from_secs(1)),
-        Err(TimeError::TimerUnavailable {
-            source: TimerUnavailableError::TokioRuntime {
-                source: TokioRuntimeError::NotEntered { .. },
-            },
-        }),
-    ));
+    runtime.block_on(future);
 }
 
 #[test]
@@ -161,39 +138,29 @@ fn test_tokio_timer_reports_disabled_time_driver_at_registration() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .expect("runtime should build");
-
-    runtime.block_on(async {
-        let timer = TokioTimer::current();
-        assert!(matches!(
-            timer.after(Duration::from_secs(1)),
-            Err(TimeError::TimerUnavailable {
-                source: TimerUnavailableError::TimeDriverDisabled,
-            }),
-        ));
-    });
-}
-
-/// Verifies that reached deadlines still require the timer's bound runtime.
-#[test]
-fn test_tokio_timer_reports_missing_runtime_for_reached_deadline() {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .expect("runtime should build");
-    let (timer, deadline) = runtime.block_on(async {
-        let clock = TokioMonotonicClock::current();
-        let deadline = clock.now();
-        (TokioTimer::from_clock(&clock), deadline)
-    });
+    let timer = TokioTimer::from_handle(runtime.handle().clone());
 
     assert!(matches!(
-        timer.at(deadline),
+        timer.after(Duration::from_secs(1)),
         Err(TimeError::TimerUnavailable {
-            source: TimerUnavailableError::TokioRuntime {
-                source: TokioRuntimeError::NotEntered { .. },
-            },
+            source: TimerUnavailableError::TimeDriverDisabled,
         }),
     ));
+}
+
+/// Verifies that reached deadlines do not require a Tokio time driver.
+#[test]
+fn test_tokio_timer_reached_deadline_needs_no_time_driver() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .expect("runtime should build");
+    let timer = TokioTimer::from_handle(runtime.handle().clone());
+    let deadline = timer.clock().now();
+    let future = timer
+        .at(deadline)
+        .expect("reached deadline should be immediately ready");
+
+    runtime.block_on(future);
 }
 
 /// Verifies that native overflow is reported before Tokio runtime validation.
@@ -264,132 +231,45 @@ async fn test_tokio_timer_retains_domain_after_source_is_dropped() {
     assert_eq!(domain, timer.clock().now().domain());
 }
 
-/// Verifies that reached deadlines reject an independent runtime.
+/// Verifies that the retained runtime, rather than the polling runtime, drives
+/// a future deadline.
 #[test]
-fn test_tokio_timer_rejects_reached_deadline_from_different_runtime() {
-    let first = tokio::runtime::Builder::new_current_thread()
+fn test_tokio_timer_future_is_driven_by_retained_runtime() {
+    let target = tokio::runtime::Builder::new_current_thread()
         .enable_time()
+        .start_paused(true)
         .build()
-        .expect("first runtime should build");
-    let second = tokio::runtime::Builder::new_current_thread()
+        .expect("target runtime should build");
+    let polling = tokio::runtime::Builder::new_current_thread()
         .enable_time()
+        .start_paused(true)
         .build()
-        .expect("second runtime should build");
-    let expected = first.handle().id();
-    let actual = second.handle().id();
-    let (timer, deadline) = first.block_on(async {
-        let clock = TokioMonotonicClock::current();
-        let deadline = clock.now();
-        (TokioTimer::from_clock(&clock), deadline)
-    });
+        .expect("polling runtime should build");
+    let timer = TokioTimer::from_handle(target.handle().clone());
+    let mut future = timer
+        .after(Duration::from_secs(5))
+        .expect("future deadline should register on the retained runtime");
 
-    let error = second.block_on(async {
-        match timer.at(deadline) {
-            Ok(_) => panic!("a reached deadline should reject another runtime"),
-            Err(error) => error,
+    let completed = polling.block_on(async {
+        tokio::select! {
+            () = &mut future => true,
+            () = tokio::time::sleep(Duration::from_secs(1)) => false,
         }
     });
+    assert!(!completed, "advancing the polling runtime must not fire it");
 
-    assert!(matches!(
-        error,
-        TimeError::TimerUnavailable {
-            source: TimerUnavailableError::TokioRuntime {
-                source: TokioRuntimeError::Mismatch {
-                    expected: actual_expected,
-                    actual: actual_runtime,
-                },
-            },
-        } if actual_expected == expected && actual_runtime == actual
-    ));
+    target.block_on(tokio::time::advance(Duration::from_secs(5)));
+    polling.block_on(future);
 }
 
-/// Verifies that future deadlines reject an independent runtime.
+/// Verifies that domain validation does not depend on an ambient runtime.
 #[test]
-fn test_tokio_timer_rejects_future_deadline_from_different_runtime() {
-    let first = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .expect("first runtime should build");
-    let second = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .expect("second runtime should build");
-    let expected = first.handle().id();
-    let actual = second.handle().id();
-    let (timer, deadline) = first.block_on(async {
-        let clock = TokioMonotonicClock::current();
-        let deadline = clock
-            .now()
-            .checked_add(Duration::from_secs(1))
-            .expect("deadline should fit");
-        (TokioTimer::from_clock(&clock), deadline)
-    });
-
-    let error = second.block_on(async {
-        match timer.at(deadline) {
-            Ok(_) => panic!("a future deadline should reject another runtime"),
-            Err(error) => error,
-        }
-    });
-
-    assert!(matches!(
-        error,
-        TimeError::TimerUnavailable {
-            source: TimerUnavailableError::TokioRuntime {
-                source: TokioRuntimeError::Mismatch {
-                    expected: actual_expected,
-                    actual: actual_runtime,
-                },
-            },
-        } if actual_expected == expected && actual_runtime == actual
-    ));
-}
-
-/// Verifies that relative deadlines reject an independent runtime.
-#[test]
-fn test_tokio_timer_after_rejects_different_runtime() {
-    let first = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .expect("first runtime should build");
-    let second = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .expect("second runtime should build");
-    let expected = first.handle().id();
-    let actual = second.handle().id();
-    let timer = first.block_on(async { TokioTimer::current() });
-
-    let error = second.block_on(async {
-        match timer.after(Duration::from_secs(1)) {
-            Ok(_) => {
-                panic!("a relative deadline should reject another runtime")
-            }
-            Err(error) => error,
-        }
-    });
-
-    assert!(matches!(
-        error,
-        TimeError::TimerUnavailable {
-            source: TimerUnavailableError::TokioRuntime {
-                source: TokioRuntimeError::Mismatch {
-                    expected: actual_expected,
-                    actual: actual_runtime,
-                },
-            },
-        } if actual_expected == expected && actual_runtime == actual
-    ));
-}
-
-/// Verifies that domain validation precedes Tokio runtime validation.
-#[test]
-fn test_tokio_timer_reports_foreign_deadline_before_runtime_validation() {
+fn test_tokio_timer_reports_foreign_deadline_outside_runtime() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()
         .expect("runtime should build");
-    let timer = runtime.block_on(async { TokioTimer::current() });
+    let timer = TokioTimer::from_handle(runtime.handle().clone());
     let foreign = ManualMonotonicClock::new().now();
 
     assert!(matches!(

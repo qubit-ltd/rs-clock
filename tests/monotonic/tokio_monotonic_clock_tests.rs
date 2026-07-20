@@ -11,10 +11,6 @@ use qubit_clock::{
     TokioMonotonicClock,
     TokioRuntimeError,
 };
-use std::panic::{
-    AssertUnwindSafe,
-    catch_unwind,
-};
 use std::time::Duration;
 
 #[tokio::test(start_paused = true)]
@@ -67,68 +63,52 @@ async fn test_tokio_monotonic_clock_creates_same_domain_timer_directly() {
     assert_eq!(clock.now().domain(), timer.clock().now().domain());
 }
 
-/// Verifies that fallible sampling reports a missing runtime context.
+/// Verifies that an explicit handle remains usable without an ambient runtime.
 #[test]
-fn test_tokio_monotonic_clock_try_now_reports_missing_runtime() {
+fn test_tokio_monotonic_clock_from_handle_follows_target_runtime() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_time()
+        .start_paused(true)
         .build()
-        .expect("runtime should build");
-    let clock = runtime.block_on(async { TokioMonotonicClock::current() });
+        .expect("paused Tokio runtime should build");
+    let clock = TokioMonotonicClock::from_handle(runtime.handle().clone());
+    let start = clock.now();
 
-    assert!(matches!(
-        clock.try_now(),
-        Err(TokioRuntimeError::NotEntered { .. }),
-    ));
+    runtime.block_on(tokio::time::advance(Duration::from_secs(5)));
+
+    assert_eq!(
+        Duration::from_secs(5),
+        clock
+            .now()
+            .duration_since(start)
+            .expect("instants should share one domain"),
+    );
 }
 
-/// Verifies that fallible sampling rejects an independent runtime.
+/// Verifies that sampling uses the retained handle instead of the caller's
+/// ambient runtime.
 #[test]
-fn test_tokio_monotonic_clock_try_now_rejects_different_runtime() {
-    let first = tokio::runtime::Builder::new_current_thread()
+fn test_tokio_monotonic_clock_samples_target_time_inside_another_runtime() {
+    let target = tokio::runtime::Builder::new_current_thread()
         .enable_time()
+        .start_paused(true)
         .build()
-        .expect("first runtime should build");
-    let second = tokio::runtime::Builder::new_current_thread()
+        .expect("target runtime should build");
+    let other = tokio::runtime::Builder::new_current_thread()
         .enable_time()
+        .start_paused(true)
         .build()
-        .expect("second runtime should build");
-    let expected = first.handle().id();
-    let actual = second.handle().id();
-    let clock = first.block_on(async { TokioMonotonicClock::current() });
+        .expect("other runtime should build");
+    let clock = TokioMonotonicClock::from_handle(target.handle().clone());
+    let start = other.block_on(async { clock.now() });
 
-    let error = second
-        .block_on(async { clock.try_now() })
-        .expect_err("a different runtime should be rejected");
+    target.block_on(tokio::time::advance(Duration::from_secs(7)));
 
-    assert!(matches!(
-        error,
-        TokioRuntimeError::Mismatch {
-            expected: actual_expected,
-            actual: actual_runtime,
-        } if actual_expected == expected && actual_runtime == actual
-    ));
-}
+    let end = other.block_on(async { clock.now() });
 
-/// Verifies that trait sampling rejects an independent runtime by panicking.
-#[test]
-fn test_tokio_monotonic_clock_trait_now_panics_in_different_runtime() {
-    let first = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .expect("first runtime should build");
-    let second = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .expect("second runtime should build");
-    let clock = first.block_on(async { TokioMonotonicClock::current() });
-
-    let result = second.block_on(async {
-        catch_unwind(AssertUnwindSafe(|| MonotonicClock::now(&clock)))
-    });
-
-    assert!(
-        result.is_err(),
-        "trait sampling should reject another runtime"
+    assert_eq!(
+        Duration::from_secs(7),
+        end.duration_since(start)
+            .expect("instants should share one domain"),
     );
 }
