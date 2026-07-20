@@ -44,14 +44,22 @@ outstanding notification.
 ## Tokio timer
 
 Enable the `tokio` feature for `TokioMonotonicClock` and `TokioTimer`.
-Creating a future deadline must occur inside a runtime with time enabled. A
-missing runtime returns `TimeError::TimerUnavailable` with
-`TimerUnavailableError::RuntimeNotEntered`; a disabled time driver reports
-`TimerUnavailableError::TimeDriverDisabled`. An already reached deadline
-returns a ready future without runtime access. `TokioTimer` fixes the `Sleep`
+Create either type with `current()` or `try_current()` inside the runtime whose
+time source it should retain. The binding is permanent. Concrete clock users
+can call `try_now()` to receive `TokioRuntimeError::NotEntered` or
+`TokioRuntimeError::Mismatch`; the generic `MonotonicClock::now` method panics
+for either runtime-affinity violation because its trait signature is
+infallible.
+
+`TokioTimer::at` and `after` validate the bound runtime before reading current
+Tokio time, including for an already reached deadline. Registration without an
+entered runtime or from an independent runtime returns
+`TimeError::TimerUnavailable` with
+`TimerUnavailableError::TokioRuntime`; a disabled time driver reports
+`TimerUnavailableError::TimeDriverDisabled`. `TokioTimer` fixes the `Sleep`
 deadline during the call, while Tokio may enroll that sleep with its time
-driver on first poll. Create the clock and future, advance paused time, and poll
-the future under the same runtime time driver.
+driver on first poll. Create the clock and timer, advance paused time, and poll
+the future under the bound runtime time driver.
 
 <a id="manual-time-coordination"></a>
 
@@ -153,8 +161,9 @@ Manual coordination futures are runtime-neutral: they use ordinary Rust
 futures and can be polled by any executor. Cancelling an observer or driver
 future removes only that observation; it does not cancel timer waiters.
 `TokioMonotonicClock` and `TokioTimer` are different: create their future
-deadlines and poll them under the same Tokio time driver that supplied the
-clock's origin.
+deadlines and poll them under the Tokio runtime retained at construction. The
+clock and timer validate that runtime before sampling or registration, while
+tasks may move freely between worker threads belonging to that same runtime.
 
 ## Wall-clock projection and reanchoring
 
@@ -222,5 +231,7 @@ throughput for 1, 2, 4, 8, and 16 concurrent caller threads.
   scheduler worker, async runtime, time driver, or custom backend was
   unavailable. `TimerUnavailableError` identifies the backend and preserves
   its available source error.
+- `TokioRuntimeError`: a Tokio clock was used without an entered runtime or
+  from a runtime different from the one retained at construction.
 - `CannotMoveBackward`: manual time was moved backward.
 - `InvalidInstantOrder`: instant arithmetic used an invalid order.
