@@ -5,19 +5,17 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Defines errors caused by an unavailable or incompatible Tokio runtime.
+//! Defines errors caused by an unavailable ambient Tokio runtime.
 
 use thiserror::Error;
-use tokio::runtime::{
-    Id,
-    TryCurrentError,
-};
+use tokio::runtime::TryCurrentError;
 
-/// Describes why a Tokio-backed clock cannot use the current runtime context.
+/// Describes why a Tokio-backed type cannot capture the current runtime.
 ///
-/// A Tokio clock is permanently bound to the runtime in which it was created.
-/// Callers can therefore distinguish a missing runtime context from an
-/// independently running, incompatible runtime.
+/// This error occurs only in `try_current` constructors. Once constructed, a
+/// Tokio clock or timer uses its retained runtime handle and does not depend on
+/// the caller's ambient runtime context. The enum is non-exhaustive; callers
+/// must retain a fallback arm when matching it.
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum TokioRuntimeError {
@@ -27,13 +25,5 @@ pub enum TokioRuntimeError {
         /// Runtime lookup error reported by Tokio.
         #[source]
         source: TryCurrentError,
-    },
-    /// The current Tokio runtime differs from the clock's bound runtime.
-    #[error("Tokio runtime mismatch: expected {expected}, actual {actual}")]
-    Mismatch {
-        /// Runtime identity retained by the Tokio clock.
-        expected: Id,
-        /// Runtime identity entered on the current thread.
-        actual: Id,
     },
 }
