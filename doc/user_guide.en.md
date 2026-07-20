@@ -11,7 +11,7 @@ tests advance logical time instead of waiting.
 | Civil timestamps | `WallClock` | `StdWallClock` | `FixedWallClock`, `ManualWallClock` |
 | Monotonic instants | `MonotonicClock` | `StdMonotonicClock`, `TokioMonotonicClock` | `ManualMonotonicClock` |
 | Async deadlines | `Timer` | `StdTimer`, `TokioTimer` | `ManualTimer` |
-| Blocking waits | `BlockingSleeper` | compose any `Timer` | compose `ManualTimer` |
+| Blocking waits | `BlockingSleeper` | compose a timer with independent progress | compose an externally driven `ManualTimer` |
 
 Wall-clock values may jump. Use them for externally meaningful timestamps.
 Monotonic instants belong to a private clock domain and must be used for
@@ -44,22 +44,34 @@ outstanding notification.
 ## Tokio timer
 
 Enable the `tokio` feature for `TokioMonotonicClock` and `TokioTimer`.
-Create either type with `current()` or `try_current()` inside the runtime whose
-time source it should retain. The binding is permanent. Concrete clock users
-can call `try_now()` to receive `TokioRuntimeError::NotEntered` or
-`TokioRuntimeError::Mismatch`; the generic `MonotonicClock::now` method panics
-for either runtime-affinity violation because its trait signature is
-infallible.
+Both types retain a Tokio runtime `Handle`. `current()` and `try_current()`
+capture the ambient handle during construction; `try_current()` returns
+`TokioRuntimeError::NotEntered` when there is no ambient runtime. Prefer
+`from_handle(handle)` at dependency-injection boundaries:
 
-`TokioTimer::at` and `after` validate the bound runtime before reading current
-Tokio time, including for an already reached deadline. Registration without an
-entered runtime or from an independent runtime returns
-`TimeError::TimerUnavailable` with
-`TimerUnavailableError::TokioRuntime`; a disabled time driver reports
-`TimerUnavailableError::TimeDriverDisabled`. `TokioTimer` fixes the `Sleep`
-deadline during the call, while Tokio may enroll that sleep with its time
-driver on first poll. Create the clock and timer, advance paused time, and poll
-the future under the bound runtime time driver.
+```rust
+use qubit_clock::{Timer, TokioTimer};
+use std::time::Duration;
+
+let runtime = tokio::runtime::Builder::new_current_thread()
+    .enable_time()
+    .build()
+    .expect("Tokio runtime should build");
+let timer = TokioTimer::from_handle(runtime.handle().clone());
+let deadline = timer
+    .after(Duration::from_millis(1))
+    .expect("deadline should register on the retained runtime");
+runtime.block_on(deadline);
+```
+
+Clock samples and `Sleep` creation briefly enter the retained handle, regardless
+of the caller's ambient runtime. A returned timer future may therefore be
+polled by another thread or runtime context. Deadline progress still belongs to
+the target runtime: its `Runtime` owner must remain alive and its time driver
+must be driven until the future completes. A future deadline on a runtime
+without time enabled returns `TimerUnavailableError::TimeDriverDisabled`.
+An already reached deadline returns an immediately ready future and needs no
+time driver. Dropping a pending future cancels that wait.
 
 <a id="manual-time-coordination"></a>
 
@@ -155,15 +167,16 @@ loop {
 # }
 ```
 
-### Runtime affinity and cancellation
+### Runtime ownership and cancellation
 
 Manual coordination futures are runtime-neutral: they use ordinary Rust
 futures and can be polled by any executor. Cancelling an observer or driver
 future removes only that observation; it does not cancel timer waiters.
-`TokioMonotonicClock` and `TokioTimer` are different: create their future
-deadlines and poll them under the Tokio runtime retained at construction. The
-clock and timer validate that runtime before sampling or registration, while
-tasks may move freely between worker threads belonging to that same runtime.
+`TokioMonotonicClock` and `TokioTimer` instead retain an explicit runtime
+capability. Their samples and timer registrations use that handle, while the
+returned future may be polled in another execution context. Cancelling it
+removes the Tokio sleep; moving it does not transfer deadline ownership to the
+polling runtime. The retained target runtime must remain alive and driven.
 
 ## Wall-clock projection and reanchoring
 
@@ -200,9 +213,12 @@ sleeper.sleep_for(Duration::from_millis(10))?;
 # Ok::<_, qubit_clock::TimeError>(())
 ```
 
-The adapter polls the timer future and parks only the calling thread. The same
-adapter works with a manual timer, so blocking integration tests also avoid
-real delays.
+The adapter polls the timer future and parks only the calling thread. Once that
+thread parks, the timer backend must still be able to make progress. `StdTimer`
+has its own scheduler worker. `ManualTimer` requires another thread or test
+controller to advance the clock. `TokioTimer` requires its retained runtime to
+be driven independently; never block the sole driver thread of a
+current-thread runtime while waiting on that runtime's timer.
 
 ## IoC assembly
 
@@ -228,10 +244,14 @@ throughput for 1, 2, 4, 8, and 16 concurrent caller threads.
 - `ClockDomainMismatch`: a deadline came from another monotonic domain.
 - `InstantOverflow`: relative or native deadline conversion overflowed.
 - `TimerUnavailable { source }`: deadline registration failed because the
-  scheduler worker, async runtime, time driver, or custom backend was
+  scheduler worker, time driver, or custom backend was
   unavailable. `TimerUnavailableError` identifies the backend and preserves
   its available source error.
-- `TokioRuntimeError`: a Tokio clock was used without an entered runtime or
-  from a runtime different from the one retained at construction.
+- `TokioRuntimeError`: `try_current()` could not capture an ambient Tokio
+  runtime. Explicit `from_handle` construction avoids this failure boundary.
 - `CannotMoveBackward`: manual time was moved backward.
 - `InvalidInstantOrder`: instant arithmetic used an invalid order.
+
+The public error enums are `#[non_exhaustive]`. Match the variants you can
+handle and keep a fallback arm so later backend errors remain source
+compatible.

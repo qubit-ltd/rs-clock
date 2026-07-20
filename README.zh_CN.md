@@ -22,7 +22,7 @@
 | 民用时间戳 | `WallClock` | `StdWallClock` | `FixedWallClock`、`ManualWallClock` |
 | 耗时与 deadline | `MonotonicClock` | `StdMonotonicClock`、`TokioMonotonicClock` | `ManualMonotonicClock` |
 | 异步 deadline | `Timer` | `StdTimer`、`TokioTimer` | `ManualTimer` |
-| 阻塞等待 | `BlockingSleeper` 适配器 | 组合真实 timer | 组合 manual timer |
+| 阻塞等待 | `BlockingSleeper` 适配器 | 组合可独立推进的 timer | 组合由外部推进的 manual timer |
 
 Wall time 可能跳变，适合表示对外有意义的时间戳。一个 clock domain 内的 monotonic
 time 永不倒退，适合测量耗时、实现 retry 和 timeout。每个 clock 都可通过
@@ -50,6 +50,12 @@ qubit-clock = { version = "0.10", features = ["tokio"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
 ```
+
+Tokio clock 与 timer 会保存 runtime `Handle`。`current()` 和 `try_current()` 在
+构造时捕获当前 Handle，`from_handle(handle)` 则用于显式注入。后续 clock 采样和
+timer 注册都使用保存的 Handle，因此返回的 future 可以在其他 runtime context 中
+poll。只要仍有 pending deadline，目标 Runtime 的所有者就必须存活，并持续驱动其
+time driver。
 
 ## 使用真实时间
 
@@ -98,11 +104,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 `advance_to_next_deadline_async()` 会等待有效的未来 deadline，再原子推进到该时刻
 仍然存在的最早 deadline。取消竞争会触发重新等待，取消 driver future 不会移动
 manual time。[用户手册](doc/user_guide.zh_CN.md#manual-time-coordination)详细说明了
-快照、count barrier、多阶段协调、runtime affinity、wall reanchor、trait object
+快照、count barrier、多阶段协调、runtime capability、wall reanchor、trait object
 注入和错误处理。
 
 同步 driver 线程可使用 `advance_to_next_deadline_after_waiters()`：它等待当前 waiter
 数量条件，并在同一个时钟状态锁内完成推进，从而消除观察与推进之间的取消窗口。
+
+`BlockingSleeper` 会在 poll 注入的 timer 时 park 调用线程，只能组合能独立推进的
+timer：standard timer 自带 worker，manual time 必须由其他线程或控制方 advance。
+Tokio timer 必须由其他 runtime 线程驱动；如果阻塞 current-thread runtime 的唯一
+驱动线程，它所等待的 deadline 将无法触发。
 
 ## 测试
 

@@ -22,7 +22,7 @@ Detailed documentation:
 | Civil timestamps | `WallClock` | `StdWallClock` | `FixedWallClock`, `ManualWallClock` |
 | Elapsed time and deadlines | `MonotonicClock` | `StdMonotonicClock`, `TokioMonotonicClock` | `ManualMonotonicClock` |
 | Async deadlines | `Timer` | `StdTimer`, `TokioTimer` | `ManualTimer` |
-| Blocking waits | `BlockingSleeper` adapter | compose a real timer | compose a manual timer |
+| Blocking waits | `BlockingSleeper` adapter | compose a timer with independent progress | compose a manually driven timer |
 
 Wall time may jump and is intended for externally meaningful timestamps.
 Monotonic time never moves backward within one clock domain and is intended for
@@ -52,6 +52,13 @@ into tests, declare Tokio directly:
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
 ```
+
+Tokio clocks and timers retain a runtime `Handle`. `current()` and
+`try_current()` capture the ambient handle during construction;
+`from_handle(handle)` supports explicit injection. Later clock samples and
+timer registrations use that retained handle, so their futures may be polled
+from another runtime context. The target runtime owner must remain alive and
+its time driver must continue running until pending deadlines complete.
 
 ## Real-time use
 
@@ -104,12 +111,18 @@ atomically advances to the earliest deadline still registered at that moment.
 Cancellation races are retried, and cancelling the driver future does not move
 manual time. The [user guide](doc/user_guide.en.md#manual-time-coordination)
 documents snapshots, count barriers, multi-stage coordination, runtime
-affinity, wall reanchoring, trait-object injection, and errors.
+capabilities, wall reanchoring, trait-object injection, and errors.
 
 Synchronous driver threads can use
 `advance_to_next_deadline_after_waiters()` to wait for a current waiter-count
 condition and advance under the same clock-state lock, avoiding a cancellation
 gap between observation and advancement.
+
+`BlockingSleeper` parks its caller while polling the injected timer. Use it
+only when that timer can progress independently: the standard timer has a
+worker, while manual time must be advanced elsewhere. A Tokio timer must be
+driven by another runtime thread; blocking the sole driver of a current-thread
+runtime prevents its own deadline from firing.
 
 ## Testing
 

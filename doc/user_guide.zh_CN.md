@@ -10,7 +10,7 @@
 | 民用时间戳 | `WallClock` | `StdWallClock` | `FixedWallClock`、`ManualWallClock` |
 | 单调时刻 | `MonotonicClock` | `StdMonotonicClock`、`TokioMonotonicClock` | `ManualMonotonicClock` |
 | 异步 deadline | `Timer` | `StdTimer`、`TokioTimer` | `ManualTimer` |
-| 阻塞等待 | `BlockingSleeper` | 组合任意 `Timer` | 组合 `ManualTimer` |
+| 阻塞等待 | `BlockingSleeper` | 组合可独立推进的 timer | 组合由外部推进的 `ManualTimer` |
 
 Wall clock 可能跳变，适合表达对外有意义的时间戳。Monotonic instant 属于私有 clock
 domain，适合 timeout、retry delay 和耗时测量。
@@ -39,19 +39,32 @@ let _still_usable = clock.now();
 
 ## Tokio Timer
 
-`TokioMonotonicClock` 与 `TokioTimer` 需要启用 `tokio` feature。必须在目标 runtime
-中使用 `current()` 或 `try_current()` 构造它们，构造后的 runtime 绑定不会改变。
-具体 clock 调用方可以用 `try_now()` 接收 `TokioRuntimeError::NotEntered` 或
-`TokioRuntimeError::Mismatch`；通用 `MonotonicClock::now` 的 trait 签名不可返回错误，
-因此遇到这两类 runtime 亲和性违规时会 panic。
+`TokioMonotonicClock` 与 `TokioTimer` 需要启用 `tokio` feature，二者都会保存 Tokio
+runtime `Handle`。`current()` 和 `try_current()` 在构造时捕获当前 Handle；没有当前
+runtime 时，`try_current()` 返回 `TokioRuntimeError::NotEntered`。IoC 组装边界应优先
+使用 `from_handle(handle)`：
 
-`TokioTimer::at` 与 `after` 会在读取当前 Tokio 时间前验证绑定 runtime，已经到达的
-deadline 也不例外。未进入 runtime 或进入另一个独立 runtime 时，注册返回带有
-`TimerUnavailableError::TokioRuntime` 的 `TimeError::TimerUnavailable`；runtime 禁用
-time driver 时 source 为 `TimerUnavailableError::TimeDriverDisabled`。`TokioTimer` 在
-调用期间固定 `Sleep` 的 deadline，但 Tokio 可以到首次 poll 时才把 sleep 登记到
-time driver。clock、timer、paused time 推进和 future poll 必须使用绑定的 runtime
-time driver。
+```rust
+use qubit_clock::{Timer, TokioTimer};
+use std::time::Duration;
+
+let runtime = tokio::runtime::Builder::new_current_thread()
+    .enable_time()
+    .build()
+    .expect("Tokio runtime should build");
+let timer = TokioTimer::from_handle(runtime.handle().clone());
+let deadline = timer
+    .after(Duration::from_millis(1))
+    .expect("deadline should register on the retained runtime");
+runtime.block_on(deadline);
+```
+
+clock 采样和 `Sleep` 创建会短暂进入保存的 Handle，不依赖调用方当前所在的 runtime。
+因此返回的 timer future 可以在其他线程或 runtime context 中 poll，但 deadline 的推进
+仍属于目标 runtime：只要 future 尚未完成，目标 `Runtime` 的所有者就必须存活，并持续
+驱动 time driver。目标 runtime 未启用 time 时，未来 deadline 返回
+`TimerUnavailableError::TimeDriverDisabled`；已经到达的 deadline 会直接返回 ready
+future，不需要 time driver。drop pending future 会取消本次等待。
 
 <a id="manual-time-coordination"></a>
 
@@ -139,13 +152,14 @@ loop {
 # }
 ```
 
-### Runtime 亲和性与取消
+### Runtime 所有权与取消
 
 Manual 协调 future 与 runtime 无关：它们是普通 Rust future，可由任意 executor
 poll。取消 observer 或 driver future 只会移除本次观察，不会取消 timer waiter。
-`TokioMonotonicClock` 与 `TokioTimer` 则不同：未来 deadline 的创建和 poll 必须使用
-构造时保留的 Tokio runtime。clock 和 timer 会在采样或注册前验证 runtime；task
-仍可在同一 runtime 的不同 worker thread 之间自由移动。
+`TokioMonotonicClock` 与 `TokioTimer` 则保存明确的 runtime capability：采样和 timer
+注册使用该 Handle，返回的 future 可以在其他执行 context 中 poll。取消 future 会
+移除 Tokio sleep；移动 future 不会把 deadline 的所有权转交给 polling runtime。
+保存 Handle 所指向的目标 runtime 必须保持存活并持续推进。
 
 ## Wall Clock 投影与重新锚定
 
@@ -182,8 +196,10 @@ sleeper.sleep_for(Duration::from_millis(10))?;
 # Ok::<_, qubit_clock::TimeError>(())
 ```
 
-适配器 poll timer future，并只 park 当前调用线程。同一个适配器也能组合 manual
-timer，因此阻塞式集成测试同样无需真实等待。
+适配器 poll timer future，并只 park 当前调用线程；线程 park 后，timer backend 仍须
+能够推进。`StdTimer` 自带 scheduler worker；`ManualTimer` 必须由其他线程或测试控制方
+advance；`TokioTimer` 必须由其保存的 runtime 独立驱动。不要在 current-thread runtime
+的唯一驱动线程上阻塞等待绑定该 runtime 的 timer。
 
 ## IoC 组装
 
@@ -205,10 +221,13 @@ cargo bench --bench std_timer_scheduler
 
 - `ClockDomainMismatch`：deadline 来自另一个 monotonic domain。
 - `InstantOverflow`：相对 deadline 或原生 deadline 转换溢出。
-- `TimerUnavailable { source }`：scheduler worker、async runtime、time driver 或自定义
+- `TimerUnavailable { source }`：scheduler worker、time driver 或自定义
   backend 不可用，导致 deadline 注册失败；`TimerUnavailableError` 标识 backend
   并保留可用的原始错误。
-- `TokioRuntimeError`：Tokio clock 在未进入 runtime 时使用，或从不同于构造时所绑定
-  runtime 的另一个 runtime 使用。
+- `TokioRuntimeError`：`try_current()` 无法捕获当前 Tokio runtime；显式使用
+  `from_handle` 可避开这个失败边界。
 - `CannotMoveBackward`：manual time 被要求倒退。
 - `InvalidInstantOrder`：instant 运算顺序无效。
+
+公开 error enum 都使用 `#[non_exhaustive]`。调用方应只匹配自己能处理的 variant，
+并保留 fallback 分支，使未来新增 backend 错误时仍保持源码兼容。

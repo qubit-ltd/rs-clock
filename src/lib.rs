@@ -12,7 +12,8 @@
 //! services can inject [`WallClock`] for business timestamps, while timeout
 //! and delay code injects [`MonotonicClock`] or [`Timer`]. A
 //! [`BlockingSleeper`] can adapt the same timer when synchronous code must
-//! block. Manual implementations allow tests to advance logical time without
+//! block, provided the timer backend can progress while the calling thread is
+//! parked. Manual implementations allow tests to advance logical time without
 //! waiting for real time to pass.
 //!
 //! # Examples
