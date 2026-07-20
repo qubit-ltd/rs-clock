@@ -265,6 +265,21 @@ fn test_manual_monotonic_clock_waiter_driver_times_out() {
     assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
 }
 
+/// Verifies that a positive guard waits before returning without a waiter.
+#[test]
+fn test_manual_monotonic_clock_waiter_driver_waits_for_guard_timeout() {
+    let clock = ManualMonotonicClock::new();
+
+    assert_eq!(
+        None,
+        clock.advance_to_next_deadline_after_waiters(
+            1,
+            Duration::from_millis(100),
+        ),
+    );
+    assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
+}
+
 /// Verifies that an unrepresentable real-time guard is rejected.
 #[test]
 fn test_manual_monotonic_clock_waiter_driver_rejects_unrepresentable_guard() {
