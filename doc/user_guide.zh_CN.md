@@ -37,6 +37,10 @@ let _still_usable = clock.now();
 只等待这个固定 deadline；具体后端可以到 future 首次 poll 时才向原生 scheduler
 登记。丢弃未完成 future 会取消尚未完成的通知。
 
+`StdTimer` 把 scheduler worker 意外退出视为 fail-fast 条件：它会唤醒该 worker
+generation 持有的 future；这些 future 在下一次 poll 时 panic，而不会永久 pending，
+也不会伪装成 deadline 已完成。后续注册会启动新的 worker generation。
+
 ## Tokio Timer
 
 `TokioMonotonicClock` 与 `TokioTimer` 需要启用 `tokio` feature，二者都会保存 Tokio
@@ -216,6 +220,14 @@ cargo bench --bench std_timer_scheduler
 ```
 
 基准测试分别报告 1、2、4、8、16 个并发调用线程下的注册/取消与 deadline 完成吞吐。
+
+`BlockingSleeper` 与 `StdTimer` 使用的小型同步状态机还提供 Loom 模型检查，可通过以下
+命令运行：
+
+```bash
+RUSTFLAGS="--cfg loom" cargo test --release --test sleep_tests notification_latch_model
+RUSTFLAGS="--cfg loom" cargo test --release --test timer_tests std_timer_waiter_model
+```
 
 ## 错误
 
