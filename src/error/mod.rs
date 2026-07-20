@@ -10,5 +10,11 @@
 mod time_error;
 mod timer_unavailable_error;
 
+#[cfg(feature = "tokio")]
+mod tokio_runtime_error;
+
 pub use time_error::TimeError;
 pub use timer_unavailable_error::TimerUnavailableError;
+
+#[cfg(feature = "tokio")]
+pub use tokio_runtime_error::TokioRuntimeError;

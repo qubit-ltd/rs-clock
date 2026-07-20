@@ -6,6 +6,14 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+#[cfg(feature = "tokio")]
+use qubit_clock::{
+    MonotonicClock,
+    Timer,
+    TokioMonotonicClock,
+    TokioRuntimeError,
+    TokioTimer,
+};
 use qubit_clock::{
     TimeError,
     TimerUnavailableError,
@@ -66,4 +74,38 @@ fn test_timer_unavailable_error_retains_custom_backend_source() {
 fn test_timer_unavailable_error_implements_std_error() {
     fn assert_error<T: Error>() {}
     assert_error::<TimerUnavailableError>();
+}
+
+/// Verifies that Tokio runtime lookup failures remain in the source chain.
+#[cfg(feature = "tokio")]
+#[test]
+fn test_timer_unavailable_error_retains_tokio_runtime_source() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("runtime should build");
+    let (timer, deadline) = runtime.block_on(async {
+        let clock = TokioMonotonicClock::current();
+        let deadline = clock.now();
+        (TokioTimer::from_clock(&clock), deadline)
+    });
+    let error = match timer.at(deadline) {
+        Ok(_) => panic!("runtime-less registration should fail"),
+        Err(error) => error,
+    };
+
+    let timer_error = error
+        .source()
+        .expect("timer unavailability should be the outer source");
+    let runtime_error = timer_error
+        .source()
+        .and_then(|source| source.downcast_ref::<TokioRuntimeError>())
+        .expect("Tokio runtime error should be retained");
+    let lookup_error = runtime_error
+        .source()
+        .and_then(|source| {
+            source.downcast_ref::<tokio::runtime::TryCurrentError>()
+        })
+        .expect("Tokio runtime lookup error should be retained");
+    assert!(lookup_error.is_missing_context());
 }

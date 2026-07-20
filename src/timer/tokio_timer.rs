@@ -15,19 +15,18 @@ use crate::{
     TimerFuture,
     TimerUnavailableError,
     TokioMonotonicClock,
+    TokioRuntimeError,
 };
-use tokio::runtime::Handle;
+use std::time::Duration;
 use tokio::time::Instant;
 
 /// An asynchronous timer backed by one Tokio runtime time driver.
 ///
+/// The timer retains the source clock's exact domain, origin, and runtime
+/// binding. Registration validates that runtime before reading Tokio time, so
+/// both reached and future deadlines reject a missing or independent runtime.
 /// The timer fixes each native Tokio deadline before [`Timer::at`] returns;
 /// Tokio may enroll the resulting sleep with its time driver on first poll.
-/// The timer retains the source clock's exact domain and origin. Future
-/// deadlines must be created and polled under the same Tokio time driver;
-/// reached deadlines return an immediately ready future without accessing a
-/// runtime. Tokio does not expose a driver identity that this crate can
-/// validate.
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioTimer {
@@ -36,11 +35,49 @@ pub struct TokioTimer {
 }
 
 impl TokioTimer {
+    /// Creates a timer bound to the currently entered Tokio runtime.
+    ///
+    /// # Returns
+    ///
+    /// A timer with a new clock domain bound to the current runtime.
+    ///
+    /// # Panics
+    ///
+    /// Panics when no Tokio runtime is entered or all process-wide clock-domain
+    /// identifiers are exhausted.
+    #[must_use]
+    #[track_caller]
+    #[inline]
+    pub fn current() -> Self {
+        Self::try_current().unwrap_or_else(|error| {
+            panic!("cannot create Tokio timer: {error}")
+        })
+    }
+
+    /// Tries to create a timer bound to the currently entered Tokio runtime.
+    ///
+    /// # Returns
+    ///
+    /// A timer with a new clock domain bound to the current runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokioRuntimeError::NotEntered`] when no Tokio runtime is
+    /// entered.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
+    #[inline]
+    pub fn try_current() -> Result<Self, TokioRuntimeError> {
+        TokioMonotonicClock::try_current().map(|clock| Self { clock })
+    }
+
     /// Creates a timer sharing the supplied Tokio clock's exact domain.
     ///
     /// # Parameters
     ///
-    /// * `clock` - Tokio clock whose domain, origin, and driver affinity apply.
+    /// * `clock` - Tokio clock whose domain, origin, and runtime binding apply.
     ///
     /// # Returns
     ///
@@ -99,26 +136,28 @@ impl Timer for TokioTimer {
     /// # Returns
     ///
     /// A future waiting for the fixed deadline, or an immediately ready future
-    /// for a reached deadline. Tokio may register the sleep on first poll.
+    /// for a reached deadline in the bound runtime. Tokio may register the
+    /// sleep on first poll.
     ///
     /// # Errors
     ///
     /// Returns a domain mismatch or instant overflow before runtime access.
-    /// For future deadlines, returns [`TimeError::TimerUnavailable`] with
-    /// [`TimerUnavailableError::RuntimeNotEntered`] when no runtime is
-    /// entered, or [`TimerUnavailableError::TimeDriverDisabled`] when its
-    /// time driver is disabled. Reached deadlines do not require runtime
-    /// access.
+    /// Returns [`TimeError::TimerUnavailable`] with
+    /// [`TimerUnavailableError::TokioRuntime`] when no runtime is entered or
+    /// an independent runtime is entered, or
+    /// [`TimerUnavailableError::TimeDriverDisabled`] when the bound runtime's
+    /// time driver is disabled. Runtime validation applies to reached and
+    /// future deadlines alike.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let deadline = self.native_deadline(deadline)?;
+        self.clock.ensure_current_runtime().map_err(|source| {
+            TimeError::TimerUnavailable {
+                source: TimerUnavailableError::TokioRuntime { source },
+            }
+        })?;
         if deadline <= Instant::now() {
             return Ok(Box::pin(std::future::ready(())));
         }
-        Handle::try_current().map_err(|source| {
-            TimeError::TimerUnavailable {
-                source: TimerUnavailableError::RuntimeNotEntered { source },
-            }
-        })?;
         let sleep =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 tokio::time::sleep_until(deadline)
@@ -129,5 +168,33 @@ impl Timer for TokioTimer {
         Ok(Box::pin(async move {
             sleep.await;
         }))
+    }
+
+    /// Registers a notification after a duration in the bound Tokio runtime.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Duration from the current bound-runtime instant.
+    ///
+    /// # Returns
+    ///
+    /// A future that becomes ready when the fixed deadline is reached.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::TimerUnavailable`] with
+    /// [`TimerUnavailableError::TokioRuntime`] when no runtime is entered or
+    /// an independent runtime is entered. Returns
+    /// [`TimeError::InstantOverflow`] when the relative deadline cannot be
+    /// represented, or another timer-unavailability error when registration
+    /// fails.
+    #[inline]
+    fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
+        let now = self.clock.try_now().map_err(|source| {
+            TimeError::TimerUnavailable {
+                source: TimerUnavailableError::TokioRuntime { source },
+            }
+        })?;
+        self.at(now.checked_add(duration)?)
     }
 }
