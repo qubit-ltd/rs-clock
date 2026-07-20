@@ -112,6 +112,12 @@ where
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         self.as_ref().at(deadline)
     }
+
+    /// Delegates relative deadline registration to the shared timer.
+    #[inline(always)]
+    fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
+        self.as_ref().after(duration)
+    }
 }
 
 impl<T> Timer for Box<T>
@@ -128,5 +134,11 @@ where
     #[inline(always)]
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         self.as_ref().at(deadline)
+    }
+
+    /// Delegates relative deadline registration to the boxed timer.
+    #[inline(always)]
+    fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
+        self.as_ref().after(duration)
     }
 }

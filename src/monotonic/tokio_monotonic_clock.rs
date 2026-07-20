@@ -12,23 +12,23 @@ use crate::{
     MonotonicClock,
     MonotonicInstant,
     Timer,
+    TokioRuntimeError,
     TokioTimer,
 };
 use std::sync::Arc;
+use tokio::runtime::Handle;
 use tokio::time::Instant;
 
 /// A monotonic clock backed by Tokio's time driver.
 ///
-/// It follows Tokio pause and advance semantics. The type intentionally does
-/// not implement [`Clone`]; shared identity uses `Arc<TokioMonotonicClock>`.
+/// It follows the pause and advance semantics of the Tokio runtime entered at
+/// construction. The binding is permanent and validated before every sample;
+/// moving tasks between worker threads of that runtime is supported, while
+/// sampling from an independent runtime is rejected.
 ///
-/// When Tokio time is paused or explicitly advanced, create this clock after
-/// entering the runtime and read it only from that runtime. A paired
-/// [`TokioTimer`](crate::TokioTimer) must also be polled by the same runtime
-/// time driver. Moving tasks between worker threads of one runtime is
-/// supported; moving the clock or timer between independent runtimes is not.
-/// Driver identity is a caller contract because Tokio does not expose an
-/// identity that this crate can validate.
+/// The type intentionally does not implement [`Clone`]; shared identity uses
+/// `Arc<TokioMonotonicClock>`. Use [`Self::try_now`] when runtime-affinity
+/// failures must be handled without a panic.
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioMonotonicClock {
@@ -36,30 +36,53 @@ pub struct TokioMonotonicClock {
     domain: ClockDomain,
     /// Native Tokio instant mapped to elapsed duration zero.
     origin: Instant,
+    /// Tokio runtime capability retained for identity validation.
+    runtime: Handle,
 }
 
 impl TokioMonotonicClock {
-    /// Creates a new Tokio clock domain at the current Tokio instant.
-    ///
-    /// Calling this method does not itself require a Tokio runtime. When using
-    /// paused or explicitly advanced Tokio time, call it after entering the
-    /// runtime whose time driver will read this clock and poll its paired
-    /// timer.
+    /// Creates a Tokio clock bound to the currently entered runtime.
     ///
     /// # Returns
     ///
-    /// A Tokio monotonic clock with a newly allocated domain.
+    /// A Tokio monotonic clock bound to the current runtime.
+    ///
+    /// # Panics
+    ///
+    /// Panics when no Tokio runtime is entered or all process-wide clock-domain
+    /// identifiers are exhausted.
+    #[must_use]
+    #[track_caller]
+    #[inline]
+    pub fn current() -> Self {
+        Self::try_current().unwrap_or_else(|error| {
+            panic!("cannot create Tokio monotonic clock: {error}")
+        })
+    }
+
+    /// Tries to create a Tokio clock bound to the currently entered runtime.
+    ///
+    /// # Returns
+    ///
+    /// A Tokio monotonic clock bound to the current runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokioRuntimeError::NotEntered`] when no Tokio runtime is
+    /// entered.
     ///
     /// # Panics
     ///
     /// Panics if all process-wide clock-domain identifiers are exhausted.
-    #[must_use]
     #[inline]
-    pub fn new() -> Self {
-        Self {
+    pub fn try_current() -> Result<Self, TokioRuntimeError> {
+        let runtime = Handle::try_current()
+            .map_err(|source| TokioRuntimeError::NotEntered { source })?;
+        Ok(Self {
             domain: ClockDomain::new(),
             origin: Instant::now(),
-        }
+            runtime,
+        })
     }
 
     /// Creates a private handle retaining this exact Tokio clock domain.
@@ -69,11 +92,29 @@ impl TokioMonotonicClock {
     /// A clock handle with the same domain identifier and Tokio origin.
     #[must_use]
     #[inline]
-    pub(crate) const fn same_domain_handle(&self) -> Self {
+    pub(crate) fn same_domain_handle(&self) -> Self {
         Self {
             domain: self.domain,
             origin: self.origin,
+            runtime: self.runtime.clone(),
         }
+    }
+
+    /// Tries to sample the current instant from the bound Tokio runtime.
+    ///
+    /// # Returns
+    ///
+    /// The current elapsed duration represented in this clock's domain.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokioRuntimeError::NotEntered`] when no Tokio runtime is
+    /// entered, or [`TokioRuntimeError::Mismatch`] when a different runtime is
+    /// entered.
+    #[inline]
+    pub fn try_now(&self) -> Result<MonotonicInstant, TokioRuntimeError> {
+        self.ensure_current_runtime()?;
+        Ok(MonotonicInstant::new(self.domain, self.origin.elapsed()))
     }
 
     /// Returns the Tokio origin used by the paired timer.
@@ -96,21 +137,27 @@ impl TokioMonotonicClock {
     pub(crate) const fn domain(&self) -> ClockDomain {
         self.domain
     }
-}
 
-impl Default for TokioMonotonicClock {
-    /// Creates a new independent Tokio monotonic clock domain.
+    /// Verifies that the bound Tokio runtime is currently entered.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// A Tokio monotonic clock with a newly allocated domain.
-    ///
-    /// # Panics
-    ///
-    /// Panics if all process-wide clock-domain identifiers are exhausted.
-    #[inline(always)]
-    fn default() -> Self {
-        Self::new()
+    /// Returns [`TokioRuntimeError::NotEntered`] when no Tokio runtime is
+    /// entered, or [`TokioRuntimeError::Mismatch`] when the entered runtime
+    /// differs from the bound runtime.
+    #[inline]
+    pub(crate) fn ensure_current_runtime(
+        &self,
+    ) -> Result<(), TokioRuntimeError> {
+        let actual = Handle::try_current()
+            .map_err(|source| TokioRuntimeError::NotEntered { source })?
+            .id();
+        let expected = self.runtime.id();
+        if actual == expected {
+            Ok(())
+        } else {
+            Err(TokioRuntimeError::Mismatch { expected, actual })
+        }
     }
 }
 
@@ -120,16 +167,25 @@ impl MonotonicClock for TokioMonotonicClock {
     /// # Returns
     ///
     /// The current elapsed duration represented in this clock's domain.
+    ///
+    /// # Panics
+    ///
+    /// Panics when no Tokio runtime is entered or the entered runtime differs
+    /// from the runtime bound at construction. Use [`Self::try_now`] to handle
+    /// either condition without a panic.
+    #[track_caller]
     #[inline]
     fn now(&self) -> MonotonicInstant {
-        MonotonicInstant::new(self.domain, self.origin.elapsed())
+        self.try_now().unwrap_or_else(|error| {
+            panic!("cannot sample Tokio monotonic clock: {error}")
+        })
     }
 
     /// Creates a timer retaining this exact Tokio clock domain and origin.
     ///
     /// # Returns
     ///
-    /// A shared timer using the same caller-managed Tokio driver affinity.
+    /// A shared timer bound to the same Tokio runtime.
     #[inline]
     fn new_timer(&self) -> Arc<dyn Timer> {
         Arc::new(TokioTimer::from_clock(self))

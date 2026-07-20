@@ -138,7 +138,22 @@ fn test_timer_future_is_send_and_static() {
 fn test_timer_arc_and_box_delegate_to_inner_timer() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let shared = Arc::new(RecordingTimer::new(Arc::clone(&clock)));
-    let boxed: Box<dyn Timer> = Box::new(RecordingTimer::new(clock));
+    let boxed = Box::new(RecordingTimer::new(clock));
+
+    assert_eq!(
+        Duration::ZERO,
+        <Box<RecordingTimer> as Timer>::clock(&boxed)
+            .now()
+            .elapsed_since_origin()
+    );
+    let direct_deadline = boxed
+        .clock()
+        .now()
+        .checked_add(Duration::from_secs(3))
+        .expect("boxed timer deadline should be representable");
+    let _direct_future =
+        <Box<RecordingTimer> as Timer>::at(&boxed, direct_deadline)
+            .expect("boxed timer registration should succeed");
 
     let _shared_future = shared
         .after(Duration::from_secs(2))
@@ -153,5 +168,8 @@ fn test_timer_arc_and_box_delegate_to_inner_timer() {
             .deadline()
             .map(MonotonicInstant::elapsed_since_origin)
     );
-    assert_eq!(Duration::ZERO, boxed.clock().now().elapsed_since_origin());
+    assert_eq!(
+        Some(Duration::from_secs(4)),
+        boxed.deadline().map(MonotonicInstant::elapsed_since_origin)
+    );
 }

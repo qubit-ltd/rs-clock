@@ -8,3 +8,6 @@
 
 mod time_error_tests;
 mod timer_unavailable_error_tests;
+
+#[cfg(feature = "tokio")]
+mod tokio_runtime_error_tests;

@@ -14,6 +14,9 @@ use std::{
 
 use thiserror::Error;
 
+#[cfg(feature = "tokio")]
+use super::TokioRuntimeError;
+
 /// Describes the backend failure that prevented timer registration.
 ///
 /// Each variant preserves the most specific stable source exposed by its
@@ -30,14 +33,14 @@ pub enum TimerUnavailableError {
         #[source]
         source: io::Error,
     },
-    /// No asynchronous runtime was entered when a deadline was registered.
+    /// The current Tokio runtime cannot drive the bound timer.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    #[error("no asynchronous runtime is entered: {source}")]
-    RuntimeNotEntered {
-        /// Runtime lookup error reported by Tokio.
+    #[error("the Tokio runtime cannot drive the bound timer: {source}")]
+    TokioRuntime {
+        /// Missing or mismatched Tokio runtime context.
         #[source]
-        source: tokio::runtime::TryCurrentError,
+        source: TokioRuntimeError,
     },
     /// The entered asynchronous runtime has no enabled time driver.
     #[cfg(feature = "tokio")]

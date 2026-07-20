@@ -48,6 +48,8 @@ pub mod sleep;
 pub mod timer;
 pub mod wall;
 
+#[cfg(feature = "tokio")]
+pub use error::TokioRuntimeError;
 pub use error::{
     TimeError,
     TimerUnavailableError,
