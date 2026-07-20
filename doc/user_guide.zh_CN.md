@@ -39,13 +39,19 @@ let _still_usable = clock.now();
 
 ## Tokio Timer
 
-`TokioMonotonicClock` 与 `TokioTimer` 需要启用 `tokio` feature。创建未来 deadline
-必须发生在启用 time 的 runtime 中；未进入 runtime 时，`at`/`after` 返回带有
-`TimerUnavailableError::RuntimeNotEntered` 的 `TimeError::TimerUnavailable`；runtime
-禁用 time driver 时 source 为 `TimerUnavailableError::TimeDriverDisabled`。已经到达
-的 deadline 无需访问 runtime，会直接返回 ready future。`TokioTimer` 在调用期间固定
-`Sleep` 的 deadline，但 Tokio 可以到首次 poll 时才把 sleep 登记到 time driver。
-clock、future、paused time 推进和 future poll 必须使用同一个 runtime time driver。
+`TokioMonotonicClock` 与 `TokioTimer` 需要启用 `tokio` feature。必须在目标 runtime
+中使用 `current()` 或 `try_current()` 构造它们，构造后的 runtime 绑定不会改变。
+具体 clock 调用方可以用 `try_now()` 接收 `TokioRuntimeError::NotEntered` 或
+`TokioRuntimeError::Mismatch`；通用 `MonotonicClock::now` 的 trait 签名不可返回错误，
+因此遇到这两类 runtime 亲和性违规时会 panic。
+
+`TokioTimer::at` 与 `after` 会在读取当前 Tokio 时间前验证绑定 runtime，已经到达的
+deadline 也不例外。未进入 runtime 或进入另一个独立 runtime 时，注册返回带有
+`TimerUnavailableError::TokioRuntime` 的 `TimeError::TimerUnavailable`；runtime 禁用
+time driver 时 source 为 `TimerUnavailableError::TimeDriverDisabled`。`TokioTimer` 在
+调用期间固定 `Sleep` 的 deadline，但 Tokio 可以到首次 poll 时才把 sleep 登记到
+time driver。clock、timer、paused time 推进和 future poll 必须使用绑定的 runtime
+time driver。
 
 <a id="manual-time-coordination"></a>
 
@@ -138,7 +144,8 @@ loop {
 Manual 协调 future 与 runtime 无关：它们是普通 Rust future，可由任意 executor
 poll。取消 observer 或 driver future 只会移除本次观察，不会取消 timer waiter。
 `TokioMonotonicClock` 与 `TokioTimer` 则不同：未来 deadline 的创建和 poll 必须使用
-提供 clock origin 的同一个 Tokio time driver。
+构造时保留的 Tokio runtime。clock 和 timer 会在采样或注册前验证 runtime；task
+仍可在同一 runtime 的不同 worker thread 之间自由移动。
 
 ## Wall Clock 投影与重新锚定
 
@@ -201,5 +208,7 @@ cargo bench --bench std_timer_scheduler
 - `TimerUnavailable { source }`：scheduler worker、async runtime、time driver 或自定义
   backend 不可用，导致 deadline 注册失败；`TimerUnavailableError` 标识 backend
   并保留可用的原始错误。
+- `TokioRuntimeError`：Tokio clock 在未进入 runtime 时使用，或从不同于构造时所绑定
+  runtime 的另一个 runtime 使用。
 - `CannotMoveBackward`：manual time 被要求倒退。
 - `InvalidInstantOrder`：instant 运算顺序无效。
