@@ -5,6 +5,6 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-#[cfg(loom)]
-mod common;
-mod timer;
+//! Model tests for internal blocking-sleep synchronization state.
+
+mod notification_latch_tests;
