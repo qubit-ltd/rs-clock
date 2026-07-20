@@ -8,3 +8,4 @@
 //! Tests for the sleep module.
 
 mod blocking_sleeper_tests;
+mod internal;

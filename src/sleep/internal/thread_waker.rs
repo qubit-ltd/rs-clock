@@ -7,13 +7,8 @@
 // =============================================================================
 //! Defines the notification latch used by a blocking sleeper.
 
-use std::sync::{
-    Arc,
-    atomic::{
-        AtomicBool,
-        Ordering,
-    },
-};
+use super::notification_latch::NotificationLatch;
+use std::sync::Arc;
 use std::task::Wake;
 
 /// Thread notification latch used as a future waker.
@@ -21,7 +16,7 @@ pub(crate) struct ThreadWaker {
     /// Thread parked while its timer future remains pending.
     thread: std::thread::Thread,
     /// Notification bit preventing wake-before-park races.
-    notified: AtomicBool,
+    notification: NotificationLatch,
 }
 
 impl ThreadWaker {
@@ -36,17 +31,17 @@ impl ThreadWaker {
     /// A latch with no pending notification.
     #[must_use]
     #[inline(always)]
-    pub(crate) const fn new(thread: std::thread::Thread) -> Self {
+    pub(crate) fn new(thread: std::thread::Thread) -> Self {
         Self {
             thread,
-            notified: AtomicBool::new(false),
+            notification: NotificationLatch::new(),
         }
     }
 
     /// Clears a stale notification before polling the future again.
     #[inline(always)]
     pub(crate) fn clear_notification(&self) {
-        self.notified.store(false, Ordering::Release);
+        self.notification.clear_notification();
     }
 
     /// Takes and clears the currently latched notification.
@@ -57,7 +52,7 @@ impl ThreadWaker {
     #[must_use]
     #[inline(always)]
     pub(crate) fn take_notification(&self) -> bool {
-        self.notified.swap(false, Ordering::AcqRel)
+        self.notification.take_notification()
     }
 }
 
@@ -71,7 +66,7 @@ impl Wake for ThreadWaker {
     /// Latches a notification before unparking the blocked thread.
     #[inline(always)]
     fn wake_by_ref(self: &Arc<Self>) {
-        self.notified.store(true, Ordering::Release);
+        self.notification.notify();
         self.thread.unpark();
     }
 }
