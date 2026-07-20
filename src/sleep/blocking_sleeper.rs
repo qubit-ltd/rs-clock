@@ -27,6 +27,16 @@ use std::time::Duration;
 /// This type owns no clock or scheduling policy of its own. It composes a
 /// shared timer and blocks only the calling thread while polling the timer's
 /// future. Clones share that same timer.
+///
+/// # Progress
+///
+/// The timer backend must still make progress after the calling thread parks.
+/// [`StdTimer`](crate::StdTimer) has its own worker. A
+/// [`ManualTimer`](crate::ManualTimer) requires another thread or controller to
+/// advance its clock. A `TokioTimer` requires its retained runtime to remain
+/// alive and be driven independently. Blocking the sole driver thread of a
+/// current-thread Tokio runtime while waiting on that same runtime's timer
+/// prevents the deadline from completing.
 #[derive(Clone)]
 pub struct BlockingSleeper {
     /// Timer providing eager deadline registration and completion futures.
@@ -38,7 +48,8 @@ impl BlockingSleeper {
     ///
     /// # Parameters
     ///
-    /// * `timer` - Timer used for every blocking deadline.
+    /// * `timer` - Timer used for every blocking deadline. Its backend must
+    ///   progress independently while the calling thread is parked.
     ///
     /// # Returns
     ///
@@ -79,6 +90,11 @@ impl BlockingSleeper {
     ///
     /// Panics when the composed timer panics during registration or its
     /// returned future panics while being polled.
+    ///
+    /// # Blocking
+    ///
+    /// Parks the calling thread while the composed timer is pending. The timer
+    /// backend must be driven independently during that interval.
     #[inline(always)]
     pub fn sleep_until(
         &self,
@@ -110,6 +126,11 @@ impl BlockingSleeper {
     ///
     /// Panics when the composed timer panics during registration or its
     /// returned future panics while being polled.
+    ///
+    /// # Blocking
+    ///
+    /// Parks the calling thread while the composed timer is pending. The timer
+    /// backend must be driven independently during that interval.
     #[inline(always)]
     pub fn sleep_for(&self, duration: Duration) -> Result<(), TimeError> {
         let future = self.timer.after(duration)?;
