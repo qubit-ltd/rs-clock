@@ -56,7 +56,7 @@ pub(crate) fn next_identifier_state(identifier: u64) -> Option<u64> {
 ///
 /// Panics when the allocator has already reached its terminal zero state.
 #[must_use = "the allocated domain identifier must initialize a clock domain"]
-#[inline(always)]
+#[inline]
 fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
     next.fetch_update(
         Ordering::Relaxed,

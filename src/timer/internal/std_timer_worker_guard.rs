@@ -51,7 +51,7 @@ impl<'a> StdTimerWorkerGuard<'a> {
     /// # Returns
     ///
     /// A guard responsible for restoring scheduler state when the worker exits.
-    #[inline(always)]
+    #[inline]
     pub(super) fn handoff(mut self) -> Self {
         let worker_guard = Self::new(self.scheduler, self.worker_generation);
         self.worker_generation = 0;

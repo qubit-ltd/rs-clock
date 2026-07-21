@@ -6,13 +6,13 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-mod manual_timer_tests;
-mod std_timer_tests;
-mod timer_future_tests;
-mod timer_tests;
+use qubit_clock::TimerFuture;
+use std::future;
 
-mod internal;
-mod support;
+#[test]
+fn test_timer_future_is_send_and_static() {
+    fn assert_send_static<T: Send + 'static>(_: T) {}
 
-#[cfg(feature = "tokio")]
-mod tokio_timer_tests;
+    let future: TimerFuture = Box::pin(future::pending());
+    assert_send_static(future);
+}
