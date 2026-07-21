@@ -143,6 +143,14 @@ impl BlockingSleeper {
     ///
     /// * `future` - Eagerly registered timer future to drive to completion.
     ///
+    /// # Returns
+    ///
+    /// The completion result produced by `future`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the completion error reported by `future`.
+    ///
     /// # Panics
     ///
     /// Panics when polling the timer future panics.
