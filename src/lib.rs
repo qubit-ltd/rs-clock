@@ -84,6 +84,8 @@ pub use wall::{
 pub use timer::internal::std_timer_scheduler::{
     fail_next_std_timer_worker_spawn,
     panic_next_std_timer_worker,
+    reset_std_timer_worker_notification_count,
+    std_timer_worker_notification_count,
 };
 
 #[cfg(feature = "tokio")]
