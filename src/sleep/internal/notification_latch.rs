@@ -7,12 +7,12 @@
 // =============================================================================
 //! Defines the one-bit notification state used while blocking on a Timer.
 
-#[cfg(loom)]
+#[cfg(all(test, loom))]
 use loom::sync::atomic::{
     AtomicBool,
     Ordering,
 };
-#[cfg(not(loom))]
+#[cfg(not(all(test, loom)))]
 use std::sync::atomic::{
     AtomicBool,
     Ordering,
