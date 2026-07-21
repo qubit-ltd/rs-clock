@@ -39,6 +39,12 @@ pub enum TimerUnavailableError {
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     #[error("the asynchronous runtime time driver is disabled")]
     TimeDriverDisabled,
+    /// The target asynchronous runtime shut down before a pending timer future
+    /// completed.
+    #[cfg(feature = "tokio")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    #[error("the asynchronous runtime shut down before the timer future completed")]
+    RuntimeShuttingDown,
     /// A custom timer backend is unavailable.
     #[error("timer backend '{backend}' is unavailable: {source}")]
     BackendUnavailable {
