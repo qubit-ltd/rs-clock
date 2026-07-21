@@ -18,45 +18,21 @@ use crate::{
     TokioRuntimeError,
 };
 use std::{
-    any::Any,
+    convert::Infallible,
     panic::{
+        AssertUnwindSafe,
         catch_unwind,
         resume_unwind,
-        AssertUnwindSafe,
     },
-    task::Poll,
+    task::{
+        Context,
+        Poll,
+    },
     time::Duration,
 };
 use tokio::runtime::Handle;
+use tokio::task::JoinSet;
 use tokio::time::Instant;
-
-/// Panic message emitted by the Tokio version locked for this crate.
-const RUNTIME_SHUTTING_DOWN_PANIC: &str =
-    "A Tokio 1.x context was found, but it is being shutdown.";
-
-/// Returns whether `payload` is Tokio's runtime-shutdown timer panic.
-///
-/// Tokio exposes this lifecycle failure by panicking while polling `Sleep`.
-/// This helper recognizes the locked Tokio version's stable panic message so
-/// [`TokioTimer`] can preserve [`Timer`](crate::Timer)'s typed completion-error
-/// contract. Any other panic is resumed unchanged.
-///
-/// # Parameters
-///
-/// * `payload` - Panic payload captured while polling one Tokio sleep.
-///
-/// # Returns
-///
-/// `true` when `payload` identifies a retained runtime that is shutting down.
-#[inline]
-fn is_runtime_shutting_down_panic(payload: &(dyn Any + Send)) -> bool {
-    payload
-        .downcast_ref::<&str>()
-        .is_some_and(|message| *message == RUNTIME_SHUTTING_DOWN_PANIC)
-        || payload
-            .downcast_ref::<String>()
-            .is_some_and(|message| message == RUNTIME_SHUTTING_DOWN_PANIC)
-}
 
 /// An asynchronous timer backed by one Tokio runtime time driver.
 ///
@@ -179,6 +155,41 @@ impl TokioTimer {
             .ok_or(TimeError::InstantOverflow)
     }
 
+    /// Polls the retained runtime's liveness sentinel.
+    ///
+    /// # Parameters
+    ///
+    /// * `tasks` - Single pending task owned by the retained runtime.
+    /// * `context` - Task context polling the Timer future.
+    ///
+    /// # Returns
+    ///
+    /// [`Poll::Pending`] while the retained runtime remains alive, or a
+    /// structured shutdown error after that runtime cancels the sentinel.
+    ///
+    /// # Panics
+    ///
+    /// Resumes an unexpected sentinel-task panic and panics if the one-task
+    /// set becomes empty without yielding a task result.
+    fn poll_runtime_shutdown(
+        tasks: &mut JoinSet<Infallible>,
+        context: &mut Context<'_>,
+    ) -> Poll<Result<(), TimeError>> {
+        match tasks.poll_join_next(context) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Some(Err(error))) if error.is_cancelled() => {
+                Poll::Ready(Err(TimeError::TimerUnavailable {
+                    source: TimerUnavailableError::RuntimeShuttingDown,
+                }))
+            }
+            Poll::Ready(Some(Err(error))) => resume_unwind(error.into_panic()),
+            Poll::Ready(Some(Ok(never))) => match never {},
+            Poll::Ready(None) => {
+                panic!("Tokio Timer task set must retain one liveness sentinel")
+            }
+        }
+    }
+
     /// Creates the future for one native deadline while the target runtime is
     /// entered.
     ///
@@ -189,8 +200,8 @@ impl TokioTimer {
     ///
     /// # Returns
     ///
-    /// An immediately ready future or a Tokio sleep bound to the entered time
-    /// driver.
+    /// An immediately ready future or a Tokio sleep paired with a retained-
+    /// runtime liveness sentinel. Dropping the future aborts the sentinel.
     ///
     /// # Errors
     ///
@@ -206,20 +217,32 @@ impl TokioTimer {
         let sleep = catch_unwind(AssertUnwindSafe(|| {
             tokio::time::sleep_until(deadline)
         }))
-            .map_err(|_| TimeError::TimerUnavailable {
-                source: TimerUnavailableError::TimeDriverDisabled,
-            })?;
+        .map_err(|_| TimeError::TimerUnavailable {
+            source: TimerUnavailableError::TimeDriverDisabled,
+        })?;
+        let mut sentinel = JoinSet::new();
+        sentinel.spawn(std::future::pending::<Infallible>());
         let mut sleep = Box::pin(sleep);
         Ok(Box::pin(std::future::poll_fn(move |context| {
-            match catch_unwind(AssertUnwindSafe(|| sleep.as_mut().poll(context))) {
+            if let Poll::Ready(result) =
+                Self::poll_runtime_shutdown(&mut sentinel, context)
+            {
+                return Poll::Ready(result);
+            }
+            match catch_unwind(AssertUnwindSafe(|| {
+                sleep.as_mut().poll(context)
+            })) {
                 Ok(Poll::Pending) => Poll::Pending,
                 Ok(Poll::Ready(())) => Poll::Ready(Ok(())),
-                Err(payload) if is_runtime_shutting_down_panic(payload.as_ref()) => {
-                    Poll::Ready(Err(TimeError::TimerUnavailable {
-                        source: TimerUnavailableError::RuntimeShuttingDown,
-                    }))
+                Err(payload) => {
+                    if let Poll::Ready(result) =
+                        Self::poll_runtime_shutdown(&mut sentinel, context)
+                    {
+                        Poll::Ready(result)
+                    } else {
+                        resume_unwind(payload)
+                    }
                 }
-                Err(payload) => resume_unwind(payload),
             }
         })))
     }

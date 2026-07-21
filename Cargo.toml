@@ -43,6 +43,11 @@ path = "tests/timer/internal/std_timer_worker_failure_tests.rs"
 name = "std_timer_scheduler"
 harness = false
 
+[[bench]]
+name = "tokio_timer"
+harness = false
+required-features = ["tokio"]
+
 [features]
 default = []
 tokio = ["dep:tokio"]
