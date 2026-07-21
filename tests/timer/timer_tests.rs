@@ -51,7 +51,7 @@ impl Timer for RecordingTimer {
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         *self.deadline.lock().expect("deadline mutex is poisoned") =
             Some(deadline);
-        Ok(Box::pin(future::ready(())))
+        Ok(Box::pin(future::ready(Ok(()))))
     }
 }
 

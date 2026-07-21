@@ -14,7 +14,6 @@ use qubit_clock::{
 use std::sync::Arc;
 use std::task::{
     Context,
-    Poll,
     Wake,
     Waker,
 };
@@ -22,6 +21,8 @@ use std::time::Duration;
 
 #[cfg(loom)]
 use crate::common::std_timer_waiter as modeled_std_timer_waiter;
+#[cfg(loom)]
+use std::task::Poll;
 
 /// Provides stable Waker identity without performing work when invoked.
 struct NoopWake;
@@ -42,8 +43,8 @@ fn test_std_timer_waiter_retains_same_registered_waker() {
     let waker = Waker::from(Arc::new(NoopWake));
     let mut context = Context::from_waker(&waker);
 
-    assert_eq!(Poll::Pending, future.as_mut().poll(&mut context));
-    assert_eq!(Poll::Pending, future.as_mut().poll(&mut context));
+    assert!(future.as_mut().poll(&mut context).is_pending());
+    assert!(future.as_mut().poll(&mut context).is_pending());
 }
 
 /// Verifies polling concurrently with completion cannot lose the terminal

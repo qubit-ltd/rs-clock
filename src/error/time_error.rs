@@ -71,10 +71,10 @@ pub enum TimeError {
     /// Duration was requested with an earlier instant after the current one.
     #[error("earlier monotonic instant is later than the current instant")]
     InvalidInstantOrder,
-    /// A timer could not register a requested deadline.
+    /// A timer could not register or complete a requested deadline.
     #[error("monotonic timer is unavailable: {source}")]
     TimerUnavailable {
-        /// Backend error that prevented timer registration.
+        /// Backend error that prevented timer registration or completion.
         #[source]
         source: TimerUnavailableError,
     },

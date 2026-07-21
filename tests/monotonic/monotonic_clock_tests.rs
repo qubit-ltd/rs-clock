@@ -51,7 +51,7 @@ impl Timer for ExternalTimer {
         &self,
         _deadline: MonotonicInstant,
     ) -> Result<TimerFuture, TimeError> {
-        Ok(Box::pin(std::future::ready(())))
+        Ok(Box::pin(std::future::ready(Ok(()))))
     }
 }
 

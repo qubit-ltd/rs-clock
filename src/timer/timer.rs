@@ -63,7 +63,8 @@ pub trait Timer: Send + Sync {
     ///
     /// # Returns
     ///
-    /// A future that becomes ready when `deadline` is reached.
+    /// A future that returns `Ok(())` when `deadline` is reached. The future
+    /// returns a [`TimeError`] if the backend fails after registration.
     ///
     /// # Errors
     ///
@@ -83,7 +84,8 @@ pub trait Timer: Send + Sync {
     ///
     /// # Returns
     ///
-    /// A future that becomes ready when the fixed deadline is reached.
+    /// A future that returns `Ok(())` when the fixed deadline is reached. The
+    /// future returns a [`TimeError`] if the backend later fails.
     ///
     /// # Errors
     ///

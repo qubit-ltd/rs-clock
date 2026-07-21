@@ -33,13 +33,14 @@ let _still_usable = clock.now();
 ```
 
 `Timer::after` 在调用期间采样 clock 并固定绝对 deadline；`Timer::at` 接受绝对
-`MonotonicInstant`，同样在返回前固定 deadline。返回的 `TimerFuture` 输出为 `()`，
-只等待这个固定 deadline；具体后端可以到 future 首次 poll 时才向原生 scheduler
-登记。丢弃未完成 future 会取消尚未完成的通知。
+`MonotonicInstant`，同样在返回前固定 deadline。返回的 `TimerFuture` 输出为
+`Result<(), TimeError>`，只等待这个固定 deadline；具体后端可以到 future 首次
+poll 时才向原生 scheduler 登记。丢弃未完成 future 会取消尚未完成的通知。
 
-`StdTimer` 把 scheduler worker 意外退出视为 fail-fast 条件：它会唤醒该 worker
-generation 持有的 future；这些 future 在下一次 poll 时 panic，而不会永久 pending，
-也不会伪装成 deadline 已完成。后续注册会启动新的 worker generation。
+`StdTimer` 会唤醒意外退出的 scheduler worker generation 持有的 future；这些
+future 在下一次 poll 时返回包含 `SchedulerWorkerTerminated` 的
+`TimerUnavailable`，而不会永久 pending，也不会伪装成 deadline 已完成。后续注册会
+启动新的 worker generation。
 
 ## Tokio Timer
 

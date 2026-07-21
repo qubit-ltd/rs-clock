@@ -31,6 +31,9 @@ pub enum TimerUnavailableError {
         #[source]
         source: io::Error,
     },
+    /// The standard timer scheduler worker exited before the deadline.
+    #[error("the scheduler worker thread terminated unexpectedly")]
+    SchedulerWorkerTerminated,
     /// The target asynchronous runtime has no enabled time driver.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]

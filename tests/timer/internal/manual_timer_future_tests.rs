@@ -65,7 +65,7 @@ async fn test_manual_timer_future_latches_completion_before_first_poll() {
     clock
         .advance(Duration::from_secs(2))
         .expect("manual time should advance");
-    future.await;
+    future.await.expect("manual timer should complete");
     assert_eq!(0, clock.pending_waiters());
 }
 
@@ -82,8 +82,8 @@ fn test_manual_timer_future_replaces_registered_waker() {
     let second_waker = Waker::from(Arc::clone(&second_counter));
     let mut first_context = Context::from_waker(&first_waker);
     let mut second_context = Context::from_waker(&second_waker);
-    assert_eq!(Poll::Pending, future.as_mut().poll(&mut first_context));
-    assert_eq!(Poll::Pending, future.as_mut().poll(&mut second_context));
+    assert!(future.as_mut().poll(&mut first_context).is_pending());
+    assert!(future.as_mut().poll(&mut second_context).is_pending());
 
     clock
         .advance(Duration::from_secs(3))
@@ -91,5 +91,8 @@ fn test_manual_timer_future_replaces_registered_waker() {
 
     assert_eq!(0, first_counter.0.load(Ordering::Relaxed));
     assert_eq!(1, second_counter.0.load(Ordering::Relaxed));
-    assert_eq!(Poll::Ready(()), future.as_mut().poll(&mut second_context));
+    assert!(matches!(
+        future.as_mut().poll(&mut second_context),
+        Poll::Ready(Ok(()))
+    ));
 }

@@ -42,6 +42,17 @@ fn test_timer_unavailable_error_retains_worker_spawn_source() {
     assert_eq!(io::ErrorKind::OutOfMemory, io_error.kind());
 }
 
+#[test]
+fn test_timer_unavailable_error_reports_worker_termination() {
+    let error = TimerUnavailableError::SchedulerWorkerTerminated;
+
+    assert_eq!(
+        "the scheduler worker thread terminated unexpectedly",
+        error.to_string()
+    );
+    assert!(error.source().is_none());
+}
+
 /// Verifies that custom backends identify themselves and retain their source.
 #[test]
 fn test_timer_unavailable_error_retains_custom_backend_source() {

@@ -29,7 +29,7 @@ async fn test_tokio_timer_fixes_deadline_before_first_poll() {
         .expect("Tokio deadline should register");
 
     tokio::time::advance(Duration::from_secs(8)).await;
-    future.await;
+    future.await.expect("Tokio timer should complete");
 }
 
 /// Verifies that relative deadline overflow remains a structured time error.
@@ -85,7 +85,7 @@ fn test_tokio_timer_registers_future_deadline_outside_runtime() {
 
     runtime.block_on(async {
         tokio::time::advance(Duration::from_secs(1)).await;
-        future.await;
+        future.await.expect("Tokio timer should complete");
     });
 }
 
@@ -100,7 +100,9 @@ fn test_tokio_timer_after_zero_succeeds_outside_runtime() {
         .after(Duration::ZERO)
         .expect("zero delay should be ready without a time driver");
 
-    runtime.block_on(future);
+    runtime
+        .block_on(future)
+        .expect("reached Tokio timer should complete");
 }
 
 /// Verifies that Arc delegation preserves retained-runtime registration.
@@ -115,7 +117,9 @@ fn test_tokio_timer_arc_after_uses_retained_runtime() {
         .after(Duration::ZERO)
         .expect("Arc timer should register through its retained runtime");
 
-    runtime.block_on(future);
+    runtime
+        .block_on(future)
+        .expect("Arc Tokio timer should complete");
 }
 
 /// Verifies that Box delegation preserves retained-runtime registration.
@@ -130,7 +134,9 @@ fn test_tokio_timer_box_after_uses_retained_runtime() {
         .after(Duration::ZERO)
         .expect("boxed timer should register through its retained runtime");
 
-    runtime.block_on(future);
+    runtime
+        .block_on(future)
+        .expect("boxed Tokio timer should complete");
 }
 
 #[test]
@@ -160,7 +166,9 @@ fn test_tokio_timer_reached_deadline_needs_no_time_driver() {
         .at(deadline)
         .expect("reached deadline should be immediately ready");
 
-    runtime.block_on(future);
+    runtime
+        .block_on(future)
+        .expect("reached Tokio timer should complete");
 }
 
 /// Verifies that native overflow is reported before Tokio runtime validation.
@@ -194,7 +202,7 @@ async fn test_tokio_timer_returns_ready_future_for_reached_deadline() {
         .at(deadline)
         .expect("reached deadline should register successfully");
 
-    future.await;
+    future.await.expect("Tokio timer should complete");
 }
 
 #[tokio::test]
@@ -252,14 +260,19 @@ fn test_tokio_timer_future_is_driven_by_retained_runtime() {
 
     let completed = polling.block_on(async {
         tokio::select! {
-            () = &mut future => true,
+            result = &mut future => {
+                result.expect("retained-runtime timer should complete");
+                true
+            },
             () = tokio::time::sleep(Duration::from_secs(1)) => false,
         }
     });
     assert!(!completed, "advancing the polling runtime must not fire it");
 
     target.block_on(tokio::time::advance(Duration::from_secs(5)));
-    polling.block_on(future);
+    polling
+        .block_on(future)
+        .expect("retained-runtime timer should complete");
 }
 
 /// Verifies that domain validation does not depend on an ambient runtime.

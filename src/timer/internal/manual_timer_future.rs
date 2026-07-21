@@ -60,7 +60,7 @@ impl ManualTimerFuture {
 }
 
 impl Future for ManualTimerFuture {
-    type Output = ();
+    type Output = Result<(), TimeError>;
 
     /// Checks manual time and records the current task waker while pending.
     ///
@@ -78,13 +78,13 @@ impl Future for ManualTimerFuture {
     ) -> Poll<Self::Output> {
         let this = self.get_mut();
         let Some(waiter_id) = this.waiter_id else {
-            return Poll::Ready(());
+            return Poll::Ready(Ok(()));
         };
         let result = this.clock.poll_timer_waiter(waiter_id, context);
         if result.is_ready() {
             this.waiter_id = None;
         }
-        result
+        result.map(Ok)
     }
 }
 

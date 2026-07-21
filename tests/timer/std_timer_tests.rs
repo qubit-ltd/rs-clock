@@ -18,7 +18,6 @@ use qubit_clock::{
 use std::sync::Arc;
 use std::task::{
     Context,
-    Poll,
     Waker,
 };
 use std::time::Duration;
@@ -62,7 +61,7 @@ fn test_std_timer_continues_after_registered_waker_panics() {
         .expect("panicking deadline should register");
     let waker = Waker::from(Arc::new(PanickingWaker));
     let mut context = Context::from_waker(&waker);
-    assert_eq!(Poll::Pending, panicking.as_mut().poll(&mut context));
+    assert!(panicking.as_mut().poll(&mut context).is_pending());
 
     let survivor = timer
         .after(Duration::from_millis(30))
@@ -85,7 +84,7 @@ fn test_std_timer_survives_panicking_waker_payload_destructor() {
         .expect("panicking deadline should register");
     let waker = Waker::from(Arc::new(DestructorPanickingWaker));
     let mut context = Context::from_waker(&waker);
-    assert_eq!(Poll::Pending, panicking.as_mut().poll(&mut context));
+    assert!(panicking.as_mut().poll(&mut context).is_pending());
 
     let survivor = timer
         .after(Duration::from_millis(30))

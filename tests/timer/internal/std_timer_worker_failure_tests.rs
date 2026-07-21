@@ -16,11 +16,9 @@ use qubit_clock::{
     panic_next_std_timer_worker,
 };
 #[cfg(coverage)]
-use std::any::Any;
-#[cfg(coverage)]
-use std::panic::{
-    AssertUnwindSafe,
-    catch_unwind,
+use qubit_clock::{
+    TimeError,
+    TimerUnavailableError,
 };
 #[cfg(coverage)]
 use std::sync::{
@@ -48,11 +46,6 @@ const FAILURE_GUARD: Duration = Duration::from_secs(2);
 #[cfg(coverage)]
 const RECOVERY_GUARD: Duration = Duration::from_secs(2);
 
-/// Panic message exposed when a standard Timer worker exits unexpectedly.
-#[cfg(coverage)]
-const EXPECTED_FAILURE: &str =
-    "standard Timer scheduler worker terminated unexpectedly";
-
 /// Unparks the thread currently polling a standard Timer future.
 #[cfg(coverage)]
 struct ThreadUnparker {
@@ -73,24 +66,7 @@ impl Wake for ThreadUnparker {
     }
 }
 
-/// Returns the string carried by a panic payload when one is available.
-///
-/// # Parameters
-///
-/// * `payload` - Captured panic payload to inspect.
-///
-/// # Returns
-///
-/// The borrowed panic message, or `None` for a non-string payload.
-#[cfg(coverage)]
-fn panic_message(payload: &(dyn Any + Send)) -> Option<&str> {
-    payload
-        .downcast_ref::<&'static str>()
-        .copied()
-        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
-}
-
-/// Polls a standard Timer future until it completes or panics.
+/// Polls a standard Timer future until it completes.
 ///
 /// # Parameters
 ///
@@ -99,28 +75,26 @@ fn panic_message(payload: &(dyn Any + Send)) -> Option<&str> {
 ///
 /// # Returns
 ///
-/// `Ok(())` after deadline completion, or the captured panic payload.
+/// The Timer completion result.
 #[cfg(coverage)]
 fn poll_until_terminal(
     mut future: qubit_clock::TimerFuture,
     mut pending_sender: Option<SyncSender<()>>,
-) -> Result<(), Box<dyn Any + Send>> {
-    catch_unwind(AssertUnwindSafe(|| {
-        let thread_waker = Arc::new(ThreadUnparker {
-            thread: std::thread::current(),
-        });
-        let waker = Waker::from(thread_waker);
-        let mut context = Context::from_waker(&waker);
-        loop {
-            if future.as_mut().poll(&mut context) == Poll::Ready(()) {
-                return;
-            }
-            if let Some(sender) = pending_sender.take() {
-                let _ = sender.send(());
-            }
-            std::thread::park();
+) -> Result<(), TimeError> {
+    let thread_waker = Arc::new(ThreadUnparker {
+        thread: std::thread::current(),
+    });
+    let waker = Waker::from(thread_waker);
+    let mut context = Context::from_waker(&waker);
+    loop {
+        if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
+            return result;
         }
-    }))
+        if let Some(sender) = pending_sender.take() {
+            let _ = sender.send(());
+        }
+        std::thread::park();
+    }
 }
 
 /// Verifies worker failure reaches existing waiters and permits a replacement.
@@ -147,8 +121,12 @@ fn test_std_timer_worker_failure_fails_waiter_and_recovers_next_generation() {
     let failure = failure_receiver
         .recv_timeout(FAILURE_GUARD)
         .expect("failed worker must not leave its waiter pending");
-    let payload = failure.expect_err("failed worker waiter should panic");
-    assert_eq!(Some(EXPECTED_FAILURE), panic_message(payload.as_ref()));
+    assert!(matches!(
+        failure,
+        Err(TimeError::TimerUnavailable {
+            source: TimerUnavailableError::SchedulerWorkerTerminated,
+        })
+    ));
     failure_waiter
         .join()
         .expect("failure-observing thread should finish");
@@ -164,7 +142,7 @@ fn test_std_timer_worker_failure_fails_waiter_and_recovers_next_generation() {
     recovery_receiver
         .recv_timeout(RECOVERY_GUARD)
         .expect("new worker generation should make progress")
-        .expect("recovered timer should complete without panic");
+        .expect("recovered timer should complete successfully");
     recovery_waiter
         .join()
         .expect("recovery-observing thread should finish");

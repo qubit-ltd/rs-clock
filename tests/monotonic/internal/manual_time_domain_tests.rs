@@ -43,7 +43,7 @@ async fn test_manual_time_domain_drives_mixed_waiters_in_deadline_order() {
             .expect("async deadline should exist")
             .elapsed_since_origin(),
     );
-    async_wait.await;
+    async_wait.await.expect("manual timer should complete");
     assert_eq!(1, clock.pending_waiters());
     assert_eq!(
         Duration::from_secs(5),

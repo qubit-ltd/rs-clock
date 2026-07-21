@@ -30,6 +30,7 @@ use std::sync::{
 };
 use std::task::{
     Context,
+    Poll,
     Wake,
     Waker,
 };
@@ -114,8 +115,8 @@ fn block_on_timer_future(mut future: TimerFuture) {
     let mut context = Context::from_waker(&waker);
     loop {
         thread_waker.prepare_to_poll();
-        if future.as_mut().poll(&mut context).is_ready() {
-            return;
+        if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
+            return result.expect("timer should complete");
         }
         thread_waker.park_until_notified();
     }
