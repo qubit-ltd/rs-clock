@@ -27,6 +27,10 @@ use std::time::Duration;
 /// Every call to [`clock()`](Self::clock) on one Timer must report the same
 /// clock domain for the Timer's lifetime. Implementations must reject deadlines
 /// from a different domain with [`TimeError::ClockDomainMismatch`].
+///
+/// Timer failures have two stages: the outer [`Result`] reports registration
+/// failures, while the returned [`TimerFuture`] reports failures observed after
+/// registration, such as an unavailable scheduler worker.
 pub trait Timer: Send + Sync {
     /// Returns the monotonic clock whose domain this timer uses.
     ///
@@ -104,18 +108,46 @@ where
     T: Timer + ?Sized,
 {
     /// Delegates access to the shared timer's clock.
+    ///
+    /// # Returns
+    ///
+    /// The clock exposed by the wrapped timer.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates absolute deadline registration to the shared timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the wrapped timer's clock domain.
+    ///
+    /// # Returns
+    ///
+    /// The wrapped timer's cancellation-safe completion future.
+    ///
+    /// # Errors
+    ///
+    /// Returns any registration error reported by the wrapped timer.
     #[inline(always)]
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         self.as_ref().at(deadline)
     }
 
     /// Delegates relative deadline registration to the shared timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Duration from the wrapped timer's current instant.
+    ///
+    /// # Returns
+    ///
+    /// The wrapped timer's cancellation-safe completion future.
+    ///
+    /// # Errors
+    ///
+    /// Returns any registration error reported by the wrapped timer.
     #[inline(always)]
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
         self.as_ref().after(duration)
@@ -127,18 +159,46 @@ where
     T: Timer + ?Sized,
 {
     /// Delegates access to the boxed timer's clock.
+    ///
+    /// # Returns
+    ///
+    /// The clock exposed by the wrapped timer.
     #[inline(always)]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
 
     /// Delegates absolute deadline registration to the boxed timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the wrapped timer's clock domain.
+    ///
+    /// # Returns
+    ///
+    /// The wrapped timer's cancellation-safe completion future.
+    ///
+    /// # Errors
+    ///
+    /// Returns any registration error reported by the wrapped timer.
     #[inline(always)]
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         self.as_ref().at(deadline)
     }
 
     /// Delegates relative deadline registration to the boxed timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Duration from the wrapped timer's current instant.
+    ///
+    /// # Returns
+    ///
+    /// The wrapped timer's cancellation-safe completion future.
+    ///
+    /// # Errors
+    ///
+    /// Returns any registration error reported by the wrapped timer.
     #[inline(always)]
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
         self.as_ref().after(duration)
