@@ -330,7 +330,7 @@ async fn test_manual_monotonic_clock_waits_and_advances_to_next_deadline_async()
     let reached = driver.await.expect("manual-time driver should finish");
 
     assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
-    timer_future.await;
+    timer_future.await.expect("manual timer should complete");
 }
 
 #[test]
@@ -360,7 +360,10 @@ fn test_manual_monotonic_clock_async_driver_retries_after_deadline_cancellation(
         .expect("active deadline should remain observable");
     assert_eq!(Poll::Ready(expected), driver.as_mut().poll(&mut context),);
     assert_eq!(Duration::from_secs(5), clock.now().elapsed_since_origin());
-    assert_eq!(Poll::Ready(()), active.as_mut().poll(&mut context));
+    assert!(matches!(
+        active.as_mut().poll(&mut context),
+        Poll::Ready(Ok(()))
+    ));
 }
 
 #[test]
@@ -388,8 +391,11 @@ fn test_manual_monotonic_clock_async_driver_selects_current_earliest_deadline()
         panic!("the async driver should reach the current earliest deadline");
     };
     assert_eq!(Duration::from_secs(2), reached.elapsed_since_origin());
-    assert_eq!(Poll::Pending, later.as_mut().poll(&mut context));
-    assert_eq!(Poll::Ready(()), earlier.as_mut().poll(&mut context));
+    assert!(later.as_mut().poll(&mut context).is_pending());
+    assert!(matches!(
+        earlier.as_mut().poll(&mut context),
+        Poll::Ready(Ok(()))
+    ));
 }
 
 #[test]

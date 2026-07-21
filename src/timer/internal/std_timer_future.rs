@@ -9,6 +9,10 @@
 
 use super::std_timer_scheduler::StdTimerScheduler;
 use super::std_timer_waiter::StdTimerWaiter;
+use crate::{
+    TimeError,
+    TimerUnavailableError,
+};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -55,7 +59,7 @@ impl StdTimerFuture {
 }
 
 impl Future for StdTimerFuture {
-    type Output = ();
+    type Output = Result<(), TimeError>;
 
     /// Polls the worker-owned completion latch.
     ///
@@ -65,12 +69,9 @@ impl Future for StdTimerFuture {
     ///
     /// # Returns
     ///
-    /// [`Poll::Ready`] after the native deadline, otherwise [`Poll::Pending`].
-    ///
-    /// # Panics
-    ///
-    /// Panics when the scheduler worker serving this registration exits before
-    /// reaching the deadline.
+    /// [`Poll::Ready(Ok)`] after the native deadline,
+    /// [`Poll::Ready(Err)`] if the scheduler worker exits, otherwise
+    /// [`Poll::Pending`].
     fn poll(
         self: Pin<&mut Self>,
         context: &mut Context<'_>,
@@ -80,13 +81,13 @@ impl Future for StdTimerFuture {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Ok(())) => {
                 this.waiter_id = None;
-                Poll::Ready(())
+                Poll::Ready(Ok(()))
             }
             Poll::Ready(Err(())) => {
                 this.waiter_id = None;
-                panic!(
-                    "standard Timer scheduler worker terminated unexpectedly"
-                );
+                Poll::Ready(Err(TimeError::TimerUnavailable {
+                    source: TimerUnavailableError::SchedulerWorkerTerminated,
+                }))
             }
         }
     }

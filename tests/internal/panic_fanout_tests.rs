@@ -20,7 +20,6 @@ use std::sync::{
 };
 use std::task::{
     Context,
-    Poll,
     Wake,
     Waker,
 };
@@ -56,8 +55,8 @@ fn test_panic_fanout_attempts_every_due_waker_before_resuming_panic() {
     }));
     let mut first_context = Context::from_waker(&first_waker);
     let mut second_context = Context::from_waker(&second_waker);
-    assert_eq!(Poll::Pending, first.as_mut().poll(&mut first_context));
-    assert_eq!(Poll::Pending, second.as_mut().poll(&mut second_context));
+    assert!(first.as_mut().poll(&mut first_context).is_pending());
+    assert!(second.as_mut().poll(&mut second_context).is_pending());
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         clock.advance(Duration::from_secs(1))

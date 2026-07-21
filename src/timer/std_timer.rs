@@ -139,7 +139,7 @@ impl Timer for StdTimer {
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let deadline = self.native_deadline(deadline)?;
         if deadline <= Instant::now() {
-            return Ok(Box::pin(std::future::ready(())));
+            return Ok(Box::pin(std::future::ready(Ok(()))));
         }
         let waiter = Arc::new(StdTimerWaiter::new());
         let waiter_id =

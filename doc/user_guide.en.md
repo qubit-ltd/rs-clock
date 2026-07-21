@@ -36,15 +36,15 @@ let _still_usable = clock.now();
 
 `Timer::after` samples the clock and fixes its absolute deadline during the
 call. `Timer::at` accepts an absolute `MonotonicInstant` and also fixes that
-deadline before returning. The returned `TimerFuture` has output `()` and waits
-only for the fixed deadline; a backend may enroll it with a native scheduler
-when the future is first polled. Dropping an incomplete future cancels the
-outstanding notification.
+deadline before returning. The returned `TimerFuture` has output
+`Result<(), TimeError>` and waits only for the fixed deadline; a backend may
+enroll it with a native scheduler when the future is first polled. Dropping an
+incomplete future cancels the outstanding notification.
 
-`StdTimer` treats an unexpected scheduler-worker exit as a fail-fast condition.
-It wakes futures owned by the exited worker generation; their next poll panics
-instead of remaining pending or reporting that their deadlines completed. A
-later registration starts a replacement worker generation.
+`StdTimer` wakes futures owned by an unexpectedly exited scheduler-worker
+generation. Their next poll returns `TimerUnavailable` with
+`SchedulerWorkerTerminated` instead of remaining pending or reporting deadline
+completion. A later registration starts a replacement worker generation.
 
 ## Tokio timer
 

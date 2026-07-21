@@ -71,7 +71,7 @@ struct WakeBeforeParkFuture {
 }
 
 impl Future for WakeBeforeParkFuture {
-    type Output = ();
+    type Output = Result<(), TimeError>;
 
     fn poll(
         self: Pin<&mut Self>,
@@ -79,7 +79,7 @@ impl Future for WakeBeforeParkFuture {
     ) -> Poll<Self::Output> {
         let this = self.get_mut();
         if this.polled {
-            Poll::Ready(())
+            Poll::Ready(Ok(()))
         } else {
             this.polled = true;
             // Exercise the consuming Wake path; standard Timer tests cover
@@ -89,6 +89,48 @@ impl Future for WakeBeforeParkFuture {
             Poll::Pending
         }
     }
+}
+
+struct CompletionFailingTimer {
+    clock: ManualMonotonicClock,
+}
+
+impl Timer for CompletionFailingTimer {
+    fn clock(&self) -> &dyn MonotonicClock {
+        &self.clock
+    }
+
+    fn at(
+        &self,
+        _deadline: MonotonicInstant,
+    ) -> Result<TimerFuture, TimeError> {
+        Ok(Box::pin(std::future::ready(Err(
+            TimeError::TimerUnavailable {
+                source: TimerUnavailableError::BackendUnavailable {
+                    backend: "test",
+                    source: Box::new(io::Error::other(
+                        "test timer completion failed",
+                    )),
+                },
+            },
+        ))))
+    }
+}
+
+#[test]
+fn test_blocking_sleeper_returns_completion_error() {
+    let clock = ManualMonotonicClock::new();
+    let sleeper =
+        BlockingSleeper::new(Arc::new(CompletionFailingTimer { clock }));
+
+    let Err(TimeError::TimerUnavailable {
+        source: TimerUnavailableError::BackendUnavailable { backend, source },
+    }) = sleeper.sleep_for(Duration::from_secs(1))
+    else {
+        panic!("failing timer should report completion failure");
+    };
+    assert_eq!("test", backend);
+    assert_eq!("test timer completion failed", source.to_string());
 }
 
 struct WakeBeforeParkTimer {

@@ -48,5 +48,5 @@ async fn test_async_lock_timeout_is_driven_by_manual_time() {
     clock
         .advance(Duration::from_secs(20))
         .expect("manual timeout advance should succeed");
-    wait.await;
+    wait.await.expect("manual timeout should complete");
 }

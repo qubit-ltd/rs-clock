@@ -162,7 +162,7 @@ impl TokioTimer {
         now: Instant,
     ) -> Result<TimerFuture, TimeError> {
         if deadline <= now {
-            return Ok(Box::pin(std::future::ready(())));
+            return Ok(Box::pin(std::future::ready(Ok(()))));
         }
         let sleep =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -171,7 +171,10 @@ impl TokioTimer {
             .map_err(|_| TimeError::TimerUnavailable {
                 source: TimerUnavailableError::TimeDriverDisabled,
             })?;
-        Ok(Box::pin(sleep))
+        Ok(Box::pin(async move {
+            sleep.await;
+            Ok(())
+        }))
     }
 }
 

@@ -87,9 +87,10 @@ async fn test_async_retry_timeout_uses_manual_deadline() {
     let timeout_task = tokio::spawn(async move {
         tokio::select! {
             () = pending::<()>() => false,
-            () = worker_timer
+            result = worker_timer
                 .after(Duration::from_secs(30))
                 .expect("manual timeout should register") => {
+                result.expect("manual timeout should complete");
                 true
             },
         }

@@ -31,7 +31,7 @@ fn test_manual_timer_returns_ready_future_for_reached_deadline() {
 
     assert!(matches!(
         future.as_mut().poll(&mut context),
-        Poll::Ready(()),
+        Poll::Ready(Ok(())),
     ));
     assert_eq!(0, clock.pending_waiters());
 }

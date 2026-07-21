@@ -23,6 +23,7 @@ use std::sync::{
 };
 use std::task::{
     Context,
+    Poll,
     Wake,
     Waker,
 };
@@ -132,7 +133,8 @@ fn block_on_with_wake_thread(mut future: TimerFuture) -> Option<ThreadId> {
     let mut context = Context::from_waker(&waker);
     loop {
         recorder.prepare_to_poll();
-        if future.as_mut().poll(&mut context).is_ready() {
+        if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
+            result.expect("standard timer should complete");
             return recorder.wake_thread();
         }
         recorder.park_until_notified();
@@ -168,7 +170,7 @@ fn observe_worker(timer: &dyn Timer) -> ThreadId {
 /// Verifies that an immediately ready future does not require a prior wake.
 #[test]
 fn test_block_on_with_wake_thread_accepts_immediate_ready_future() {
-    let future: TimerFuture = Box::pin(std::future::ready(()));
+    let future: TimerFuture = Box::pin(std::future::ready(Ok(())));
     assert_eq!(block_on_with_wake_thread(future), None);
 }
 

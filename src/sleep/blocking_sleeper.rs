@@ -83,8 +83,8 @@ impl BlockingSleeper {
     ///
     /// # Errors
     ///
-    /// Returns any error produced while registering the deadline, before the
-    /// current thread parks.
+    /// Returns any error produced while registering or completing the
+    /// deadline.
     ///
     /// # Panics
     ///
@@ -101,8 +101,7 @@ impl BlockingSleeper {
         deadline: MonotonicInstant,
     ) -> Result<(), TimeError> {
         let future = self.timer.at(deadline)?;
-        Self::block_on(future);
-        Ok(())
+        Self::block_on(future)
     }
 
     /// Blocks the current thread for a relative duration.
@@ -120,7 +119,8 @@ impl BlockingSleeper {
     ///
     /// # Errors
     ///
-    /// Returns deadline overflow or registration failure before parking.
+    /// Returns deadline overflow, registration failure, or a backend failure
+    /// reported while waiting.
     ///
     /// # Panics
     ///
@@ -134,8 +134,7 @@ impl BlockingSleeper {
     #[inline(always)]
     pub fn sleep_for(&self, duration: Duration) -> Result<(), TimeError> {
         let future = self.timer.after(duration)?;
-        Self::block_on(future);
-        Ok(())
+        Self::block_on(future)
     }
 
     /// Polls one timer future, parking between incomplete polls.
@@ -147,14 +146,14 @@ impl BlockingSleeper {
     /// # Panics
     ///
     /// Panics when polling the timer future panics.
-    fn block_on(mut future: TimerFuture) {
+    fn block_on(mut future: TimerFuture) -> Result<(), TimeError> {
         let thread_waker = Arc::new(ThreadWaker::new(std::thread::current()));
         let waker = Waker::from(Arc::clone(&thread_waker));
         let mut context = Context::from_waker(&waker);
         loop {
             thread_waker.clear_notification();
-            if matches!(future.as_mut().poll(&mut context), Poll::Ready(())) {
-                return;
+            if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
+                return result;
             }
             while !thread_waker.take_notification() {
                 std::thread::park();

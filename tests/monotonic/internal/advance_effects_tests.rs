@@ -20,7 +20,6 @@ use std::sync::{
 };
 use std::task::{
     Context,
-    Poll,
     Wake,
     Waker,
 };
@@ -51,8 +50,8 @@ fn test_manual_advance_effects_wake_every_due_waiter() {
     let mut second = timer
         .after(Duration::from_secs(2))
         .expect("second deadline should register");
-    assert_eq!(Poll::Pending, first.as_mut().poll(&mut first_context));
-    assert_eq!(Poll::Pending, second.as_mut().poll(&mut second_context));
+    assert!(first.as_mut().poll(&mut first_context).is_pending());
+    assert!(second.as_mut().poll(&mut second_context).is_pending());
 
     clock
         .advance(Duration::from_secs(2))
