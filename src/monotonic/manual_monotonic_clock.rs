@@ -281,7 +281,8 @@ impl ManualMonotonicClock {
     ///     timer
     ///         .after(Duration::from_secs(5))
     ///         .expect("timer deadline should register")
-    ///         .await;
+    ///         .await
+    ///         .expect("timer should complete");
     /// });
     ///
     /// let observed = clock.wait_for_next_deadline_async().await;

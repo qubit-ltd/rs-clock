@@ -398,6 +398,11 @@ impl ManualWaiterRegistry {
 
     /// Removes reached observers and returns their registered task wakers.
     ///
+    /// # Parameters
+    ///
+    /// * `elapsed` - Current elapsed duration used to determine which observers
+    ///   have reached their thresholds.
+    ///
     /// # Returns
     ///
     /// Stored task wakers for every observer whose threshold has been reached.

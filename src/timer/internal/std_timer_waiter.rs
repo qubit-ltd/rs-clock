@@ -51,6 +51,11 @@ impl StdTimerWaiter {
     /// the deadline remains active. The unit error is private and only
     /// distinguishes the worker-failure terminal state from deadline
     /// completion.
+    ///
+    /// # Errors
+    ///
+    /// The returned unit error indicates that the scheduler worker exited
+    /// before the deadline completed.
     pub(crate) fn poll(&self, context: &Context<'_>) -> Poll<Result<(), ()>> {
         let replaced_waker = {
             let mut state = self
@@ -85,6 +90,7 @@ impl StdTimerWaiter {
     /// The detached Waker that must be invoked outside scheduler locks, or
     /// `None` when no Waker was registered or the waiter was already terminal.
     #[must_use = "the detached Waker must be invoked or safely discarded"]
+    #[inline(always)]
     pub(crate) fn complete(&self) -> Option<Waker> {
         self.transition_to(StdTimerWaiterState::Ready)
     }
@@ -96,6 +102,7 @@ impl StdTimerWaiter {
     /// The detached Waker that must be invoked outside scheduler locks, or
     /// `None` when no Waker was registered or the waiter was already terminal.
     #[must_use = "the detached Waker must be invoked or safely discarded"]
+    #[inline(always)]
     pub(crate) fn fail(&self) -> Option<Waker> {
         self.transition_to(StdTimerWaiterState::WorkerFailed)
     }
