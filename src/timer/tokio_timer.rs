@@ -17,9 +17,46 @@ use crate::{
     TokioMonotonicClock,
     TokioRuntimeError,
 };
-use std::time::Duration;
+use std::{
+    any::Any,
+    panic::{
+        catch_unwind,
+        resume_unwind,
+        AssertUnwindSafe,
+    },
+    task::Poll,
+    time::Duration,
+};
 use tokio::runtime::Handle;
 use tokio::time::Instant;
+
+/// Panic message emitted by the Tokio version locked for this crate.
+const RUNTIME_SHUTTING_DOWN_PANIC: &str =
+    "A Tokio 1.x context was found, but it is being shutdown.";
+
+/// Returns whether `payload` is Tokio's runtime-shutdown timer panic.
+///
+/// Tokio exposes this lifecycle failure by panicking while polling `Sleep`.
+/// This helper recognizes the locked Tokio version's stable panic message so
+/// [`TokioTimer`] can preserve [`Timer`](crate::Timer)'s typed completion-error
+/// contract. Any other panic is resumed unchanged.
+///
+/// # Parameters
+///
+/// * `payload` - Panic payload captured while polling one Tokio sleep.
+///
+/// # Returns
+///
+/// `true` when `payload` identifies a retained runtime that is shutting down.
+#[inline]
+fn is_runtime_shutting_down_panic(payload: &(dyn Any + Send)) -> bool {
+    payload
+        .downcast_ref::<&str>()
+        .is_some_and(|message| *message == RUNTIME_SHUTTING_DOWN_PANIC)
+        || payload
+            .downcast_ref::<String>()
+            .is_some_and(|message| message == RUNTIME_SHUTTING_DOWN_PANIC)
+}
 
 /// An asynchronous timer backed by one Tokio runtime time driver.
 ///
@@ -27,7 +64,9 @@ use tokio::time::Instant;
 /// capability. It enters that runtime briefly to sample time and create each
 /// Tokio sleep, so registration does not depend on the caller's ambient
 /// runtime. The returned future may be polled elsewhere, but the retained
-/// runtime must remain alive and driven until the deadline completes.
+/// runtime must remain alive and driven until the future completes or is
+/// dropped. If it shuts down first, a pending future returns
+/// [`TimerUnavailableError::RuntimeShuttingDown`].
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioTimer {
@@ -164,17 +203,25 @@ impl TokioTimer {
         if deadline <= now {
             return Ok(Box::pin(std::future::ready(Ok(()))));
         }
-        let sleep =
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                tokio::time::sleep_until(deadline)
-            }))
+        let sleep = catch_unwind(AssertUnwindSafe(|| {
+            tokio::time::sleep_until(deadline)
+        }))
             .map_err(|_| TimeError::TimerUnavailable {
                 source: TimerUnavailableError::TimeDriverDisabled,
             })?;
-        Ok(Box::pin(async move {
-            sleep.await;
-            Ok(())
-        }))
+        let mut sleep = Box::pin(sleep);
+        Ok(Box::pin(std::future::poll_fn(move |context| {
+            match catch_unwind(AssertUnwindSafe(|| sleep.as_mut().poll(context))) {
+                Ok(Poll::Pending) => Poll::Pending,
+                Ok(Poll::Ready(())) => Poll::Ready(Ok(())),
+                Err(payload) if is_runtime_shutting_down_panic(payload.as_ref()) => {
+                    Poll::Ready(Err(TimeError::TimerUnavailable {
+                        source: TimerUnavailableError::RuntimeShuttingDown,
+                    }))
+                }
+                Err(payload) => resume_unwind(payload),
+            }
+        })))
     }
 }
 
@@ -198,7 +245,9 @@ impl Timer for TokioTimer {
     /// # Returns
     ///
     /// A future waiting for the fixed deadline, or an immediately ready future
-    /// for a reached deadline in the retained runtime's time domain.
+    /// for a reached deadline in the retained runtime's time domain. If the
+    /// retained runtime shuts down before a pending future completes, that
+    /// future returns [`TimerUnavailableError::RuntimeShuttingDown`].
     ///
     /// # Errors
     ///
@@ -222,6 +271,8 @@ impl Timer for TokioTimer {
     /// # Returns
     ///
     /// A future that becomes ready when the fixed deadline is reached.
+    /// If the retained runtime shuts down before that happens, the future
+    /// returns [`TimerUnavailableError::RuntimeShuttingDown`].
     ///
     /// # Errors
     ///

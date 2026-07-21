@@ -54,8 +54,10 @@ tokio = { version = "1", features = ["macros", "rt"] }
 Tokio clock 与 timer 会保存 runtime `Handle`。`current()` 和 `try_current()` 在
 构造时捕获当前 Handle，`from_handle(handle)` 则用于显式注入。后续 clock 采样和
 timer 注册都使用保存的 Handle，因此返回的 future 可以在其他 runtime context 中
-poll。只要仍有 pending deadline，目标 Runtime 的所有者就必须存活，并持续驱动其
-time driver。
+poll。只要仍有 pending future，目标 Runtime 的所有者就必须存活，并持续驱动其
+time driver，直到 future 完成或被丢弃。若 runtime 提前关闭，pending
+`TokioTimer` future 会返回携带
+`TimerUnavailableError::RuntimeShuttingDown` 的 `TimeError::TimerUnavailable`。
 
 ## 使用真实时间
 

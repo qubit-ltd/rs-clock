@@ -91,3 +91,16 @@ fn test_timer_unavailable_error_reports_disabled_time_driver() {
     );
     assert!(error.source().is_none());
 }
+
+/// Verifies that retained Tokio runtime shutdown has a stable typed error.
+#[cfg(feature = "tokio")]
+#[test]
+fn test_timer_unavailable_error_reports_runtime_shutdown() {
+    let error = TimerUnavailableError::RuntimeShuttingDown;
+
+    assert_eq!(
+        "the asynchronous runtime shut down before the timer future completed",
+        error.to_string()
+    );
+    assert!(error.source().is_none());
+}

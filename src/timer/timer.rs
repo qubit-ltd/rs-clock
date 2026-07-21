@@ -31,7 +31,9 @@ use std::time::Duration;
 ///
 /// Timer failures have two stages: the outer [`Result`] reports registration
 /// failures, while the returned [`TimerFuture`] reports failures observed after
-/// registration, such as an unavailable scheduler worker.
+/// registration, such as an unavailable scheduler worker or a Tokio runtime
+/// that shut down. Custom implementations may document additional lifecycle
+/// preconditions and panic conditions.
 pub trait Timer: Send + Sync {
     /// Returns the monotonic clock whose domain this timer uses.
     ///

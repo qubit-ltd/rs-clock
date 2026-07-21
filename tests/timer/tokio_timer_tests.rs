@@ -275,6 +275,36 @@ fn test_tokio_timer_future_is_driven_by_retained_runtime() {
         .expect("retained-runtime timer should complete");
 }
 
+/// Verifies that runtime shutdown becomes a structured timer completion error.
+#[test]
+fn test_tokio_timer_reports_retained_runtime_shutdown_on_poll() {
+    let future = {
+        let target = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("target runtime should build");
+        let timer = TokioTimer::from_handle(target.handle().clone());
+        timer
+            .after(Duration::from_secs(1))
+            .expect("future deadline should register")
+    };
+    let polling = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("polling runtime should build");
+
+    let error = polling
+        .block_on(future)
+        .expect_err("shutdown target runtime should fail the timer future");
+
+    assert!(matches!(
+        error,
+        TimeError::TimerUnavailable {
+            source: TimerUnavailableError::RuntimeShuttingDown,
+        },
+    ));
+}
+
 /// Verifies that domain validation does not depend on an ambient runtime.
 #[test]
 fn test_tokio_timer_reports_foreign_deadline_outside_runtime() {

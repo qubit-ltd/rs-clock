@@ -18,6 +18,13 @@ use crate::TimeError;
 /// future is returned. A backend may defer enrollment with its native
 /// scheduler until the future is first polled. Dropping an incomplete future
 /// cancels its outstanding notification in either case. Completion reports a
-/// backend failure that occurs after successful registration.
+/// recoverable backend failure that occurs after successful registration.
+/// Built-in timers report backend shutdown through [`TimeError`].
+///
+/// # Panics
+///
+/// A custom Timer implementation may document additional panic conditions.
+/// Built-in manual timers may also resume panics from registered task Wakers
+/// after notifying every affected Waker.
 pub type TimerFuture =
     Pin<Box<dyn Future<Output = Result<(), TimeError>> + Send + 'static>>;

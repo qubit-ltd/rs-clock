@@ -25,6 +25,9 @@ use tokio::time::Instant;
 /// samples Tokio time. It therefore follows the retained runtime's pause and
 /// advance semantics without requiring callers to enter that runtime. The
 /// runtime owner must remain alive while the clock or a derived timer is used.
+/// A pending derived timer reports
+/// [`TimerUnavailableError::RuntimeShuttingDown`](crate::TimerUnavailableError::RuntimeShuttingDown)
+/// if that runtime shuts down before its future completes.
 ///
 /// The type intentionally does not implement [`Clone`]; shared identity uses
 /// `Arc<TokioMonotonicClock>`. Derived timers retain an independent handle with

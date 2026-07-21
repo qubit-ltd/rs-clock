@@ -58,7 +58,9 @@ Tokio clocks and timers retain a runtime `Handle`. `current()` and
 `from_handle(handle)` supports explicit injection. Later clock samples and
 timer registrations use that retained handle, so their futures may be polled
 from another runtime context. The target runtime owner must remain alive and
-its time driver must continue running until pending deadlines complete.
+its time driver must continue running until pending futures complete or are
+dropped. If it shuts down first, a pending `TokioTimer` future returns
+`TimeError::TimerUnavailable` with `TimerUnavailableError::RuntimeShuttingDown`.
 
 ## Real-time use
 
