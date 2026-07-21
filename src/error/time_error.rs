@@ -79,3 +79,10 @@ pub enum TimeError {
         source: TimerUnavailableError,
     },
 }
+
+impl From<TimerUnavailableError> for TimeError {
+    /// Wraps a timer-backend failure as a monotonic time error.
+    fn from(source: TimerUnavailableError) -> Self {
+        Self::TimerUnavailable { source }
+    }
+}
