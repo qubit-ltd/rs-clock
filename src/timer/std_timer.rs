@@ -39,6 +39,18 @@ pub struct StdTimer {
 }
 
 impl StdTimer {
+    /// Creates a timer backed by a new standard monotonic clock.
+    ///
+    /// # Returns
+    ///
+    /// A timer with a fresh clock domain and the process-wide scheduler.
+    #[must_use]
+    #[inline]
+    pub fn new() -> Self {
+        let clock = StdMonotonicClock::new();
+        Self::from_clock(&clock)
+    }
+
     /// Creates a timer sharing the supplied standard clock's exact domain.
     ///
     /// # Parameters
@@ -80,6 +92,13 @@ impl StdTimer {
             .origin()
             .checked_add(deadline.elapsed_since_origin())
             .ok_or(TimeError::InstantOverflow)
+    }
+}
+
+impl Default for StdTimer {
+    /// Creates a standard timer with a fresh clock domain.
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -59,3 +59,15 @@ fn test_time_error_implements_std_error() {
     fn assert_error<T: std::error::Error>() {}
     assert_error::<TimeError>();
 }
+
+#[test]
+fn test_timer_unavailable_error_converts_to_time_error() {
+    let error: TimeError = TimerUnavailableError::SchedulerWorkerTerminated.into();
+
+    assert!(matches!(
+        error,
+        TimeError::TimerUnavailable {
+            source: TimerUnavailableError::SchedulerWorkerTerminated,
+        }
+    ));
+}

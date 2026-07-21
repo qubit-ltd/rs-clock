@@ -29,6 +29,26 @@ use super::internal::{
 };
 
 #[test]
+fn test_std_timer_new_registers_deadline() {
+    let timer = StdTimer::new();
+    let future = timer
+        .after(Duration::from_millis(1))
+        .expect("new timer should register a deadline");
+
+    block_on_timer_future(future);
+}
+
+#[test]
+fn test_std_timer_default_registers_deadline() {
+    let timer = StdTimer::default();
+    let future = timer
+        .after(Duration::from_millis(1))
+        .expect("default timer should register a deadline");
+
+    block_on_timer_future(future);
+}
+
+#[test]
 fn test_std_timer_returns_ready_future_for_reached_deadline() {
     let clock = StdMonotonicClock::new();
     let timer = StdTimer::from_clock(&clock);
