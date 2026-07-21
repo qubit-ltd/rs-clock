@@ -195,7 +195,7 @@ impl StdTimerSchedulerState {
     ///
     /// Panics after every nonzero worker generation has been allocated.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(super) fn mark_worker_started(&mut self) -> u64 {
         self.worker_generation = self.worker_generation.wrapping_add(1);
         assert_ne!(
@@ -212,7 +212,7 @@ impl StdTimerSchedulerState {
     ///
     /// * `generation` - Generation of the worker that has exited, or zero for a
     ///   disarmed guard.
-    #[inline(always)]
+    #[inline]
     pub(super) fn mark_worker_stopped(&mut self, generation: u64) {
         if self.worker_generation == generation {
             self.worker_running = false;
@@ -260,7 +260,7 @@ impl StdTimerSchedulerState {
     ///
     /// Panics after all nonzero identifiers have been allocated.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     fn allocate_waiter_id(&mut self) -> u64 {
         let waiter_id = self.next_waiter_id;
         assert_ne!(waiter_id, 0, "standard Timer waiter identifiers exhausted");

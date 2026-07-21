@@ -34,7 +34,7 @@ use std::time::Duration;
 ///
 /// Panics with `exhausted_message` when the allocator is already exhausted.
 #[must_use = "the allocated identifier must be retained by its registration"]
-#[inline(always)]
+#[inline]
 pub(crate) fn allocate_identifier(
     next_identifier: &mut u64,
     exhausted_message: &str,
@@ -322,7 +322,7 @@ impl ManualWaiterRegistry {
     /// # Returns
     ///
     /// Its stored task waker, or `None` when absent or not yet polled.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn unregister_observer(
         &mut self,
         observer_id: u64,

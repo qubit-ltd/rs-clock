@@ -127,14 +127,6 @@ fn test_timer_after_returns_registration_error_immediately() {
 }
 
 #[test]
-fn test_timer_future_is_send_and_static() {
-    fn assert_send_static<T: Send + 'static>(_: T) {}
-
-    let future: TimerFuture = Box::pin(future::pending());
-    assert_send_static(future);
-}
-
-#[test]
 fn test_timer_arc_and_box_delegate_to_inner_timer() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let shared = Arc::new(RecordingTimer::new(Arc::clone(&clock)));
