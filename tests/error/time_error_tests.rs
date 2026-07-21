@@ -62,7 +62,8 @@ fn test_time_error_implements_std_error() {
 
 #[test]
 fn test_timer_unavailable_error_converts_to_time_error() {
-    let error: TimeError = TimerUnavailableError::SchedulerWorkerTerminated.into();
+    let error: TimeError =
+        TimerUnavailableError::SchedulerWorkerTerminated.into();
 
     assert!(matches!(
         error,

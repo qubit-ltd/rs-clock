@@ -97,6 +97,15 @@ impl StdTimer {
 
 impl Default for StdTimer {
     /// Creates a standard timer with a fresh clock domain.
+    ///
+    /// # Returns
+    ///
+    /// A standard timer with a newly allocated clock domain.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
+    #[inline(always)]
     fn default() -> Self {
         Self::new()
     }
@@ -116,6 +125,7 @@ impl std::fmt::Debug for StdTimer {
     /// # Errors
     ///
     /// Returns [`std::fmt::Error`] when the destination rejects output.
+    #[inline]
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("StdTimer")

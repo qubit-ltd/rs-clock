@@ -185,6 +185,7 @@ impl std::fmt::Debug for BlockingSleeper {
     /// # Errors
     ///
     /// Returns [`std::fmt::Error`] when the destination rejects output.
+    #[inline]
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("BlockingSleeper")
