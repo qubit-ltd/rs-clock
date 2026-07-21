@@ -25,8 +25,8 @@ use std::time::Duration;
 use super::internal::{
     DestructorPanickingWaker,
     PanickingWaker,
-    block_on_timer_future,
 };
+use super::support::block_on_timer_future;
 
 #[test]
 fn test_std_timer_new_registers_deadline() {

@@ -13,7 +13,7 @@ use qubit_clock::{
 };
 use std::time::Duration;
 
-use super::block_on_timer_future;
+use super::super::support::block_on_timer_future;
 
 #[test]
 fn test_std_timer_future_cancellation_does_not_block_later_registration() {

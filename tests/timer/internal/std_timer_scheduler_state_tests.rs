@@ -17,7 +17,7 @@ use std::{
     time::Duration,
 };
 
-use super::block_on_timer_future;
+use super::super::support::block_on_timer_future;
 
 /// Delay retained by the scheduler before the earlier registration arrives.
 const LATER_DEADLINE_DELAY: Duration = Duration::from_secs(30);

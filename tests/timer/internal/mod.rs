@@ -15,10 +15,8 @@ mod std_timer_scheduler_state_tests;
 mod std_timer_waiter_state_tests;
 mod std_timer_waiter_tests;
 mod std_timer_worker_guard_tests;
-mod thread_waker_tests;
 
 pub(super) use panicking_waker_tests::{
     DestructorPanickingWaker,
     PanickingWaker,
 };
-pub(super) use thread_waker_tests::block_on_timer_future;
