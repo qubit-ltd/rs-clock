@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clock = ManualMonotonicClock::new_shared();
     let timer = clock.new_timer();
     let task = tokio::spawn(async move {
-        timer.after(Duration::from_secs(5))?.await;
+        timer.after(Duration::from_secs(5))?.await?;
         Ok::<_, qubit_clock::TimeError>(())
     });
 

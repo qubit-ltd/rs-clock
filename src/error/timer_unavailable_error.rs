@@ -14,7 +14,7 @@ use std::{
 
 use thiserror::Error;
 
-/// Describes the backend failure that prevented timer registration.
+/// Describes a backend failure that prevented timer registration or completion.
 ///
 /// Each variant preserves the most specific stable source exposed by its
 /// backend. Custom [`Timer`](crate::Timer) implementations should use
@@ -44,7 +44,8 @@ pub enum TimerUnavailableError {
     BackendUnavailable {
         /// Stable name identifying the custom backend.
         backend: &'static str,
-        /// Backend-specific error that prevented timer registration.
+        /// Backend-specific error that prevented timer registration or
+        /// completion.
         #[source]
         source: Box<dyn StdError + Send + Sync + 'static>,
     },

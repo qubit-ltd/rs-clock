@@ -28,7 +28,7 @@ use std::time::Duration;
 # async fn example() -> Result<(), qubit_clock::TimeError> {
 let clock = StdMonotonicClock::new();
 let timer = clock.new_timer();
-timer.after(Duration::from_millis(10))?.await;
+timer.after(Duration::from_millis(10))?.await?;
 let _still_usable = clock.now();
 # Ok(())
 # }
@@ -66,7 +66,9 @@ let timer = TokioTimer::from_handle(runtime.handle().clone());
 let deadline = timer
     .after(Duration::from_millis(1))
     .expect("deadline should register on the retained runtime");
-runtime.block_on(deadline);
+runtime
+    .block_on(deadline)
+    .expect("deadline should complete");
 ```
 
 Clock samples and `Sleep` creation briefly enter the retained handle, regardless
@@ -108,7 +110,7 @@ use std::time::Duration;
 let clock = ManualMonotonicClock::new_shared();
 let timer = clock.new_timer();
 let task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(8))?.await;
+    timer.after(Duration::from_secs(8))?.await?;
     Ok::<_, qubit_clock::TimeError>(())
 });
 
@@ -154,8 +156,8 @@ will execute and avoids waiting for another deadline after it has completed:
 let clock = ManualMonotonicClock::new_shared();
 let timer = clock.new_timer();
 let mut task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(1))?.await;
-    timer.after(Duration::from_secs(2))?.await;
+    timer.after(Duration::from_secs(1))?.await?;
+    timer.after(Duration::from_secs(2))?.await?;
     Ok::<_, qubit_clock::TimeError>(())
 });
 
@@ -256,10 +258,10 @@ RUSTFLAGS="--cfg loom" cargo test --release --test timer_tests std_timer_waiter_
 
 - `ClockDomainMismatch`: a deadline came from another monotonic domain.
 - `InstantOverflow`: relative or native deadline conversion overflowed.
-- `TimerUnavailable { source }`: deadline registration failed because the
-  scheduler worker, time driver, or custom backend was
-  unavailable. `TimerUnavailableError` identifies the backend and preserves
-  its available source error.
+- `TimerUnavailable { source }`: deadline registration or completion failed
+  because the scheduler worker, time driver, or custom backend was unavailable.
+  `TimerUnavailableError` identifies the backend and preserves its available
+  source error.
 - `TokioRuntimeError`: `try_current()` could not capture an ambient Tokio
   runtime. Explicit `from_handle` construction avoids this failure boundary.
 - `CannotMoveBackward`: manual time was moved backward.

@@ -26,7 +26,7 @@ use std::time::Duration;
 # async fn example() -> Result<(), qubit_clock::TimeError> {
 let clock = StdMonotonicClock::new();
 let timer = clock.new_timer();
-timer.after(Duration::from_millis(10))?.await;
+timer.after(Duration::from_millis(10))?.await?;
 let _still_usable = clock.now();
 # Ok(())
 # }
@@ -61,7 +61,9 @@ let timer = TokioTimer::from_handle(runtime.handle().clone());
 let deadline = timer
     .after(Duration::from_millis(1))
     .expect("deadline should register on the retained runtime");
-runtime.block_on(deadline);
+runtime
+    .block_on(deadline)
+    .expect("deadline should complete");
 ```
 
 clock 采样和 `Sleep` 创建会短暂进入保存的 Handle，不依赖调用方当前所在的 runtime。
@@ -98,7 +100,7 @@ use std::time::Duration;
 let clock = ManualMonotonicClock::new_shared();
 let timer = clock.new_timer();
 let task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(8))?.await;
+    timer.after(Duration::from_secs(8))?.await?;
     Ok::<_, qubit_clock::TimeError>(())
 });
 
@@ -139,8 +141,8 @@ Manual timer 的注册是 eager 的：timer future 尚未首次 poll，`pending_
 let clock = ManualMonotonicClock::new_shared();
 let timer = clock.new_timer();
 let mut task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(1))?.await;
-    timer.after(Duration::from_secs(2))?.await;
+    timer.after(Duration::from_secs(1))?.await?;
+    timer.after(Duration::from_secs(2))?.await?;
     Ok::<_, qubit_clock::TimeError>(())
 });
 
@@ -235,8 +237,8 @@ RUSTFLAGS="--cfg loom" cargo test --release --test timer_tests std_timer_waiter_
 - `ClockDomainMismatch`：deadline 来自另一个 monotonic domain。
 - `InstantOverflow`：相对 deadline 或原生 deadline 转换溢出。
 - `TimerUnavailable { source }`：scheduler worker、time driver 或自定义
-  backend 不可用，导致 deadline 注册失败；`TimerUnavailableError` 标识 backend
-  并保留可用的原始错误。
+  backend 不可用，导致 deadline 注册或完成失败；`TimerUnavailableError` 标识
+  backend 并保留可用的原始错误。
 - `TokioRuntimeError`：`try_current()` 无法捕获当前 Tokio runtime；显式使用
   `from_handle` 可避开这个失败边界。
 - `CannotMoveBackward`：manual time 被要求倒退。
