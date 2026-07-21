@@ -17,8 +17,18 @@ use qubit_clock::{
     TokioRuntimeError,
     TokioTimer,
 };
+use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
+
+/// Environment flag selecting the isolated runtime-shutdown child path.
+const TOKIO_SHUTDOWN_CHILD: &str = "QUBIT_CLOCK_TOKIO_SHUTDOWN_CHILD";
+
+/// Exact integration-test path executed in the isolated child process.
+const TOKIO_SHUTDOWN_TEST: &str = concat!(
+    "timer::tokio_timer_tests::",
+    "test_tokio_timer_reports_retained_runtime_shutdown_without_panicking",
+);
 
 #[tokio::test(start_paused = true)]
 async fn test_tokio_timer_fixes_deadline_before_first_poll() {
@@ -275,15 +285,40 @@ fn test_tokio_timer_future_is_driven_by_retained_runtime() {
         .expect("retained-runtime timer should complete");
 }
 
-/// Verifies that runtime shutdown becomes a structured timer completion error.
+/// Verifies runtime shutdown becomes a structured error without invoking the
+/// process panic hook.
 #[test]
-fn test_tokio_timer_reports_retained_runtime_shutdown_on_poll() {
+fn test_tokio_timer_reports_retained_runtime_shutdown_without_panicking() {
+    if std::env::var_os(TOKIO_SHUTDOWN_CHILD).is_none() {
+        let output = Command::new(
+            std::env::current_exe()
+                .expect("current test executable should exist"),
+        )
+        .args(["--exact", TOKIO_SHUTDOWN_TEST, "--nocapture"])
+        .env(TOKIO_SHUTDOWN_CHILD, "1")
+        .output()
+        .expect("isolated shutdown test should start");
+        assert!(
+            output.status.success(),
+            "isolated shutdown test should pass: {}",
+            String::from_utf8_lossy(&output.stderr),
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !stderr.contains(
+                "A Tokio 1.x context was found, but it is being shutdown."
+            ),
+            "runtime shutdown must not invoke the panic hook: {stderr}",
+        );
+        return;
+    }
+
     let future = {
-        let target = tokio::runtime::Builder::new_current_thread()
+        let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_time()
             .build()
-            .expect("target runtime should build");
-        let timer = TokioTimer::from_handle(target.handle().clone());
+            .expect("retained runtime should build");
+        let timer = TokioTimer::from_handle(runtime.handle().clone());
         timer
             .after(Duration::from_secs(1))
             .expect("future deadline should register")
