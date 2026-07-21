@@ -21,6 +21,7 @@ use std::io;
 #[cfg(coverage)]
 use std::sync::atomic::{
     AtomicBool,
+    AtomicUsize,
     Ordering,
 };
 use std::sync::{
@@ -37,6 +38,26 @@ static FAIL_NEXT_WORKER_SPAWN: AtomicBool = AtomicBool::new(false);
 
 #[cfg(coverage)]
 static PANIC_NEXT_WORKER_RUN: AtomicBool = AtomicBool::new(false);
+
+#[cfg(coverage)]
+static WORKER_NOTIFICATION_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+/// Resets the coverage-only worker-notification counter.
+#[cfg(coverage)]
+pub fn reset_std_timer_worker_notification_count() {
+    WORKER_NOTIFICATION_COUNT.store(0, Ordering::Release);
+}
+
+/// Returns the coverage-only worker-notification count.
+///
+/// # Returns
+///
+/// The number of scheduler notifications since the most recent reset.
+#[cfg(coverage)]
+#[must_use]
+pub fn std_timer_worker_notification_count() -> usize {
+    WORKER_NOTIFICATION_COUNT.load(Ordering::Acquire)
+}
 
 /// Makes the next standard Timer worker startup fail deterministically.
 ///
@@ -56,7 +77,7 @@ pub fn panic_next_std_timer_worker() {
     let scheduler = StdTimerScheduler::shared();
     let _state = scheduler.lock_state();
     PANIC_NEXT_WORKER_RUN.store(true, Ordering::Release);
-    scheduler.changed.notify_one();
+    scheduler.notify_worker();
 }
 
 /// One lazily started worker shared by every standard Timer in the process.
@@ -123,17 +144,22 @@ impl StdTimerScheduler {
         waiter: Arc<StdTimerWaiter>,
     ) -> Result<u64, TimeError> {
         let mut state = self.lock_state();
+        let previous_deadline = state.next_deadline();
         let waiter_id = state.register(deadline, waiter);
+        let next_deadline_changed = state.next_deadline() != previous_deadline;
         if state.worker_running() {
             drop(state);
-            self.changed.notify_one();
+            if next_deadline_changed {
+                self.notify_worker();
+            }
             return Ok(waiter_id);
         }
         let worker_generation = state.mark_worker_started();
         self.spawn_worker(state, waiter_id, worker_generation)
     }
 
-    /// Cancels an active waiter and wakes the worker to recalculate its wait.
+    /// Cancels an active waiter and wakes the worker when its earliest deadline
+    /// changes.
     ///
     /// # Parameters
     ///
@@ -145,12 +171,24 @@ impl StdTimerScheduler {
     /// deadline key.
     #[inline]
     pub(crate) fn cancel(&self, waiter_id: u64) {
-        let waiter = self.lock_state().cancel(waiter_id);
-        let was_registered = waiter.is_some();
+        let mut state = self.lock_state();
+        let previous_deadline = state.next_deadline();
+        let waiter = state.cancel(waiter_id);
+        let next_deadline_changed =
+            waiter.is_some() && state.next_deadline() != previous_deadline;
+        drop(state);
         drop(waiter);
-        if was_registered {
-            self.changed.notify_one();
+        if next_deadline_changed {
+            self.notify_worker();
         }
+    }
+
+    /// Notifies the worker that its scheduler wait may need recalculation.
+    #[inline]
+    fn notify_worker(&self) {
+        #[cfg(coverage)]
+        WORKER_NOTIFICATION_COUNT.fetch_add(1, Ordering::AcqRel);
+        self.changed.notify_one();
     }
 
     /// Fails registrations owned by a worker that has exited.

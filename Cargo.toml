@@ -32,6 +32,10 @@ name = "std_timer_scheduler_tests"
 path = "tests/timer/internal/std_timer_scheduler_tests.rs"
 
 [[test]]
+name = "std_timer_notification_tests"
+path = "tests/timer/internal/std_timer_notification_tests.rs"
+
+[[test]]
 name = "std_timer_spawn_failure_tests"
 path = "tests/timer/internal/std_timer_spawn_failure_tests.rs"
 
