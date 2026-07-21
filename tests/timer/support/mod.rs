@@ -5,13 +5,8 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+//! Provides support helpers shared by Timer integration tests.
 
-mod manual_timer_tests;
-mod std_timer_tests;
-mod timer_tests;
+mod timer_future_driver;
 
-mod internal;
-mod support;
-
-#[cfg(feature = "tokio")]
-mod tokio_timer_tests;
+pub(super) use timer_future_driver::block_on_timer_future;
