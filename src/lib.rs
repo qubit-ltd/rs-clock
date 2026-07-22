@@ -46,6 +46,9 @@ pub(crate) mod internal;
 pub mod error;
 pub mod monotonic;
 pub mod sleep;
+#[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
+pub mod test_util;
 pub mod timer;
 pub mod wall;
 
@@ -87,6 +90,10 @@ pub use timer::internal::std_timer_scheduler::{
     reset_std_timer_worker_notification_count,
     std_timer_worker_notification_count,
 };
+
+#[doc(hidden)]
+#[cfg(all(coverage, feature = "tokio"))]
+pub use timer::panic_next_tokio_timer_sleep_poll;
 
 #[cfg(feature = "tokio")]
 pub use monotonic::TokioMonotonicClock;
