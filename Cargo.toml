@@ -48,22 +48,27 @@ name = "std_timer_scheduler"
 harness = false
 
 [[bench]]
+name = "manual_timer"
+harness = false
+
+[[bench]]
 name = "tokio_timer"
 harness = false
 required-features = ["tokio"]
 
 [features]
 default = []
+loom-model = ["dep:loom", "test-util"]
 test-util = []
 tokio = ["dep:tokio"]
 
 [dependencies]
+loom = { version = "0.7", optional = true }
 thiserror = "2.0"
 tokio = { version = "1.52", optional = true, features = ["rt", "sync", "time"] }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
-loom = "0.7"
 tokio = { version = "1.52", features = ["macros", "rt", "sync", "test-util", "time"] }
 
 [package.metadata.docs.rs]

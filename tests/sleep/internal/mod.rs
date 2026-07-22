@@ -7,4 +7,5 @@
 // =============================================================================
 //! Model tests for internal blocking-sleep synchronization state.
 
+mod notification_latch_tests;
 mod thread_waker_tests;
