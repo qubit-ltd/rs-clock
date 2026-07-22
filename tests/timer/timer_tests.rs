@@ -82,9 +82,21 @@ fn test_timer_supports_trait_object() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let timer: Arc<dyn Timer> = Arc::new(RecordingTimer::new(clock));
 
+    assert_eq!(Duration::ZERO, timer.now().elapsed_since_origin());
     let _future = timer
         .after(Duration::from_secs(1))
         .expect("timer registration should succeed");
+}
+
+#[test]
+fn test_timer_now_forwards_to_its_clock() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    clock
+        .advance(Duration::from_secs(3))
+        .expect("manual time should advance");
+    let timer = RecordingTimer::new(Arc::clone(&clock));
+
+    assert_eq!(clock.now(), timer.now());
 }
 
 #[test]
