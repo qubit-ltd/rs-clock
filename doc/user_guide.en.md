@@ -80,6 +80,11 @@ without time enabled returns `TimerUnavailableError::TimeDriverDisabled`.
 An already reached deadline returns an immediately ready future and needs no
 time driver. Dropping a pending future cancels that wait.
 
+Tokio `Sleep` uses millisecond-level scheduling granularity rather than
+high-resolution timing. `TokioTimer` preserves the full logical `Duration`,
+but completion timing inherits that granularity and any additional platform
+scheduling delay.
+
 Tokio currently provides no public `Handle` capability query for the time
 driver. It reports a disabled driver by panicking during future-sleep creation.
 `TokioTimer` uses `catch_unwind` to convert that condition into

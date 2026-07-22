@@ -65,6 +65,12 @@ pub fn panic_next_tokio_timer_sleep_poll() {
 /// runtime must remain alive and driven until the future completes or is
 /// dropped. If it shuts down first, a pending future returns
 /// [`TimerUnavailableError::RuntimeShuttingDown`].
+///
+/// # Resolution
+///
+/// Logical deadlines preserve the full [`Duration`], but Tokio drives pending
+/// sleeps with millisecond-level scheduling granularity. This timer is not for
+/// high-resolution timing, and platform scheduling may add further delay.
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioTimer {
@@ -221,8 +227,10 @@ impl TokioTimer {
     ///
     /// # Returns
     ///
-    /// An immediately ready future or a Tokio sleep paired with a retained-
-    /// runtime liveness sentinel. Dropping the future aborts the sentinel.
+    /// An immediately ready future or a Tokio sleep paired with a shared
+    /// retained-runtime liveness sentinel. Dropping the future cancels only
+    /// its sleep and releases its sentinel reference; the sentinel remains
+    /// active while the timer or another pending future retains it.
     ///
     /// # Errors
     ///
