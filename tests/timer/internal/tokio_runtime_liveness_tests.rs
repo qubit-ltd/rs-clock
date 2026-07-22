@@ -55,6 +55,41 @@ fn test_tokio_runtime_liveness_is_shared_across_pending_deadlines() {
     assert_eq!(initial_tasks, runtime.metrics().num_alive_tasks());
 }
 
+/// Verifies that dropping one deadline leaves liveness retained by its timer.
+#[test]
+fn test_tokio_runtime_liveness_is_retained_by_timer_after_future_drop() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .expect("runtime should build");
+    let timer = TokioTimer::from_handle(runtime.handle().clone());
+    let initial_tasks = runtime.metrics().num_alive_tasks();
+    let cancelled_future = timer
+        .after(Duration::from_secs(60))
+        .expect("future deadline should register");
+
+    assert_eq!(initial_tasks + 1, runtime.metrics().num_alive_tasks());
+    drop(cancelled_future);
+    assert_eq!(
+        initial_tasks + 1,
+        runtime.metrics().num_alive_tasks(),
+        "timer should retain the shared liveness task after a deadline is dropped",
+    );
+
+    let future = timer
+        .after(Duration::from_secs(1))
+        .expect("later future deadline should register");
+    runtime.block_on(async {
+        tokio::time::advance(Duration::from_secs(1)).await;
+        future.await.expect("later future should complete");
+    });
+
+    drop(timer);
+    runtime.block_on(tokio::task::yield_now());
+    assert_eq!(initial_tasks, runtime.metrics().num_alive_tasks());
+}
+
 /// Verifies that concurrent first use initializes only one liveness task.
 #[test]
 fn test_tokio_runtime_liveness_initializes_once_under_concurrency() {
