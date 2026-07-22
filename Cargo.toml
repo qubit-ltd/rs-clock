@@ -54,11 +54,12 @@ required-features = ["tokio"]
 
 [features]
 default = []
+test-util = []
 tokio = ["dep:tokio"]
 
 [dependencies]
 thiserror = "2.0"
-tokio = { version = "1.52", optional = true, features = ["rt", "time"] }
+tokio = { version = "1.52", optional = true, features = ["rt", "sync", "time"] }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }

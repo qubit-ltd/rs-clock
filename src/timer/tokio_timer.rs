@@ -7,6 +7,9 @@
 // =============================================================================
 //! Defines a timer driven by Tokio's time driver.
 
+// qubit-style: allow coverage-cfg
+
+use crate::timer::internal::tokio_runtime_liveness::TokioRuntimeLiveness;
 use crate::{
     MonotonicClock,
     MonotonicInstant,
@@ -17,12 +20,20 @@ use crate::{
     TokioMonotonicClock,
     TokioRuntimeError,
 };
+#[cfg(coverage)]
+use std::sync::atomic::{
+    AtomicBool,
+    Ordering,
+};
 use std::{
-    convert::Infallible,
     panic::{
         AssertUnwindSafe,
         catch_unwind,
         resume_unwind,
+    },
+    sync::{
+        Arc,
+        OnceLock,
     },
     task::{
         Context,
@@ -31,8 +42,19 @@ use std::{
     time::Duration,
 };
 use tokio::runtime::Handle;
-use tokio::task::JoinSet;
 use tokio::time::Instant;
+
+#[cfg(coverage)]
+static PANIC_NEXT_SLEEP_POLL: AtomicBool = AtomicBool::new(false);
+
+/// Makes the next Tokio Timer sleep poll panic deterministically.
+///
+/// This coverage-only hook exercises the defensive path for an unexpected
+/// Tokio sleep panic after the shared liveness check.
+#[cfg(coverage)]
+pub fn panic_next_tokio_timer_sleep_poll() {
+    PANIC_NEXT_SLEEP_POLL.store(true, Ordering::Release);
+}
 
 /// An asynchronous timer backed by one Tokio runtime time driver.
 ///
@@ -48,6 +70,8 @@ use tokio::time::Instant;
 pub struct TokioTimer {
     /// Private handle retaining the source clock domain and Tokio origin.
     clock: TokioMonotonicClock,
+    /// Lazily initialized liveness sentinel shared by pending deadlines.
+    liveness: OnceLock<Arc<TokioRuntimeLiveness>>,
 }
 
 impl TokioTimer {
@@ -71,6 +95,7 @@ impl TokioTimer {
     pub fn from_handle(runtime: Handle) -> Self {
         Self {
             clock: TokioMonotonicClock::from_handle(runtime),
+            liveness: OnceLock::new(),
         }
     }
 
@@ -109,7 +134,10 @@ impl TokioTimer {
     /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline]
     pub fn try_current() -> Result<Self, TokioRuntimeError> {
-        TokioMonotonicClock::try_current().map(|clock| Self { clock })
+        TokioMonotonicClock::try_current().map(|clock| Self {
+            clock,
+            liveness: OnceLock::new(),
+        })
     }
 
     /// Creates a timer sharing the supplied Tokio clock's exact domain.
@@ -127,6 +155,7 @@ impl TokioTimer {
     pub fn from_clock(clock: &TokioMonotonicClock) -> Self {
         Self {
             clock: clock.same_domain_handle(),
+            liveness: OnceLock::new(),
         }
     }
 
@@ -155,11 +184,11 @@ impl TokioTimer {
             .ok_or(TimeError::InstantOverflow)
     }
 
-    /// Polls the retained runtime's liveness sentinel.
+    /// Polls the retained runtime's shared shutdown notification.
     ///
     /// # Parameters
     ///
-    /// * `tasks` - Single pending task owned by the retained runtime.
+    /// * `shutdown` - Shared future completed by sentinel cancellation.
     /// * `context` - Task context polling the Timer future.
     ///
     /// # Returns
@@ -169,24 +198,16 @@ impl TokioTimer {
     ///
     /// # Panics
     ///
-    /// Resumes an unexpected sentinel-task panic and panics if the one-task
-    /// set becomes empty without yielding a task result.
+    /// This operation does not panic.
     fn poll_runtime_shutdown(
-        tasks: &mut JoinSet<Infallible>,
+        shutdown: &mut (impl std::future::Future<Output = ()> + Unpin),
         context: &mut Context<'_>,
     ) -> Poll<Result<(), TimeError>> {
-        match tasks.poll_join_next(context) {
+        match std::pin::Pin::new(shutdown).poll(context) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Err(error))) if error.is_cancelled() => {
-                Poll::Ready(Err(TimeError::TimerUnavailable {
-                    source: TimerUnavailableError::RuntimeShuttingDown,
-                }))
-            }
-            Poll::Ready(Some(Err(error))) => resume_unwind(error.into_panic()),
-            Poll::Ready(Some(Ok(never))) => match never {},
-            Poll::Ready(None) => {
-                panic!("Tokio Timer task set must retain one liveness sentinel")
-            }
+            Poll::Ready(()) => Poll::Ready(Err(TimeError::TimerUnavailable {
+                source: TimerUnavailableError::RuntimeShuttingDown,
+            })),
         }
     }
 
@@ -208,35 +229,53 @@ impl TokioTimer {
     /// Returns [`TimerUnavailableError::TimeDriverDisabled`] when a future
     /// deadline cannot be registered because Tokio time is disabled.
     fn schedule(
+        &self,
         deadline: Instant,
         now: Instant,
     ) -> Result<TimerFuture, TimeError> {
         if deadline <= now {
             return Ok(Box::pin(std::future::ready(Ok(()))));
         }
+        // Tokio 1.52 exposes no public query for whether a Handle has a time
+        // driver. Catching the constructor panic preserves a typed error in
+        // unwind builds, but the process panic hook runs first and panic=abort
+        // cannot recover. Temporarily replacing the global hook would race
+        // with application panic handling, so this library deliberately does
+        // not attempt to suppress that observable side effect.
         let sleep = catch_unwind(AssertUnwindSafe(|| {
             tokio::time::sleep_until(deadline)
         }))
         .map_err(|_| TimeError::TimerUnavailable {
             source: TimerUnavailableError::TimeDriverDisabled,
         })?;
-        let mut sentinel = JoinSet::new();
-        sentinel.spawn(std::future::pending::<Infallible>());
+        // Criterion's `tokio_timer` benchmark showed that 10,240 legacy
+        // per-deadline sentinels retained 10,240 tasks and made registration
+        // more than 20% slower than native sleeps. One lazy sentinel per Timer
+        // preserves structured shutdown errors without that scaling cost.
+        let liveness = Arc::clone(
+            self.liveness
+                .get_or_init(|| Arc::new(TokioRuntimeLiveness::new())),
+        );
+        let mut shutdown = TokioRuntimeLiveness::shutdown_future(&liveness);
         let mut sleep = Box::pin(sleep);
         Ok(Box::pin(std::future::poll_fn(move |context| {
             if let Poll::Ready(result) =
-                Self::poll_runtime_shutdown(&mut sentinel, context)
+                Self::poll_runtime_shutdown(&mut shutdown, context)
             {
                 return Poll::Ready(result);
             }
             match catch_unwind(AssertUnwindSafe(|| {
+                #[cfg(coverage)]
+                if PANIC_NEXT_SLEEP_POLL.swap(false, Ordering::AcqRel) {
+                    panic!("injected Tokio sleep poll panic");
+                }
                 sleep.as_mut().poll(context)
             })) {
                 Ok(Poll::Pending) => Poll::Pending,
                 Ok(Poll::Ready(())) => Poll::Ready(Ok(())),
                 Err(payload) => {
                     if let Poll::Ready(result) =
-                        Self::poll_runtime_shutdown(&mut sentinel, context)
+                        Self::poll_runtime_shutdown(&mut shutdown, context)
                     {
                         Poll::Ready(result)
                     } else {
@@ -278,10 +317,13 @@ impl Timer for TokioTimer {
     /// Returns [`TimerUnavailableError::TimeDriverDisabled`] when a future
     /// deadline requires a time driver that the retained runtime did not
     /// enable. Reached deadlines do not require a time driver.
+    /// In unwind builds Tokio's panic hook may observe this disabled-driver
+    /// condition before it is converted into the structured error. In
+    /// `panic = "abort"` builds Tokio aborts before conversion is possible.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let deadline = self.native_deadline(deadline)?;
         self.clock
-            .with_runtime(|| Self::schedule(deadline, Instant::now()))
+            .with_runtime(|| self.schedule(deadline, Instant::now()))
     }
 
     /// Registers a notification after a duration in the retained Tokio
@@ -302,6 +344,9 @@ impl Timer for TokioTimer {
     /// Returns [`TimeError::InstantOverflow`] when the relative deadline cannot
     /// be represented, or [`TimerUnavailableError::TimeDriverDisabled`] when a
     /// nonzero future deadline requires a disabled time driver.
+    /// In unwind builds Tokio's panic hook may observe this disabled-driver
+    /// condition before it is converted into the structured error. In
+    /// `panic = "abort"` builds Tokio aborts before conversion is possible.
     #[inline]
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
         self.clock.with_runtime(|| {
@@ -309,7 +354,7 @@ impl Timer for TokioTimer {
             let deadline = now
                 .checked_add(duration)
                 .ok_or(TimeError::InstantOverflow)?;
-            Self::schedule(deadline, now)
+            self.schedule(deadline, now)
         })
     }
 }
