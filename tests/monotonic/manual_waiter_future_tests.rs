@@ -54,10 +54,11 @@ struct ReentrantDropWaker {
     drop_completed: SyncSender<()>,
 }
 
-#[allow(clippy::manual_noop_waker)]
 impl Wake for ReentrantDropWaker {
     /// Ignores wake requests because these tests exercise only destruction.
-    fn wake(self: Arc<Self>) {}
+    fn wake(self: Arc<Self>) {
+        drop(self);
+    }
 }
 
 impl Drop for ReentrantDropWaker {
