@@ -13,5 +13,9 @@
 mod fault_injecting_timer;
 mod timer_failure_point;
 
+#[cfg(all(loom, feature = "loom-model"))]
+#[doc(hidden)]
+pub mod loom;
+
 pub use fault_injecting_timer::FaultInjectingTimer;
 pub use timer_failure_point::TimerFailurePoint;

@@ -10,7 +10,7 @@
 mod advance_effects;
 mod manual_monotonic_state;
 mod manual_time_domain;
-mod manual_waiter_registry;
+pub(crate) mod manual_waiter_registry;
 mod waiter_registration_guard;
 
 pub(crate) use advance_effects::AdvanceEffects;

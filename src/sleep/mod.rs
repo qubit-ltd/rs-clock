@@ -8,6 +8,6 @@
 //! Blocking adaptation over asynchronous monotonic timers.
 
 mod blocking_sleeper;
-mod internal;
+pub(crate) mod internal;
 
 pub use blocking_sleeper::BlockingSleeper;

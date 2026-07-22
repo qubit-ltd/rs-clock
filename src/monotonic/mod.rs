@@ -8,7 +8,7 @@
 //! Monotonic clocks and domain-scoped instants.
 
 mod clock_domain;
-mod internal;
+pub(crate) mod internal;
 mod manual_deadline_future;
 mod manual_monotonic_clock;
 mod manual_waiter_future;

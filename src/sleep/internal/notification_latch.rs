@@ -8,12 +8,12 @@
 // qubit-style: allow source-test-pair
 //! Defines the one-bit notification state used while blocking on a Timer.
 
-#[cfg(all(test, loom))]
+#[cfg(all(loom, feature = "loom-model"))]
 use loom::sync::atomic::{
     AtomicBool,
     Ordering,
 };
-#[cfg(not(all(test, loom)))]
+#[cfg(not(all(loom, feature = "loom-model")))]
 use std::sync::atomic::{
     AtomicBool,
     Ordering,

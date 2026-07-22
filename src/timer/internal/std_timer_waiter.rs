@@ -8,9 +8,9 @@
 //! Stores completion state for one standard timer registration.
 
 use super::std_timer_waiter_state::StdTimerWaiterState;
-#[cfg(all(test, loom))]
+#[cfg(all(loom, feature = "loom-model"))]
 use loom::sync::Mutex;
-#[cfg(not(all(test, loom)))]
+#[cfg(not(all(loom, feature = "loom-model")))]
 use std::sync::Mutex;
 use std::task::{
     Context,

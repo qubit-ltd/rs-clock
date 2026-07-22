@@ -7,7 +7,7 @@
 // =============================================================================
 //! Internal synchronization helpers for blocking sleep.
 
-mod notification_latch;
+pub(crate) mod notification_latch;
 mod thread_waker;
 
 pub(super) use thread_waker::ThreadWaker;
