@@ -5,6 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+// qubit-style: allow source-test-pair
 //! Stores deadline waiters and waiter-count observers for a manual clock.
 
 use crate::monotonic::clock_domain::next_identifier_state;
