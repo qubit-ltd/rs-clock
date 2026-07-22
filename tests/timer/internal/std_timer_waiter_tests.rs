@@ -27,10 +27,11 @@ use std::task::Poll;
 /// Provides stable Waker identity without performing work when invoked.
 struct NoopWake;
 
-#[allow(clippy::manual_noop_waker)]
 impl Wake for NoopWake {
     /// Ignores the notification.
-    fn wake(self: Arc<Self>) {}
+    fn wake(self: Arc<Self>) {
+        drop(self);
+    }
 }
 
 #[test]
