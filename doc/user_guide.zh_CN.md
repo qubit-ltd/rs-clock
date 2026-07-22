@@ -73,6 +73,9 @@ clock 采样和 `Sleep` 创建会短暂进入保存的 Handle，不依赖调用�
 `TimerUnavailableError::TimeDriverDisabled`；已经到达的 deadline 会直接返回 ready
 future，不需要 time driver。drop pending future 会取消本次等待。
 
+Tokio `Sleep` 的调度粒度为毫秒级，不适合高分辨率计时。`TokioTimer` 会保留完整的
+逻辑 `Duration`，但 future 的实际完成时机仍受该粒度以及平台调度延迟影响。
+
 Tokio 当前没有公开 API 可查询 `Handle` 是否具备 time driver；它会在创建未来 sleep
 时用 panic 报告未启用状态。`TokioTimer` 在允许 unwind 时通过 `catch_unwind` 将其
 转换为 `TimeDriverDisabled`，但进程 panic hook 会先运行，仍可能记录或观察到该
