@@ -9,13 +9,23 @@
 //! Stores deadline waiters and waiter-count observers for a manual clock.
 
 use crate::monotonic::clock_domain::next_identifier_state;
-use std::collections::HashMap;
+use std::collections::{
+    BTreeSet,
+    HashMap,
+};
+use std::ops::Bound::{
+    Excluded,
+    Unbounded,
+};
 use std::task::{
     Context,
     Poll,
     Waker,
 };
 use std::time::Duration;
+
+/// Waiter count above which ordered deadline lookups replace linear scans.
+const DEADLINE_INDEX_THRESHOLD: usize = 64;
 
 /// Allocates the current nonzero registry identifier and advances its state.
 ///
@@ -52,6 +62,13 @@ pub(crate) struct ManualWaiterRegistry {
     next_timer_waiter_id: u64,
     /// Timer deadlines and optional task wakers keyed by registration ID.
     timer_waiters: HashMap<u64, (Duration, Option<Waker>)>,
+    /// Unreached timer registrations ordered by deadline and registration ID.
+    ///
+    /// Populated only while the waiter count exceeds
+    /// [`DEADLINE_INDEX_THRESHOLD`].
+    future_timer_deadlines: BTreeSet<(Duration, u64)>,
+    /// Latest elapsed time observed while collecting due timer notifications.
+    elapsed: Duration,
     /// Next identifier assigned to a waiter-registration observer.
     next_observer_id: u64,
     /// Waiter-count observers keyed by registration identifier.
@@ -72,6 +89,8 @@ impl ManualWaiterRegistry {
         Self {
             next_timer_waiter_id: 1,
             timer_waiters: HashMap::new(),
+            future_timer_deadlines: BTreeSet::new(),
+            elapsed: Duration::ZERO,
             next_observer_id: 1,
             count_observers: HashMap::new(),
             deadline_observers: HashMap::new(),
@@ -101,6 +120,18 @@ impl ManualWaiterRegistry {
             "manual timer waiter identifiers exhausted",
         );
         self.timer_waiters.insert(waiter_id, (deadline, None));
+        if self.timer_waiters.len() == DEADLINE_INDEX_THRESHOLD + 1 {
+            self.future_timer_deadlines.extend(
+                self.timer_waiters
+                    .iter()
+                    .filter(|(_, (deadline, _))| *deadline > self.elapsed)
+                    .map(|(waiter_id, (deadline, _))| (*deadline, *waiter_id)),
+            );
+        } else if self.timer_waiters.len() > DEADLINE_INDEX_THRESHOLD
+            && deadline > self.elapsed
+        {
+            self.future_timer_deadlines.insert((deadline, waiter_id));
+        }
         waiter_id
     }
 
@@ -124,7 +155,13 @@ impl ManualWaiterRegistry {
     ) -> Option<Option<Waker>> {
         self.timer_waiters
             .remove(&waiter_id)
-            .map(|(_, waker)| waker)
+            .map(|(deadline, waker)| {
+                self.future_timer_deadlines.remove(&(deadline, waiter_id));
+                if self.timer_waiters.len() <= DEADLINE_INDEX_THRESHOLD {
+                    self.future_timer_deadlines.clear();
+                }
+                waker
+            })
     }
 
     /// Returns the earliest deadline strictly after elapsed.
@@ -140,12 +177,19 @@ impl ManualWaiterRegistry {
         &self,
         elapsed: Duration,
     ) -> Option<Duration> {
-        self.timer_waiters
-            .values()
-            .map(|(deadline, _)| deadline)
-            .filter(|deadline| **deadline > elapsed)
-            .min()
-            .copied()
+        if self.timer_waiters.len() > DEADLINE_INDEX_THRESHOLD {
+            self.future_timer_deadlines
+                .range((Excluded((elapsed, u64::MAX)), Unbounded))
+                .next()
+                .map(|(deadline, _)| *deadline)
+        } else {
+            self.timer_waiters
+                .values()
+                .map(|(deadline, _)| deadline)
+                .filter(|deadline| **deadline > elapsed)
+                .min()
+                .copied()
+        }
     }
 
     /// Takes task wakers for timer deadlines reached by elapsed.
@@ -166,11 +210,50 @@ impl ManualWaiterRegistry {
         &mut self,
         elapsed: Duration,
     ) -> Vec<Waker> {
-        self.timer_waiters
-            .values_mut()
-            .filter(|(deadline, _)| *deadline <= elapsed)
-            .filter_map(|(_, waker)| waker.take())
-            .collect()
+        self.elapsed = elapsed;
+        if self.timer_waiters.len() <= DEADLINE_INDEX_THRESHOLD {
+            return self
+                .timer_waiters
+                .values_mut()
+                .filter(|(deadline, _)| *deadline <= elapsed)
+                .filter_map(|(_, waker)| waker.take())
+                .collect();
+        }
+        if self
+            .future_timer_deadlines
+            .last()
+            .is_some_and(|(deadline, _)| *deadline <= elapsed)
+        {
+            self.future_timer_deadlines.clear();
+            return self
+                .timer_waiters
+                .values_mut()
+                .filter_map(|(_, waker)| waker.take())
+                .collect();
+        }
+        let mut after_elapsed =
+            self.future_timer_deadlines.split_off(&(elapsed, u64::MIN));
+        while after_elapsed
+            .first()
+            .is_some_and(|(deadline, _)| *deadline == elapsed)
+        {
+            let registration = after_elapsed
+                .pop_first()
+                .expect("the first registration was observed above");
+            self.future_timer_deadlines.insert(registration);
+        }
+        let due_registrations =
+            std::mem::replace(&mut self.future_timer_deadlines, after_elapsed);
+        let mut wakers = Vec::new();
+        for (_, waiter_id) in due_registrations {
+            if let Some((_, waiter_waker)) =
+                self.timer_waiters.get_mut(&waiter_id)
+                && let Some(waker) = waiter_waker.take()
+            {
+                wakers.push(waker);
+            }
+        }
+        wakers
     }
 
     /// Registers a count observer when count has not already been reached.
@@ -390,10 +473,14 @@ impl ManualWaiterRegistry {
             };
             return (Poll::Pending, replaced_waker);
         }
+        self.future_timer_deadlines.remove(&(*deadline, waiter_id));
         let removed_waker = self
             .timer_waiters
             .remove(&waiter_id)
             .and_then(|(_, waker)| waker);
+        if self.timer_waiters.len() <= DEADLINE_INDEX_THRESHOLD {
+            self.future_timer_deadlines.clear();
+        }
         (Poll::Ready(()), removed_waker)
     }
 
