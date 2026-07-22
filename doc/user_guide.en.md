@@ -256,22 +256,29 @@ The process-wide standard timer scheduler benchmark is available with:
 
 ```bash
 cargo bench --bench std_timer_scheduler
+cargo bench --bench manual_timer
 cargo bench --bench tokio_timer --features tokio
 ```
 
-The benchmark reports registration/cancellation and deadline-completion
-throughput for 1, 2, 4, 8, and 16 concurrent caller threads. The Tokio benchmark
-compares native sleeps, the retained legacy per-deadline sentinel, and the
-shared-sentinel implementation at 1,024 and 10,240 pending deadlines.
+The standard-timer benchmark reports registration/cancellation and
+deadline-completion throughput for 1, 2, 4, 8, and 16 concurrent caller
+threads. The manual-timer benchmark measures registration/cancellation, batch
+completion, and sequential completion at 1, 8, 32, 128, and 1,024 waiters. The
+Tokio benchmark compares native sleeps, the retained legacy per-deadline
+sentinel, and the shared-sentinel implementation at 1,024 and 10,240 pending
+deadlines.
 
-The small synchronization state machines used by `BlockingSleeper` and
-`StdTimer` also have Loom model checks. Run them with:
+The synchronization state machines used by `BlockingSleeper`, `StdTimer`, and
+the manual timer registry also have Loom models that exercise their production
+algorithms. Run every model with:
 
 ```bash
-RUSTFLAGS="--cfg loom" cargo test --release --test sleep_tests notification_latch_model
-RUSTFLAGS="--cfg loom" cargo test --release --test timer_tests std_timer_waiter_model
-RUSTFLAGS="--cfg loom" cargo test --release --test monotonic_tests manual_waiter_registry_model
+RUSTFLAGS="--cfg loom" cargo test --release --all-features loom
 ```
+
+Loom model test names contain `loom`. The shared CI check discovers that set
+before execution and fails when it discovers no models, preventing an empty
+filter from silently passing.
 
 ## Errors
 

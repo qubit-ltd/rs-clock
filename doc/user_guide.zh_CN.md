@@ -231,21 +231,24 @@ advance；`TokioTimer` 必须由其保存的 runtime 独立驱动。不要在 cu
 
 ```bash
 cargo bench --bench std_timer_scheduler
+cargo bench --bench manual_timer
 cargo bench --bench tokio_timer --features tokio
 ```
 
 standard timer 基准测试分别报告 1、2、4、8、16 个并发调用线程下的注册/取消与
-deadline 完成吞吐。Tokio 基准测试在 1,024 与 10,240 个 pending deadline 下比较
-原生 sleep、保留的旧版逐 deadline sentinel 与共享 sentinel 实现。
+deadline 完成吞吐。manual timer 基准测试测量 1、8、32、128、1,024 个 waiter 下的
+注册/取消、批量完成与顺序完成。Tokio 基准测试在 1,024 与 10,240 个 pending
+deadline 下比较原生 sleep、保留的旧版逐 deadline sentinel 与共享 sentinel 实现。
 
-`BlockingSleeper` 与 `StdTimer` 使用的小型同步状态机还提供 Loom 模型检查，可通过以下
-命令运行：
+`BlockingSleeper`、`StdTimer` 与 manual timer registry 的同步状态机还提供直接覆盖
+生产算法的 Loom 模型。可通过以下命令运行全部模型：
 
 ```bash
-RUSTFLAGS="--cfg loom" cargo test --release --test sleep_tests notification_latch_model
-RUSTFLAGS="--cfg loom" cargo test --release --test timer_tests std_timer_waiter_model
-RUSTFLAGS="--cfg loom" cargo test --release --test monotonic_tests manual_waiter_registry_model
+RUSTFLAGS="--cfg loom" cargo test --release --all-features loom
 ```
+
+Loom 模型测试名称都包含 `loom`。共享 CI 脚本会先发现模型再执行；如果一个模型都未
+发现，检查会直接失败，避免空过滤条件被误判为通过。
 
 ## 错误
 
