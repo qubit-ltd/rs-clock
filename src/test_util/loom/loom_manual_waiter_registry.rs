@@ -122,6 +122,7 @@ impl LoomManualWaiterRegistry {
     /// # Panics
     ///
     /// Panics when `waiter_id` is not registered.
+    #[must_use = "the poll state and detached waker must both be handled"]
     #[inline(always)]
     pub fn poll_timer(
         &mut self,
@@ -147,6 +148,7 @@ impl LoomManualWaiterRegistry {
     /// # Panics
     ///
     /// Panics when `observer_id` is not registered.
+    #[must_use = "the poll state and detached waker must both be handled"]
     #[inline(always)]
     pub fn poll_deadline_observer(
         &mut self,
