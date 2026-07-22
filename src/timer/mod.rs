@@ -7,6 +7,8 @@
 // =============================================================================
 //! Timer capabilities for asynchronous deadline notification.
 
+// qubit-style: allow coverage-cfg
+
 pub(crate) mod internal;
 mod manual_timer;
 mod std_timer;
@@ -27,3 +29,7 @@ pub use timer_future::TimerFuture;
 
 #[cfg(feature = "tokio")]
 pub use tokio_timer::TokioTimer;
+
+#[doc(hidden)]
+#[cfg(all(coverage, feature = "tokio"))]
+pub use tokio_timer::panic_next_tokio_timer_sleep_poll;

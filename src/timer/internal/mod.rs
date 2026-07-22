@@ -15,3 +15,6 @@ pub(crate) mod std_timer_scheduler_state;
 pub(crate) mod std_timer_waiter;
 pub(crate) mod std_timer_waiter_state;
 pub(crate) mod std_timer_worker_guard;
+
+#[cfg(feature = "tokio")]
+pub(crate) mod tokio_runtime_liveness;
