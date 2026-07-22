@@ -457,7 +457,8 @@ impl ManualTimeDomain {
             let elapsed = state.elapsed;
             state.waiters.poll_timer(waiter_id, elapsed, context)
         };
-        if result.0.is_ready() {
+        let (poll, _) = result;
+        if poll.is_ready() {
             self.notify_waiters_changed();
         }
         result
