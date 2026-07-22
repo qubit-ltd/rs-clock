@@ -5,6 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+// qubit-style: allow source-test-pair
 //! Defines the one-bit notification state used while blocking on a Timer.
 
 #[cfg(all(test, loom))]
