@@ -59,6 +59,17 @@ pub trait Timer: Send + Sync {
     #[must_use = "the Timer clock should be used to sample or validate deadlines"]
     fn clock(&self) -> &dyn MonotonicClock;
 
+    /// Returns the current monotonic instant in this timer's clock domain.
+    ///
+    /// # Returns
+    ///
+    /// The current instant sampled from this timer's clock.
+    #[must_use = "the current timer instant should be used to measure or validate deadlines"]
+    #[inline(always)]
+    fn now(&self) -> MonotonicInstant {
+        self.clock().now()
+    }
+
     /// Creates a notification for an absolute monotonic deadline.
     ///
     /// The deadline is fixed before this method returns. A deadline at or
@@ -101,7 +112,7 @@ pub trait Timer: Send + Sync {
     /// for that deadline.
     #[inline]
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
-        let deadline = self.clock().now().checked_add(duration)?;
+        let deadline = self.now().checked_add(duration)?;
         self.at(deadline)
     }
 }
