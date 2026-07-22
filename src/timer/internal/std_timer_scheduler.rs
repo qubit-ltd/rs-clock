@@ -183,14 +183,6 @@ impl StdTimerScheduler {
         }
     }
 
-    /// Notifies the worker that its scheduler wait may need recalculation.
-    #[inline]
-    fn notify_worker(&self) {
-        #[cfg(coverage)]
-        WORKER_NOTIFICATION_COUNT.fetch_add(1, Ordering::AcqRel);
-        self.changed.notify_one();
-    }
-
     /// Fails registrations owned by a worker that has exited.
     ///
     /// Scheduler state is restored atomically under its lock. Waiter
@@ -213,6 +205,14 @@ impl StdTimerScheduler {
         let mut fanout = PanicFanout::new();
         fanout.wake_all(wakers);
         fanout.discard_panics();
+    }
+
+    /// Notifies the worker that its scheduler wait may need recalculation.
+    #[inline]
+    fn notify_worker(&self) {
+        #[cfg(coverage)]
+        WORKER_NOTIFICATION_COUNT.fetch_add(1, Ordering::AcqRel);
+        self.changed.notify_one();
     }
 
     /// Starts the native worker after its running state is committed.
