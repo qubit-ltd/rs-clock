@@ -160,6 +160,113 @@ fn test_manual_monotonic_clock_advance_to_current_is_noop() {
     assert_eq!(current, clock.now());
 }
 
+/// Verifies high-cardinality deadline bookkeeping across cancellation and due
+/// futures that have not yet been polled for cleanup.
+#[test]
+fn test_manual_monotonic_clock_tracks_many_indexed_deadlines() {
+    const EARLIEST_COUNT: usize = 64;
+    const LATER_COUNT: usize = 192;
+
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let mut cancelled = (0..EARLIEST_COUNT / 2)
+        .map(|_| {
+            timer
+                .after(Duration::from_secs(1))
+                .expect("earliest deadline should register")
+        })
+        .collect::<Vec<_>>();
+    let mut due = (EARLIEST_COUNT / 2..EARLIEST_COUNT)
+        .map(|_| {
+            timer
+                .after(Duration::from_secs(1))
+                .expect("duplicate earliest deadline should register")
+        })
+        .collect::<Vec<_>>();
+    let later = (0..LATER_COUNT)
+        .map(|offset| {
+            timer
+                .after(Duration::from_secs(2 + (offset % 3) as u64))
+                .expect("later deadline should register")
+        })
+        .collect::<Vec<_>>();
+
+    cancelled.clear();
+    assert_eq!(EARLIEST_COUNT / 2 + LATER_COUNT, clock.pending_waiters());
+    assert_eq!(
+        Some(
+            clock
+                .now()
+                .checked_add(Duration::from_secs(1))
+                .expect("earliest deadline should be representable"),
+        ),
+        clock.next_deadline(),
+    );
+
+    let waker = Waker::noop();
+    let mut context = Context::from_waker(waker);
+    for future in &mut due {
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending,));
+    }
+    clock
+        .advance(Duration::from_secs(1))
+        .expect("manual clock should reach earliest deadline");
+    assert_eq!(EARLIEST_COUNT / 2 + LATER_COUNT, clock.pending_waiters());
+    assert_eq!(
+        Some(
+            clock
+                .now()
+                .checked_add(Duration::from_secs(1))
+                .expect("next deadline should be representable"),
+        ),
+        clock.next_deadline(),
+    );
+
+    for future in &mut due {
+        assert!(matches!(
+            future.as_mut().poll(&mut context),
+            Poll::Ready(Ok(())),
+        ));
+    }
+    assert_eq!(LATER_COUNT, clock.pending_waiters());
+
+    drop(later);
+    assert_eq!(0, clock.pending_waiters());
+    assert_eq!(None, clock.next_deadline());
+}
+
+/// Verifies the indexed fast path when one advance reaches every waiter.
+#[test]
+fn test_manual_monotonic_clock_completes_many_waiters_at_one_deadline() {
+    const WAITER_COUNT: usize = 65;
+
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let mut futures = (0..WAITER_COUNT)
+        .map(|_| {
+            timer
+                .after(Duration::from_secs(1))
+                .expect("shared deadline should register")
+        })
+        .collect::<Vec<_>>();
+    let waker = Waker::noop();
+    let mut context = Context::from_waker(waker);
+    for future in &mut futures {
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending,));
+    }
+
+    clock
+        .advance(Duration::from_secs(1))
+        .expect("manual clock should reach shared deadline");
+    for future in &mut futures {
+        assert!(matches!(
+            future.as_mut().poll(&mut context),
+            Poll::Ready(Ok(())),
+        ));
+    }
+    assert_eq!(0, clock.pending_waiters());
+}
+
 /// Verifies that an existing waiter advances before guard representation.
 #[test]
 fn test_manual_monotonic_clock_advances_after_existing_waiter() {
