@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-pub(crate) use crate::support::clock_domain;
 mod clock_domain_tests;
 mod internal;
 mod manual_deadline_future_tests;

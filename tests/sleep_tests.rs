@@ -7,6 +7,4 @@
 // =============================================================================
 //! Integration tests for the sleep module.
 
-#[cfg(loom)]
-mod common;
 mod sleep;

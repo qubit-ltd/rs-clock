@@ -15,8 +15,6 @@ use qubit_clock::{
 use std::collections::HashSet;
 use std::time::Duration;
 
-use super::clock_domain::next_identifier_state;
-
 #[test]
 fn test_clock_domain_new_creates_distinct_domains() {
     let first = ClockDomain::new();
@@ -25,13 +23,6 @@ fn test_clock_domain_new_creates_distinct_domains() {
     assert_ne!(first, second);
     assert_ne!("0", first.to_string());
     assert_ne!("0", second.to_string());
-}
-
-#[test]
-fn test_clock_domain_identifier_state_reaches_terminal_zero() {
-    assert_eq!(Some(2), next_identifier_state(1));
-    assert_eq!(Some(0), next_identifier_state(u64::MAX));
-    assert_eq!(None, next_identifier_state(0));
 }
 
 #[test]

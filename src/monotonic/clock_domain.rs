@@ -122,6 +122,7 @@ impl Display for ClockDomain {
     /// Returns [`std::fmt::Error`] when the formatter rejects the output.
     #[inline(always)]
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(formatter)
+        let Self(identifier) = self;
+        identifier.fmt(formatter)
     }
 }
