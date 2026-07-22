@@ -35,6 +35,12 @@ pub enum TimerUnavailableError {
     #[error("the scheduler worker thread terminated unexpectedly")]
     SchedulerWorkerTerminated,
     /// The target asynchronous runtime has no enabled time driver.
+    ///
+    /// Tokio currently exposes this condition by panicking while creating a
+    /// future sleep. [`TokioTimer`](crate::TokioTimer) catches that unwind and
+    /// returns this variant, but the process panic hook runs before unwinding.
+    /// Consequently the hook may still log or otherwise observe the panic,
+    /// and a `panic = "abort"` build cannot convert it into this error.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     #[error("the asynchronous runtime time driver is disabled")]

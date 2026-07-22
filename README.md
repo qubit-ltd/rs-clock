@@ -61,6 +61,15 @@ from another runtime context. The target runtime owner must remain alive and
 its time driver must continue running until pending futures complete or are
 dropped. If it shuts down first, a pending `TokioTimer` future returns
 `TimeError::TimerUnavailable` with `TimerUnavailableError::RuntimeShuttingDown`.
+For a future deadline on a runtime without time enabled, Tokio exposes the
+condition through a panic. `TokioTimer` converts it to `TimeDriverDisabled` in
+unwind builds, but the process panic hook still observes it; `panic = "abort"`
+cannot be converted. Enable time on every injected runtime to avoid that side
+effect.
+
+For reusable timer-failure fixtures in downstream tests, enable the separate
+default-off `test-util` feature in a development dependency. It provides
+`FaultInjectingTimer` for deterministic registration or completion failures.
 
 ## Real-time use
 

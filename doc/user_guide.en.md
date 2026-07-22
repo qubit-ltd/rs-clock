@@ -80,6 +80,21 @@ without time enabled returns `TimerUnavailableError::TimeDriverDisabled`.
 An already reached deadline returns an immediately ready future and needs no
 time driver. Dropping a pending future cancels that wait.
 
+Tokio currently provides no public `Handle` capability query for the time
+driver. It reports a disabled driver by panicking during future-sleep creation.
+`TokioTimer` uses `catch_unwind` to convert that condition into
+`TimeDriverDisabled` when unwinding is enabled, but the process panic hook runs
+before the catch and can still log or observe it. A `panic = "abort"` build
+cannot recover. Replacing the process-global hook temporarily would race with
+application panic handling, so the library does not do so. Enabling time on
+every runtime injected into `TokioTimer` is the only fully side-effect-free
+configuration with the current public Tokio API.
+
+Downstream tests can enable the default-off `test-util` feature in a development
+dependency. `FaultInjectingTimer` then provides reusable, runtime-neutral
+registration and completion failures while preserving normal domain and
+reached-deadline behavior.
+
 <a id="manual-time-coordination"></a>
 
 ## Deterministic manual time
@@ -241,10 +256,13 @@ The process-wide standard timer scheduler benchmark is available with:
 
 ```bash
 cargo bench --bench std_timer_scheduler
+cargo bench --bench tokio_timer --features tokio
 ```
 
 The benchmark reports registration/cancellation and deadline-completion
-throughput for 1, 2, 4, 8, and 16 concurrent caller threads.
+throughput for 1, 2, 4, 8, and 16 concurrent caller threads. The Tokio benchmark
+compares native sleeps, the retained legacy per-deadline sentinel, and the
+shared-sentinel implementation at 1,024 and 10,240 pending deadlines.
 
 The small synchronization state machines used by `BlockingSleeper` and
 `StdTimer` also have Loom model checks. Run them with:
@@ -252,6 +270,7 @@ The small synchronization state machines used by `BlockingSleeper` and
 ```bash
 RUSTFLAGS="--cfg loom" cargo test --release --test sleep_tests notification_latch_model
 RUSTFLAGS="--cfg loom" cargo test --release --test timer_tests std_timer_waiter_model
+RUSTFLAGS="--cfg loom" cargo test --release --test monotonic_tests manual_waiter_registry_model
 ```
 
 ## Errors

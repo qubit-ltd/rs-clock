@@ -58,6 +58,13 @@ poll。只要仍有 pending future，目标 Runtime 的所有者就必须存活�
 time driver，直到 future 完成或被丢弃。若 runtime 提前关闭，pending
 `TokioTimer` future 会返回携带
 `TimerUnavailableError::RuntimeShuttingDown` 的 `TimeError::TimerUnavailable`。
+当未启用 time 的 runtime 注册未来 deadline 时，Tokio 通过 panic 暴露该状态。
+`TokioTimer` 在 unwind 构建中会把它转换为 `TimeDriverDisabled`，但进程 panic hook
+仍会先观察到该 panic；`panic = "abort"` 则无法转换。为避免这一副作用，应为注入的
+runtime 始终启用 time。
+
+下游测试若需要复用 timer 故障 fixture，可在开发依赖中启用默认关闭的独立
+`test-util` feature。它提供 `FaultInjectingTimer`，可确定性地注入注册或完成故障。
 
 ## 使用真实时间
 

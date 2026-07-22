@@ -73,6 +73,17 @@ clock 采样和 `Sleep` 创建会短暂进入保存的 Handle，不依赖调用�
 `TimerUnavailableError::TimeDriverDisabled`；已经到达的 deadline 会直接返回 ready
 future，不需要 time driver。drop pending future 会取消本次等待。
 
+Tokio 当前没有公开 API 可查询 `Handle` 是否具备 time driver；它会在创建未来 sleep
+时用 panic 报告未启用状态。`TokioTimer` 在允许 unwind 时通过 `catch_unwind` 将其
+转换为 `TimeDriverDisabled`，但进程 panic hook 会先运行，仍可能记录或观察到该
+panic；`panic = "abort"` 构建则无法恢复。临时替换进程级全局 hook 会与应用自己的
+panic 处理竞争，因此本库不会这样做。在当前 Tokio 公开 API 下，为注入
+`TokioTimer` 的每个 runtime 启用 time，是唯一完全没有该副作用的配置。
+
+下游测试可在开发依赖中启用默认关闭的 `test-util` feature。
+`FaultInjectingTimer` 提供可复用、与 runtime 无关的注册与完成故障，同时保留正常的
+domain 校验和已到达 deadline 行为。
+
 <a id="manual-time-coordination"></a>
 
 ## 确定性 Manual Time
@@ -220,9 +231,12 @@ advance；`TokioTimer` 必须由其保存的 runtime 独立驱动。不要在 cu
 
 ```bash
 cargo bench --bench std_timer_scheduler
+cargo bench --bench tokio_timer --features tokio
 ```
 
-基准测试分别报告 1、2、4、8、16 个并发调用线程下的注册/取消与 deadline 完成吞吐。
+standard timer 基准测试分别报告 1、2、4、8、16 个并发调用线程下的注册/取消与
+deadline 完成吞吐。Tokio 基准测试在 1,024 与 10,240 个 pending deadline 下比较
+原生 sleep、保留的旧版逐 deadline sentinel 与共享 sentinel 实现。
 
 `BlockingSleeper` 与 `StdTimer` 使用的小型同步状态机还提供 Loom 模型检查，可通过以下
 命令运行：
@@ -230,6 +244,7 @@ cargo bench --bench std_timer_scheduler
 ```bash
 RUSTFLAGS="--cfg loom" cargo test --release --test sleep_tests notification_latch_model
 RUSTFLAGS="--cfg loom" cargo test --release --test timer_tests std_timer_waiter_model
+RUSTFLAGS="--cfg loom" cargo test --release --test monotonic_tests manual_waiter_registry_model
 ```
 
 ## 错误
