@@ -168,7 +168,7 @@ fn test_manual_monotonic_clock_advance_to_current_is_noop() {
 /// Verifies high-cardinality deadline bookkeeping across cancellation and due
 /// futures that have not yet been polled for cleanup.
 #[test]
-fn test_manual_monotonic_clock_tracks_many_indexed_deadlines() {
+fn test_manual_monotonic_clock_tracks_many_deadlines() {
     const EARLIEST_COUNT: usize = 64;
     const LATER_COUNT: usize = 192;
 
@@ -240,7 +240,7 @@ fn test_manual_monotonic_clock_tracks_many_indexed_deadlines() {
     assert_eq!(None, clock.next_deadline());
 }
 
-/// Verifies the indexed fast path when one advance reaches every waiter.
+/// Verifies a large shared-deadline population completes in one advance.
 #[test]
 fn test_manual_monotonic_clock_completes_many_waiters_at_one_deadline() {
     const WAITER_COUNT: usize = 65;
