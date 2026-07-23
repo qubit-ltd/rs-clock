@@ -166,8 +166,9 @@ impl ManualMonotonicClock {
     ///
     /// # Errors
     ///
-    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign target and
-    /// [`TimeError::CannotMoveBackward`] for an earlier target.
+    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign target.
+    /// Returns [`TimeError::CannotMoveBackward`] for an earlier target,
+    /// retaining both the current and requested elapsed durations.
     ///
     /// # Panics
     ///

@@ -11,7 +11,10 @@ use qubit_clock::{
     TimeError,
     TimerUnavailableError,
 };
-use std::io;
+use std::{
+    io,
+    time::Duration,
+};
 
 #[test]
 fn test_time_error_clock_domain_mismatch_display() {
@@ -34,12 +37,20 @@ fn test_time_error_other_variants_display() {
         TimeError::InstantOverflow.to_string(),
     );
     assert_eq!(
-        "manual monotonic time cannot move backward",
-        TimeError::CannotMoveBackward.to_string(),
+        "manual monotonic time cannot move backward from 10s to 5s",
+        TimeError::CannotMoveBackward {
+            current_elapsed: Duration::from_secs(10),
+            requested_elapsed: Duration::from_secs(5),
+        }
+        .to_string(),
     );
     assert_eq!(
-        "earlier monotonic instant is later than the current instant",
-        TimeError::InvalidInstantOrder.to_string(),
+        "instant at 2s cannot be earlier than current instant at 1s",
+        TimeError::InvalidInstantOrder {
+            current_elapsed: Duration::from_secs(1),
+            earlier_elapsed: Duration::from_secs(2),
+        }
+        .to_string(),
     );
     assert_eq!(
         "monotonic timer is unavailable: timer backend 'test' is unavailable: \
