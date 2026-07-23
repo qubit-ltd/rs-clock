@@ -19,6 +19,31 @@ use std::sync::Arc;
 use tokio::runtime::Handle;
 use tokio::time::Instant;
 
+/// Runs one synchronous operation in the target runtime context.
+///
+/// Tokio task hooks execute while the runtime context is already borrowed.
+/// Re-entering that same runtime from such a hook panics, so an existing
+/// matching context is reused.
+///
+/// # Parameters
+///
+/// * `runtime` - Runtime context required by `operation`.
+/// * `operation` - Synchronous operation to execute.
+///
+/// # Returns
+///
+/// The value returned by `operation`.
+#[inline]
+fn within_runtime<R>(runtime: &Handle, operation: impl FnOnce() -> R) -> R {
+    let is_current =
+        Handle::try_current().is_ok_and(|current| current.id() == runtime.id());
+    if is_current {
+        return operation();
+    }
+    let _runtime_guard = runtime.enter();
+    operation()
+}
+
 /// A monotonic clock backed by Tokio's time driver.
 ///
 /// The clock retains a [`Handle`] and enters that runtime briefly whenever it
@@ -65,10 +90,7 @@ impl TokioMonotonicClock {
     #[inline]
     pub fn from_handle(runtime: Handle) -> Self {
         let domain = ClockDomain::new();
-        let origin = {
-            let _runtime_guard = runtime.enter();
-            Instant::now()
-        };
+        let origin = within_runtime(&runtime, Instant::now);
         Self {
             domain,
             origin,
@@ -166,8 +188,7 @@ impl TokioMonotonicClock {
     /// The value returned by `operation`.
     #[inline]
     pub(crate) fn with_runtime<R>(&self, operation: impl FnOnce() -> R) -> R {
-        let _runtime_guard = self.runtime.enter();
-        operation()
+        within_runtime(&self.runtime, operation)
     }
 }
 
