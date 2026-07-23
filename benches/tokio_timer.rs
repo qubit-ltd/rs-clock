@@ -8,6 +8,7 @@
 //! Measures Tokio Timer registration, cancellation, and completion costs.
 
 use criterion::{
+    BatchSize,
     BenchmarkId,
     Criterion,
     Throughput,
@@ -34,6 +35,9 @@ use tokio::task::JoinSet;
 
 /// Batch sizes representing ordinary and high-cardinality timer use.
 const BATCH_SIZES: [usize; 2] = [1_024, 10_240];
+
+/// Timer populations representing monitor- and retry-style ownership.
+const TIMER_COUNTS: [usize; 2] = [64, 1_024];
 
 /// Paused-time deadline used by registration and cancellation batches.
 const CANCELLATION_DEADLINE: Duration = Duration::from_secs(60);
@@ -179,6 +183,93 @@ fn resident_task_increase(
     resident_tasks
 }
 
+/// Creates independent timers retaining one runtime handle.
+///
+/// # Parameters
+///
+/// * `timer_count` - Number of independent timers to create.
+/// * `runtime` - Runtime whose handle is retained by each timer.
+///
+/// # Returns
+///
+/// Independent timers associated with the supplied runtime.
+fn create_timers(timer_count: usize, runtime: &Runtime) -> Vec<TokioTimer> {
+    let runtime_handle = runtime.handle().clone();
+    (0..timer_count)
+        .map(|_| TokioTimer::from_handle(runtime_handle.clone()))
+        .collect()
+}
+
+/// Registers one deadline per timer, then releases all futures and timers.
+///
+/// # Parameters
+///
+/// * `timers` - Independent timers used for deadline registration.
+/// * `runtime` - Runtime that owns the timer state and cleanup tasks.
+///
+/// # Panics
+///
+/// Panics when a deadline cannot be registered or cleanup cannot be driven.
+fn register_and_cancel_many_timers(timers: Vec<TokioTimer>, runtime: &Runtime) {
+    let futures = {
+        let _runtime_guard = runtime.enter();
+        timers
+            .iter()
+            .map(|timer| {
+                timer
+                    .after(CANCELLATION_DEADLINE)
+                    .expect("Tokio Timer deadline should register")
+            })
+            .collect::<Vec<_>>()
+    };
+    drop(futures);
+    drop(timers);
+    runtime.block_on(tokio::task::yield_now());
+}
+
+/// Counts retained tasks for independent timers on one fresh runtime.
+///
+/// # Parameters
+///
+/// * `timer_count` - Number of independent timers observed.
+///
+/// # Returns
+///
+/// Increase in live runtime tasks while deadlines and timers remain resident.
+///
+/// # Panics
+///
+/// Panics when the observation runtime cannot be built, a deadline cannot be
+/// registered, or cleanup cannot be driven.
+fn many_timer_resident_task_increase(timer_count: usize) -> usize {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .expect("task-observation runtime should build");
+    let initial_tasks = runtime.metrics().num_alive_tasks();
+    let timers = create_timers(timer_count, &runtime);
+    let futures = {
+        let _runtime_guard = runtime.enter();
+        timers
+            .iter()
+            .map(|timer| {
+                timer
+                    .after(CANCELLATION_DEADLINE)
+                    .expect("Tokio Timer deadline should register")
+            })
+            .collect::<Vec<_>>()
+    };
+    let resident_tasks = runtime
+        .metrics()
+        .num_alive_tasks()
+        .saturating_sub(initial_tasks);
+    drop(futures);
+    drop(timers);
+    runtime.block_on(tokio::task::yield_now());
+    resident_tasks
+}
+
 /// Benchmarks Tokio Timer behavior affected by task-backed scheduling.
 ///
 /// # Parameters
@@ -210,6 +301,13 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
     });
     eprintln!(
         "resident task increase at {largest_batch} futures: native={native_tasks}, per_deadline_sentinel={sentinel_tasks}, tokio_timer={timer_tasks}",
+    );
+    let largest_timer_count = TIMER_COUNTS[TIMER_COUNTS.len() - 1];
+    let many_timer_tasks =
+        many_timer_resident_task_increase(largest_timer_count);
+    eprintln!(
+        "resident task increase at {largest_timer_count} independent timers: \
+         tokio_timer={many_timer_tasks}",
     );
 
     let mut registration_group =
@@ -253,6 +351,35 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
         );
     }
     registration_group.finish();
+
+    let many_timer_runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .expect("many-timer benchmark runtime should build");
+    let mut many_timer_group = criterion.benchmark_group(
+        "tokio_timer/many_timer_registration_and_cancellation",
+    );
+    for timer_count in TIMER_COUNTS {
+        many_timer_group.throughput(Throughput::Elements(timer_count as u64));
+        many_timer_group.bench_with_input(
+            BenchmarkId::from_parameter(timer_count),
+            &timer_count,
+            |bencher, &timer_count| {
+                bencher.iter_batched(
+                    || create_timers(timer_count, &many_timer_runtime),
+                    |timers| {
+                        register_and_cancel_many_timers(
+                            timers,
+                            &many_timer_runtime,
+                        );
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+    many_timer_group.finish();
 
     let mut completion_group =
         criterion.benchmark_group("tokio_timer/deadline_completion");

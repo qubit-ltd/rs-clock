@@ -56,14 +56,14 @@ fn benchmark_registration_and_cancellation(criterion: &mut Criterion) {
     let mut group =
         criterion.benchmark_group("manual_timer/registration_and_cancellation");
     for waiter_count in WAITER_COUNTS {
+        let clock = ManualMonotonicClock::new_shared();
+        let timer = clock.new_timer();
         group.throughput(Throughput::Elements(waiter_count as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
                 bencher.iter(|| {
-                    let clock = ManualMonotonicClock::new_shared();
-                    let timer = clock.new_timer();
                     let mut futures = Vec::with_capacity(waiter_count);
                     for _ in 0..waiter_count {
                         futures.push(
