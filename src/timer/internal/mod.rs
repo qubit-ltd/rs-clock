@@ -18,3 +18,11 @@ pub(crate) mod std_timer_worker_guard;
 
 #[cfg(feature = "tokio")]
 pub(crate) mod tokio_runtime_liveness;
+#[cfg(feature = "tokio")]
+pub(crate) mod tokio_runtime_liveness_registry;
+#[cfg(feature = "tokio")]
+pub(crate) mod tokio_runtime_shutdown_guard;
+#[cfg(feature = "tokio")]
+pub(crate) mod tokio_runtime_shutdown_state;
+#[cfg(feature = "tokio")]
+pub(crate) mod tokio_timer_future;

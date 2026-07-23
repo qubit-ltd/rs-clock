@@ -60,10 +60,11 @@ required-features = ["tokio"]
 default = []
 loom-model = ["dep:loom", "test-util"]
 test-util = []
-tokio = ["dep:tokio"]
+tokio = ["dep:pin-project-lite", "dep:tokio"]
 
 [dependencies]
 loom = { version = "0.7", optional = true }
+pin-project-lite = { version = "0.2", optional = true }
 thiserror = "2.0"
 tokio = { version = "1.52", optional = true, features = ["rt", "sync", "time"] }
 

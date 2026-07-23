@@ -10,6 +10,8 @@
 // qubit-style: allow coverage-cfg
 
 use crate::timer::internal::tokio_runtime_liveness::TokioRuntimeLiveness;
+use crate::timer::internal::tokio_runtime_liveness_registry::TokioRuntimeLivenessRegistry;
+use crate::timer::internal::tokio_timer_future::TokioTimerFuture;
 use crate::{
     MonotonicClock,
     MonotonicInstant,
@@ -29,15 +31,10 @@ use std::{
     panic::{
         AssertUnwindSafe,
         catch_unwind,
-        resume_unwind,
     },
     sync::{
         Arc,
         OnceLock,
-    },
-    task::{
-        Context,
-        Poll,
     },
     time::Duration,
 };
@@ -54,6 +51,12 @@ static PANIC_NEXT_SLEEP_POLL: AtomicBool = AtomicBool::new(false);
 #[cfg(coverage)]
 pub fn panic_next_tokio_timer_sleep_poll() {
     PANIC_NEXT_SLEEP_POLL.store(true, Ordering::Release);
+}
+
+/// Takes the coverage-only sleep-poll panic request.
+#[cfg(coverage)]
+pub(crate) fn take_tokio_timer_sleep_poll_panic() -> bool {
+    PANIC_NEXT_SLEEP_POLL.swap(false, Ordering::AcqRel)
 }
 
 /// An asynchronous timer backed by one Tokio runtime time driver.
@@ -76,7 +79,7 @@ pub fn panic_next_tokio_timer_sleep_poll() {
 pub struct TokioTimer {
     /// Private handle retaining the source clock domain and Tokio origin.
     clock: TokioMonotonicClock,
-    /// Lazily initialized liveness sentinel shared by pending deadlines.
+    /// Lazily resolved liveness shared by timers on the retained runtime.
     liveness: OnceLock<Arc<TokioRuntimeLiveness>>,
 }
 
@@ -190,33 +193,6 @@ impl TokioTimer {
             .ok_or(TimeError::InstantOverflow)
     }
 
-    /// Polls the retained runtime's shared shutdown notification.
-    ///
-    /// # Parameters
-    ///
-    /// * `shutdown` - Shared future completed by sentinel cancellation.
-    /// * `context` - Task context polling the Timer future.
-    ///
-    /// # Returns
-    ///
-    /// [`Poll::Pending`] while the retained runtime remains alive, or a
-    /// structured shutdown error after that runtime cancels the sentinel.
-    ///
-    /// # Panics
-    ///
-    /// This operation does not panic.
-    fn poll_runtime_shutdown(
-        shutdown: &mut (impl std::future::Future<Output = ()> + Unpin),
-        context: &mut Context<'_>,
-    ) -> Poll<Result<(), TimeError>> {
-        match std::pin::Pin::new(shutdown).poll(context) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(()) => Poll::Ready(Err(TimeError::TimerUnavailable {
-                source: TimerUnavailableError::RuntimeShuttingDown,
-            })),
-        }
-    }
-
     /// Creates the future for one native deadline while the target runtime is
     /// entered.
     ///
@@ -227,10 +203,10 @@ impl TokioTimer {
     ///
     /// # Returns
     ///
-    /// An immediately ready future or a Tokio sleep paired with a shared
-    /// retained-runtime liveness sentinel. Dropping the future cancels only
-    /// its sleep and releases its sentinel reference; the sentinel remains
-    /// active while the timer or another pending future retains it.
+    /// An immediately ready future or a Tokio sleep paired with shared
+    /// retained-runtime liveness. Dropping the future cancels only its sleep
+    /// and releases its liveness reference; the sentinel remains active while
+    /// a timer or another pending future on that runtime retains it.
     ///
     /// # Errors
     ///
@@ -258,40 +234,14 @@ impl TokioTimer {
         })?;
         // Criterion's `tokio_timer` benchmark showed that 10,240 legacy
         // per-deadline sentinels retained 10,240 tasks and made registration
-        // more than 20% slower than native sleeps. One lazy sentinel per Timer
-        // preserves structured shutdown errors without that scaling cost.
+        // more than 20% slower than native sleeps. One lazy sentinel per
+        // retained runtime preserves structured shutdown errors without that
+        // scaling cost.
         let liveness = Arc::clone(
             self.liveness
-                .get_or_init(|| Arc::new(TokioRuntimeLiveness::new())),
+                .get_or_init(TokioRuntimeLivenessRegistry::current),
         );
-        let mut shutdown = TokioRuntimeLiveness::shutdown_future(&liveness);
-        let mut sleep = Box::pin(sleep);
-        Ok(Box::pin(std::future::poll_fn(move |context| {
-            if let Poll::Ready(result) =
-                Self::poll_runtime_shutdown(&mut shutdown, context)
-            {
-                return Poll::Ready(result);
-            }
-            match catch_unwind(AssertUnwindSafe(|| {
-                #[cfg(coverage)]
-                if PANIC_NEXT_SLEEP_POLL.swap(false, Ordering::AcqRel) {
-                    panic!("injected Tokio sleep poll panic");
-                }
-                sleep.as_mut().poll(context)
-            })) {
-                Ok(Poll::Pending) => Poll::Pending,
-                Ok(Poll::Ready(())) => Poll::Ready(Ok(())),
-                Err(payload) => {
-                    if let Poll::Ready(result) =
-                        Self::poll_runtime_shutdown(&mut shutdown, context)
-                    {
-                        Poll::Ready(result)
-                    } else {
-                        resume_unwind(payload)
-                    }
-                }
-            }
-        })))
+        Ok(Box::pin(TokioTimerFuture::new(sleep, liveness)))
     }
 }
 
