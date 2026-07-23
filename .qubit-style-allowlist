@@ -4,4 +4,5 @@ coverage-cfg | tests/timer/internal/std_timer_spawn_failure_tests.rs | Exercise 
 coverage-cfg | tests/timer/internal/std_timer_worker_failure_tests.rs | Exercise the standard Timer worker run-failure hook only in an instrumented isolated process.
 coverage-cfg | src/timer/mod.rs | Re-export the Tokio sleep-poll failure hook only for instrumented coverage tests.
 coverage-cfg | src/timer/tokio_timer.rs | Inject an otherwise timing-dependent sleep-poll panic so defensive liveness handling is tested deterministically.
-coverage-cfg | tests/timer/internal/tokio_runtime_liveness_tests.rs | Exercise the Tokio sleep-poll failure hook only in instrumented coverage builds.
+coverage-cfg | src/timer/internal/tokio_timer_future.rs | Consume the reviewed Tokio sleep-poll failure hook inside the concrete future under test.
+coverage-cfg | tests/timer/internal/tokio_timer_future_tests.rs | Exercise the Tokio sleep-poll failure hook only in instrumented coverage builds.
