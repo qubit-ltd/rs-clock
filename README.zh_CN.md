@@ -35,16 +35,17 @@ time 永不倒退，适合测量耗时、实现 retry 和 timeout。每个 clock
 qubit-clock = "0.10"
 ```
 
-需要 Tokio clock 和 timer 类型时启用对应 feature：
+需要 Tokio-backed clock、timer 类型及其 runtime 相关错误时启用对应 feature：
 
 ```toml
 [dependencies]
 qubit-clock = { version = "0.10", features = ["tokio"] }
 ```
 
-该 feature 仅公开 `TokioMonotonicClock` 和 `TokioTimer`。Manual timer 与 manual
-协调 future 不绑定 executor，也不需要启用该 feature。下文异步示例只选择 Tokio
-来运行和派生任务；复制到测试中时，需要直接声明 Tokio：
+该 feature 公开 `TokioMonotonicClock`、`TokioTimer` 以及
+`TokioRuntimeError` 等 runtime 相关错误。Manual timer 与 manual 协调 future
+不绑定 executor，也不需要启用该 feature。下文异步示例只选择 Tokio 来运行和
+派生任务；复制到测试中时，需要直接声明 Tokio：
 
 ```toml
 [dev-dependencies]
