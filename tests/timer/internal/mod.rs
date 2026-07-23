@@ -17,7 +17,15 @@ mod std_timer_waiter_tests;
 mod std_timer_worker_guard_tests;
 
 #[cfg(feature = "tokio")]
+mod tokio_runtime_liveness_registry_tests;
+#[cfg(feature = "tokio")]
 mod tokio_runtime_liveness_tests;
+#[cfg(feature = "tokio")]
+mod tokio_runtime_shutdown_guard_tests;
+#[cfg(feature = "tokio")]
+mod tokio_runtime_shutdown_state_tests;
+#[cfg(feature = "tokio")]
+mod tokio_timer_future_tests;
 
 pub(super) use panicking_waker_tests::{
     DestructorPanickingWaker,
