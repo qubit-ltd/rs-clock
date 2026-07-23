@@ -30,9 +30,6 @@ use std::time::Duration;
 /// Timer populations spanning small tests through high-cardinality workloads.
 const WAITER_COUNTS: [usize; 8] = [1, 8, 32, 63, 64, 65, 128, 1_024];
 
-/// Waiter population immediately before the ordered deadline index is enabled.
-const DEADLINE_INDEX_THRESHOLD: usize = 64;
-
 /// Deadline shared by every waiter in the batch-completion scenario.
 const BATCH_DEADLINE: Duration = Duration::from_secs(1);
 
@@ -167,36 +164,6 @@ fn benchmark_sequential_deadline_completion(criterion: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmarks repeated registration and cancellation across the index boundary.
-///
-/// # Parameters
-///
-/// * `criterion` - Criterion registry receiving the threshold measurement.
-///
-/// # Panics
-///
-/// Panics when a manual Timer deadline cannot be registered.
-fn benchmark_index_threshold_churn(criterion: &mut Criterion) {
-    let clock = ManualMonotonicClock::new_shared();
-    let timer = clock.new_timer();
-    let retained = (0..DEADLINE_INDEX_THRESHOLD)
-        .map(|_| {
-            timer
-                .after(BATCH_DEADLINE)
-                .expect("benchmark deadline should register")
-        })
-        .collect::<Vec<_>>();
-    criterion.bench_function("manual_timer/index_threshold_churn", |bencher| {
-        bencher.iter(|| {
-            let threshold_crossing = timer
-                .after(BATCH_DEADLINE)
-                .expect("threshold-crossing deadline should register");
-            drop(threshold_crossing);
-        });
-    });
-    drop(retained);
-}
-
 criterion_group! {
     name = manual_timer_benches;
     config = Criterion::default()
@@ -206,7 +173,6 @@ criterion_group! {
     targets =
         benchmark_registration_and_cancellation,
         benchmark_batch_deadline_completion,
-        benchmark_sequential_deadline_completion,
-        benchmark_index_threshold_churn
+        benchmark_sequential_deadline_completion
 }
 criterion_main!(manual_timer_benches);
