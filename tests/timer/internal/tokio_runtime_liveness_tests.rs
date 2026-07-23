@@ -10,6 +10,15 @@ use qubit_clock::{
     Timer,
     TokioTimer,
 };
+#[cfg(tokio_unstable)]
+use std::sync::{
+    OnceLock,
+    Weak,
+    atomic::{
+        AtomicUsize,
+        Ordering,
+    },
+};
 use std::{
     sync::{
         Arc,
@@ -24,6 +33,51 @@ const LIVENESS_REGISTRATION_COUNT: usize = 1_024;
 
 /// Number of independent timers used to expose per-timer liveness tasks.
 const LIVENESS_TIMER_COUNT: usize = 64;
+
+/// Verifies a Tokio spawn hook can register a deadline on the same timer.
+#[cfg(tokio_unstable)]
+#[test]
+fn test_tokio_runtime_liveness_allows_reentrant_task_hook() {
+    let timer_slot = Arc::new(OnceLock::<Weak<TokioTimer>>::new());
+    let hook_registrations = Arc::new(AtomicUsize::new(0));
+    let mut runtime_builder = tokio::runtime::Builder::new_current_thread();
+    runtime_builder.enable_time();
+    runtime_builder.on_task_spawn({
+        let timer_slot = Arc::clone(&timer_slot);
+        let hook_registrations = Arc::clone(&hook_registrations);
+        move |_| {
+            hook_registrations.fetch_add(1, Ordering::Relaxed);
+            let timer = timer_slot
+                .get()
+                .expect("timer should be published before spawning")
+                .upgrade()
+                .expect("timer should remain alive while registering");
+            drop(
+                timer
+                    .after(Duration::from_secs(60))
+                    .expect("spawn hook should register a reentrant deadline"),
+            );
+        }
+    });
+    let runtime = runtime_builder.build().expect("runtime should build");
+    let timer = Arc::new(TokioTimer::from_handle(runtime.handle().clone()));
+    timer_slot
+        .set(Arc::downgrade(&timer))
+        .expect("timer should be published once");
+    let initial_tasks = runtime.metrics().num_alive_tasks();
+
+    let future = timer
+        .after(Duration::from_secs(60))
+        .expect("initial deadline should register");
+
+    assert_eq!(1, hook_registrations.load(Ordering::Relaxed));
+    assert_eq!(initial_tasks + 1, runtime.metrics().num_alive_tasks());
+    drop(future);
+    drop(timer);
+    drop(timer_slot);
+    runtime.block_on(tokio::task::yield_now());
+    assert_eq!(initial_tasks, runtime.metrics().num_alive_tasks());
+}
 
 /// Verifies that all pending deadlines share one runtime-liveness task.
 #[test]
