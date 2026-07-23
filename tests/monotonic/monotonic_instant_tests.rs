@@ -44,6 +44,31 @@ fn test_monotonic_instant_checked_add_reports_overflow() {
 }
 
 #[test]
+fn test_monotonic_instant_validate_domain_accepts_same_domain() {
+    let instant = ManualMonotonicClock::new().now();
+
+    instant
+        .validate_domain(instant.domain())
+        .expect("an instant should validate against its own domain");
+}
+
+#[test]
+fn test_monotonic_instant_validate_domain_rejects_foreign_domain() {
+    let expected = ManualMonotonicClock::new().now();
+    let actual = ManualMonotonicClock::new().now();
+
+    let Err(TimeError::ClockDomainMismatch {
+        expected: error_expected,
+        actual: error_actual,
+    }) = actual.validate_domain(expected.domain())
+    else {
+        panic!("a foreign expected domain should report a mismatch");
+    };
+    assert_eq!(expected.domain(), error_expected);
+    assert_eq!(actual.domain(), error_actual);
+}
+
+#[test]
 fn test_monotonic_instant_rejects_foreign_domain() {
     let first = ManualMonotonicClock::new().now();
     let second = ManualMonotonicClock::new().now();

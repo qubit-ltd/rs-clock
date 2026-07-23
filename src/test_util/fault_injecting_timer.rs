@@ -178,7 +178,7 @@ impl Timer for FaultInjectingTimer {
     /// Propagates a panic raised by the configured error factory.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let now = self.clock.now();
-        deadline.ensure_domain(now.domain())?;
+        deadline.validate_domain(now.domain())?;
         if deadline <= now {
             return Ok(Box::pin(std::future::ready(Ok(()))));
         }
