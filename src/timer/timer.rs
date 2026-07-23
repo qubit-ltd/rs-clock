@@ -28,6 +28,8 @@ use std::time::Duration;
 /// Every call to [`clock()`](Self::clock) on one Timer must report the same
 /// clock domain for the Timer's lifetime. Implementations must reject deadlines
 /// from a different domain with [`TimeError::ClockDomainMismatch`].
+/// [`MonotonicInstant::validate_domain`] provides the canonical validation and
+/// error construction for custom Timer implementations.
 ///
 /// Timer failures have two stages: the outer [`Result`] reports registration
 /// failures, while the returned [`TimerFuture`] reports failures observed after

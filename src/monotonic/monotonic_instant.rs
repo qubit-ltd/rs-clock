@@ -124,7 +124,7 @@ impl MonotonicInstant {
     /// retaining both elapsed durations.
     #[inline]
     pub fn duration_since(self, earlier: Self) -> Result<Duration, TimeError> {
-        earlier.ensure_domain(self.domain)?;
+        earlier.validate_domain(self.domain)?;
         self.elapsed.checked_sub(earlier.elapsed).ok_or(
             TimeError::InvalidInstantOrder {
                 current_elapsed: self.elapsed,
@@ -133,9 +133,10 @@ impl MonotonicInstant {
         )
     }
 
-    /// Verifies that an external instant belongs to expected_domain.
+    /// Verifies that this instant belongs to `expected_domain`.
     ///
-    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign instant.
+    /// Custom monotonic clocks and timers can use this method to reject
+    /// externally supplied instants before performing domain-specific work.
     ///
     /// # Parameters
     ///
@@ -149,7 +150,7 @@ impl MonotonicInstant {
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] when the domains differ.
     #[inline]
-    pub(crate) fn ensure_domain(
+    pub fn validate_domain(
         self,
         expected_domain: ClockDomain,
     ) -> Result<(), TimeError> {

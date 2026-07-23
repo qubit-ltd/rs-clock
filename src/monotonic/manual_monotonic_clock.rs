@@ -180,7 +180,7 @@ impl ManualMonotonicClock {
         &self,
         target: MonotonicInstant,
     ) -> Result<(), TimeError> {
-        target.ensure_domain(self.domain)?;
+        target.validate_domain(self.domain)?;
         let target_elapsed = target.elapsed_since_origin();
         if let Some(effects) = self.time_domain.advance_to(target_elapsed)? {
             Self::notify_time_changed(effects);
@@ -512,7 +512,7 @@ impl ManualMonotonicClock {
         &self,
         deadline: MonotonicInstant,
     ) -> Result<Option<u64>, TimeError> {
-        deadline.ensure_domain(self.domain)?;
+        deadline.validate_domain(self.domain)?;
         let deadline_elapsed = deadline.elapsed_since_origin();
         let Some((waiter_id, observer_wakers)) =
             self.time_domain.register_timer_waiter(deadline_elapsed)
