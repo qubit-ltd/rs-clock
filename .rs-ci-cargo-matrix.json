@@ -10,6 +10,30 @@
         "test",
         "doc"
       ]
+    },
+    {
+      "name": "test-util",
+      "defaultFeatures": false,
+      "features": [
+        "test-util"
+      ],
+      "commands": [
+        "check",
+        "test",
+        "doc"
+      ]
+    },
+    {
+      "name": "tokio",
+      "defaultFeatures": false,
+      "features": [
+        "tokio"
+      ],
+      "commands": [
+        "check",
+        "test",
+        "doc"
+      ]
     }
   ]
 }
