@@ -5,23 +5,21 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Shares runtime-shutdown notification across Tokio timer futures.
+//! Retains one liveness sentinel for a Tokio runtime.
 
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::Arc,
-};
+use crate::timer::internal::tokio_runtime_shutdown_guard::TokioRuntimeShutdownGuard;
+use crate::timer::internal::tokio_runtime_shutdown_state::TokioRuntimeShutdownState;
+use std::sync::Arc;
 use tokio::{
-    sync::watch,
+    sync::futures::OwnedNotified,
     task::AbortHandle,
 };
 
-/// Runtime-liveness sentinel shared by every pending future of one timer.
+/// Runtime-liveness sentinel shared by timers retaining one runtime.
 #[derive(Debug)]
 pub(crate) struct TokioRuntimeLiveness {
-    /// Receiver closed when the retained runtime drops the sentinel task.
-    shutdown: watch::Receiver<()>,
+    /// State signaled when the retained runtime drops the sentinel task.
+    shutdown: Arc<TokioRuntimeShutdownState>,
     /// Handle used to release the sentinel after its final consumer is gone.
     sentinel: AbortHandle,
 }
@@ -34,37 +32,35 @@ impl TokioRuntimeLiveness {
     /// Shared liveness state for futures registered on the entered runtime.
     #[must_use]
     pub(crate) fn new() -> Self {
-        let (shutdown_sender, shutdown) = watch::channel(());
+        let shutdown = Arc::new(TokioRuntimeShutdownState::new());
+        let shutdown_guard =
+            TokioRuntimeShutdownGuard::new(Arc::clone(&shutdown));
         let sentinel = tokio::spawn(async move {
-            let _shutdown_sender = shutdown_sender;
+            let _shutdown_guard = shutdown_guard;
             std::future::pending::<()>().await;
         });
         let sentinel = sentinel.abort_handle();
         Self { shutdown, sentinel }
     }
 
-    /// Creates a future that completes when the retained runtime shuts down.
-    ///
-    /// The future retains this state so dropping the originating timer cannot
-    /// abort the sentinel while a deadline still needs shutdown detection.
-    ///
-    /// # Parameters
-    ///
-    /// * `liveness` - Shared liveness state to retain and observe.
+    /// Reports whether the sentinel's runtime has shut down.
     ///
     /// # Returns
     ///
-    /// A future that remains pending until the sentinel sender is dropped.
+    /// `true` after the runtime closes the shutdown channel.
     #[must_use]
-    pub(crate) fn shutdown_future(
-        liveness: &Arc<Self>,
-    ) -> Pin<Box<impl Future<Output = ()> + Send + 'static>> {
-        let mut shutdown = liveness.shutdown.clone();
-        let retained_liveness = Arc::clone(liveness);
-        Box::pin(async move {
-            let _retained_liveness = retained_liveness;
-            let _ = shutdown.changed().await;
-        })
+    #[inline]
+    pub(crate) fn is_shutdown(&self) -> bool {
+        self.shutdown.is_shutdown()
+    }
+
+    /// Creates an owned notification for retained-runtime shutdown.
+    ///
+    /// # Returns
+    ///
+    /// A future that becomes ready after the sentinel guard publishes shutdown.
+    pub(crate) fn shutdown_notification(&self) -> OwnedNotified {
+        self.shutdown.notification()
     }
 }
 
