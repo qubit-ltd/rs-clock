@@ -36,17 +36,19 @@ directly with `clock.new_timer()`.
 qubit-clock = "0.10"
 ```
 
-Enable the Tokio-backed clock and timer when required:
+Enable the `tokio` feature when you need Tokio-backed clock and timer types and
+their runtime-related errors:
 
 ```toml
 [dependencies]
 qubit-clock = { version = "0.10", features = ["tokio"] }
 ```
 
-This feature exposes `TokioMonotonicClock` and `TokioTimer`. Manual timers and
-manual coordination futures are executor-neutral and do not require it. The
-async examples below choose Tokio only to run and spawn tasks. To copy them
-into tests, declare Tokio directly:
+This feature exposes `TokioMonotonicClock`, `TokioTimer`, and runtime-related
+errors such as `TokioRuntimeError`. Manual timers and manual coordination
+futures are executor-neutral and do not require it. The async examples below
+choose Tokio only to run and spawn tasks. To copy them into tests, declare
+Tokio directly:
 
 ```toml
 [dev-dependencies]
