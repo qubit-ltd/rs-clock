@@ -30,6 +30,57 @@ const TOKIO_SHUTDOWN_TEST: &str = concat!(
     "test_tokio_timer_reports_retained_runtime_shutdown_without_panicking",
 );
 
+/// Environment flag selecting post-shutdown registration in an isolated child.
+const TOKIO_POST_SHUTDOWN_REGISTRATION_CHILD: &str =
+    "QUBIT_CLOCK_TOKIO_POST_SHUTDOWN_REGISTRATION_CHILD";
+
+/// Exact post-shutdown registration test path executed in the isolated child.
+const TOKIO_POST_SHUTDOWN_REGISTRATION_TEST: &str = concat!(
+    "timer::tokio_timer_tests::",
+    "test_tokio_timer_registers_after_retained_runtime_shutdown_without_panicking",
+);
+
+/// Runs one runtime-shutdown case in an isolated child process.
+///
+/// # Parameters
+///
+/// * `child_variable` - Environment variable selecting the child path.
+/// * `test_path` - Exact integration-test path executed in the child.
+///
+/// # Returns
+///
+/// `true` after the parent validates its child, or `false` inside that child.
+///
+/// # Panics
+///
+/// Panics when the child cannot start, fails, or invokes Tokio's shutdown panic
+/// hook.
+fn run_isolated_shutdown_test(child_variable: &str, test_path: &str) -> bool {
+    if std::env::var_os(child_variable).is_some() {
+        return false;
+    }
+    let output = Command::new(
+        std::env::current_exe().expect("current test executable should exist"),
+    )
+    .args(["--exact", test_path, "--nocapture"])
+    .env(child_variable, "1")
+    .output()
+    .expect("isolated shutdown test should start");
+    assert!(
+        output.status.success(),
+        "isolated shutdown test should pass: {}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains(
+            "A Tokio 1.x context was found, but it is being shutdown."
+        ),
+        "runtime shutdown must not invoke the panic hook: {stderr}",
+    );
+    true
+}
+
 #[tokio::test(start_paused = true)]
 async fn test_tokio_timer_fixes_deadline_before_first_poll() {
     let clock = TokioMonotonicClock::current();
@@ -289,27 +340,7 @@ fn test_tokio_timer_future_is_driven_by_retained_runtime() {
 /// process panic hook.
 #[test]
 fn test_tokio_timer_reports_retained_runtime_shutdown_without_panicking() {
-    if std::env::var_os(TOKIO_SHUTDOWN_CHILD).is_none() {
-        let output = Command::new(
-            std::env::current_exe()
-                .expect("current test executable should exist"),
-        )
-        .args(["--exact", TOKIO_SHUTDOWN_TEST, "--nocapture"])
-        .env(TOKIO_SHUTDOWN_CHILD, "1")
-        .output()
-        .expect("isolated shutdown test should start");
-        assert!(
-            output.status.success(),
-            "isolated shutdown test should pass: {}",
-            String::from_utf8_lossy(&output.stderr),
-        );
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            !stderr.contains(
-                "A Tokio 1.x context was found, but it is being shutdown."
-            ),
-            "runtime shutdown must not invoke the panic hook: {stderr}",
-        );
+    if run_isolated_shutdown_test(TOKIO_SHUTDOWN_CHILD, TOKIO_SHUTDOWN_TEST) {
         return;
     }
 
@@ -323,6 +354,45 @@ fn test_tokio_timer_reports_retained_runtime_shutdown_without_panicking() {
             .after(Duration::from_secs(1))
             .expect("future deadline should register")
     };
+    let polling = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("polling runtime should build");
+
+    let error = polling
+        .block_on(future)
+        .expect_err("shutdown target runtime should fail the timer future");
+
+    assert!(matches!(
+        error,
+        TimeError::TimerUnavailable {
+            source: TimerUnavailableError::RuntimeShuttingDown,
+        },
+    ));
+}
+
+/// Verifies first registration after retained-runtime shutdown remains typed
+/// and does not invoke the process panic hook.
+#[test]
+fn test_tokio_timer_registers_after_retained_runtime_shutdown_without_panicking()
+ {
+    if run_isolated_shutdown_test(
+        TOKIO_POST_SHUTDOWN_REGISTRATION_CHILD,
+        TOKIO_POST_SHUTDOWN_REGISTRATION_TEST,
+    ) {
+        return;
+    }
+
+    let timer = {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("retained runtime should build");
+        TokioTimer::from_handle(runtime.handle().clone())
+    };
+    let future = timer
+        .after(Duration::from_secs(1))
+        .expect("shutdown runtime should still create a diagnostic future");
     let polling = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()
