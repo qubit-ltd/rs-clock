@@ -193,6 +193,28 @@ impl TokioTimer {
             .ok_or(TimeError::InstantOverflow)
     }
 
+    /// Returns runtime liveness without a reentrant `OnceLock` initializer.
+    ///
+    /// Tokio invokes task-spawn hooks synchronously. Publishing liveness in the
+    /// registry may therefore re-enter this same timer while its first
+    /// registration is still in progress.
+    ///
+    /// # Returns
+    ///
+    /// Liveness shared by timers retaining the same Tokio runtime.
+    fn runtime_liveness(&self) -> Arc<TokioRuntimeLiveness> {
+        if let Some(liveness) = self.liveness.get() {
+            return Arc::clone(liveness);
+        }
+        let liveness = TokioRuntimeLivenessRegistry::current();
+        let _ = self.liveness.set(liveness);
+        Arc::clone(
+            self.liveness
+                .get()
+                .expect("Tokio timer liveness should be initialized"),
+        )
+    }
+
     /// Creates the future for one native deadline while the target runtime is
     /// entered.
     ///
@@ -237,10 +259,7 @@ impl TokioTimer {
         // more than 20% slower than native sleeps. One lazy sentinel per
         // retained runtime preserves structured shutdown errors without that
         // scaling cost.
-        let liveness = Arc::clone(
-            self.liveness
-                .get_or_init(TokioRuntimeLivenessRegistry::current),
-        );
+        let liveness = self.runtime_liveness();
         Ok(Box::pin(TokioTimerFuture::new(sleep, liveness)))
     }
 }

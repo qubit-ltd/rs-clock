@@ -10,9 +10,9 @@
 use crate::timer::internal::tokio_runtime_shutdown_guard::TokioRuntimeShutdownGuard;
 use crate::timer::internal::tokio_runtime_shutdown_state::TokioRuntimeShutdownState;
 use std::sync::Arc;
-use tokio::{
-    sync::futures::OwnedNotified,
-    task::AbortHandle,
+use tokio::sync::{
+    futures::OwnedNotified,
+    oneshot,
 };
 
 /// Runtime-liveness sentinel shared by timers retaining one runtime.
@@ -20,27 +20,43 @@ use tokio::{
 pub(crate) struct TokioRuntimeLiveness {
     /// State signaled when the retained runtime drops the sentinel task.
     shutdown: Arc<TokioRuntimeShutdownState>,
-    /// Handle used to release the sentinel after its final consumer is gone.
-    sentinel: AbortHandle,
+    /// Sender whose drop releases the sentinel after its final consumer.
+    _sentinel_release: oneshot::Sender<()>,
 }
 
 impl TokioRuntimeLiveness {
-    /// Spawns one task whose cancellation publishes runtime shutdown.
+    /// Creates liveness state before its sentinel task is spawned.
     ///
     /// # Returns
     ///
-    /// Shared liveness state for futures registered on the entered runtime.
+    /// Unstarted shared liveness state and its sentinel release receiver.
     #[must_use]
-    pub(crate) fn new() -> Self {
-        let shutdown = Arc::new(TokioRuntimeShutdownState::new());
+    pub(crate) fn new() -> (Self, oneshot::Receiver<()>) {
+        let (sentinel_release, release_notification) = oneshot::channel();
+        let liveness = Self {
+            shutdown: Arc::new(TokioRuntimeShutdownState::new()),
+            _sentinel_release: sentinel_release,
+        };
+        (liveness, release_notification)
+    }
+
+    /// Spawns the task whose cancellation publishes runtime shutdown.
+    ///
+    /// The registry publishes this liveness value before calling this method,
+    /// allowing synchronous Tokio task hooks to reuse it without recursively
+    /// spawning another sentinel.
+    ///
+    /// # Parameters
+    ///
+    /// * `release_notification` - Receiver completed when the final liveness
+    ///   consumer drops its sender.
+    pub(crate) fn start(&self, release_notification: oneshot::Receiver<()>) {
         let shutdown_guard =
-            TokioRuntimeShutdownGuard::new(Arc::clone(&shutdown));
-        let sentinel = tokio::spawn(async move {
+            TokioRuntimeShutdownGuard::new(Arc::clone(&self.shutdown));
+        tokio::spawn(async move {
             let _shutdown_guard = shutdown_guard;
-            std::future::pending::<()>().await;
+            let _ = release_notification.await;
         });
-        let sentinel = sentinel.abort_handle();
-        Self { shutdown, sentinel }
     }
 
     /// Reports whether the sentinel's runtime has shut down.
@@ -61,12 +77,5 @@ impl TokioRuntimeLiveness {
     /// A future that becomes ready after the sentinel guard publishes shutdown.
     pub(crate) fn shutdown_notification(&self) -> OwnedNotified {
         self.shutdown.notification()
-    }
-}
-
-impl Drop for TokioRuntimeLiveness {
-    /// Aborts the sentinel after the timer and all its futures release it.
-    fn drop(&mut self) {
-        self.sentinel.abort();
     }
 }
