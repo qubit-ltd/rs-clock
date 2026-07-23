@@ -101,14 +101,18 @@ impl ManualTimeDomain {
     ///
     /// # Errors
     ///
-    /// Returns [`TimeError::CannotMoveBackward`] for an earlier target.
+    /// Returns [`TimeError::CannotMoveBackward`] for an earlier target,
+    /// retaining both the current and requested elapsed durations.
     pub(crate) fn advance_to(
         &self,
         target_elapsed: Duration,
     ) -> Result<Option<AdvanceEffects>, TimeError> {
         let mut state = self.lock_state();
         if target_elapsed < state.elapsed {
-            return Err(TimeError::CannotMoveBackward);
+            return Err(TimeError::CannotMoveBackward {
+                current_elapsed: state.elapsed,
+                requested_elapsed: target_elapsed,
+            });
         }
         if target_elapsed == state.elapsed {
             return Ok(None);

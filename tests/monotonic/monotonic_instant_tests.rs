@@ -66,10 +66,15 @@ fn test_monotonic_instant_reports_backward_duration() {
         .checked_add(Duration::from_secs(1))
         .expect("short duration should be representable");
 
-    assert!(matches!(
-        start.duration_since(end),
-        Err(TimeError::InvalidInstantOrder),
-    ));
+    let Err(TimeError::InvalidInstantOrder {
+        current_elapsed,
+        earlier_elapsed,
+    }) = start.duration_since(end)
+    else {
+        panic!("backward duration should report both elapsed values");
+    };
+    assert_eq!(Duration::ZERO, current_elapsed);
+    assert_eq!(Duration::from_secs(1), earlier_elapsed);
 }
 
 #[test]

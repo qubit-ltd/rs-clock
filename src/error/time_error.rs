@@ -9,6 +9,7 @@
 
 use super::TimerUnavailableError;
 use crate::ClockDomain;
+use std::time::Duration;
 use thiserror::Error;
 
 /// Describes an invalid monotonic-time operation.
@@ -23,8 +24,8 @@ use thiserror::Error;
 ///     match error {
 ///         TimeError::ClockDomainMismatch { .. } => "domain mismatch",
 ///         TimeError::InstantOverflow => "overflow",
-///         TimeError::CannotMoveBackward => "backward move",
-///         TimeError::InvalidInstantOrder => "invalid order",
+///         TimeError::CannotMoveBackward { .. } => "backward move",
+///         TimeError::InvalidInstantOrder { .. } => "invalid order",
 ///         TimeError::TimerUnavailable { .. } => "timer unavailable",
 ///         _ => "other time error",
 ///     }
@@ -43,8 +44,8 @@ use thiserror::Error;
 ///     match error {
 ///         TimeError::ClockDomainMismatch { .. } => "domain mismatch",
 ///         TimeError::InstantOverflow => "overflow",
-///         TimeError::CannotMoveBackward => "backward move",
-///         TimeError::InvalidInstantOrder => "invalid order",
+///         TimeError::CannotMoveBackward { .. } => "backward move",
+///         TimeError::InvalidInstantOrder { .. } => "invalid order",
 ///         TimeError::TimerUnavailable { .. } => "timer unavailable",
 ///     }
 /// }
@@ -66,11 +67,27 @@ pub enum TimeError {
     #[error("monotonic instant overflow")]
     InstantOverflow,
     /// A manual monotonic clock was asked to move backward.
-    #[error("manual monotonic time cannot move backward")]
-    CannotMoveBackward,
+    #[error(
+        "manual monotonic time cannot move backward from {current_elapsed:?} to \
+         {requested_elapsed:?}"
+    )]
+    CannotMoveBackward {
+        /// Current elapsed duration in the manual clock domain.
+        current_elapsed: Duration,
+        /// Earlier elapsed duration requested by the caller.
+        requested_elapsed: Duration,
+    },
     /// Duration was requested with an earlier instant after the current one.
-    #[error("earlier monotonic instant is later than the current instant")]
-    InvalidInstantOrder,
+    #[error(
+        "instant at {earlier_elapsed:?} cannot be earlier than current instant \
+         at {current_elapsed:?}"
+    )]
+    InvalidInstantOrder {
+        /// Elapsed duration carried by the receiving current instant.
+        current_elapsed: Duration,
+        /// Elapsed duration carried by the supplied earlier instant.
+        earlier_elapsed: Duration,
+    },
     /// A timer could not register or complete a requested deadline.
     #[error("monotonic timer is unavailable: {source}")]
     TimerUnavailable {

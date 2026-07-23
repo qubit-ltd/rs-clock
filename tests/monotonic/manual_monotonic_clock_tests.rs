@@ -85,10 +85,15 @@ fn test_manual_monotonic_clock_advance_to_rejects_backward_target() {
         .advance(Duration::from_secs(10))
         .expect("short advance should succeed");
 
-    assert!(matches!(
-        clock.advance_to(start),
-        Err(TimeError::CannotMoveBackward),
-    ));
+    let Err(TimeError::CannotMoveBackward {
+        current_elapsed,
+        requested_elapsed,
+    }) = clock.advance_to(start)
+    else {
+        panic!("backward target should report both elapsed values");
+    };
+    assert_eq!(Duration::from_secs(10), current_elapsed);
+    assert_eq!(Duration::ZERO, requested_elapsed);
 }
 
 #[test]

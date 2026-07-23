@@ -119,14 +119,18 @@ impl MonotonicInstant {
     ///
     /// # Errors
     ///
-    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign instant and
-    /// [`TimeError::InvalidInstantOrder`] when `earlier` is later.
+    /// Returns [`TimeError::ClockDomainMismatch`] for a foreign instant.
+    /// Returns [`TimeError::InvalidInstantOrder`] when `earlier` is later,
+    /// retaining both elapsed durations.
     #[inline]
     pub fn duration_since(self, earlier: Self) -> Result<Duration, TimeError> {
         earlier.ensure_domain(self.domain)?;
-        self.elapsed
-            .checked_sub(earlier.elapsed)
-            .ok_or(TimeError::InvalidInstantOrder)
+        self.elapsed.checked_sub(earlier.elapsed).ok_or(
+            TimeError::InvalidInstantOrder {
+                current_elapsed: self.elapsed,
+                earlier_elapsed: earlier.elapsed,
+            },
+        )
     }
 
     /// Verifies that an external instant belongs to expected_domain.
