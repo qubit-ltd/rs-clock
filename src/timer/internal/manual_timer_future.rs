@@ -7,18 +7,11 @@
 // =============================================================================
 //! Defines the cancellation-safe future used by manual timers.
 
-use crate::{
-    ManualMonotonicClock,
-    MonotonicInstant,
-    TimeError,
-};
+use crate::{ManualMonotonicClock, MonotonicInstant, TimeError};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-};
+use std::task::{Context, Poll};
 
 /// A deadline future eagerly registered with one manual time domain.
 pub(crate) struct ManualTimerFuture {
@@ -72,10 +65,7 @@ impl Future for ManualTimerFuture {
     ///
     /// [`Poll::Ready`] once the registered deadline is reached, otherwise
     /// [`Poll::Pending`].
-    fn poll(
-        self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
         let Some(waiter_id) = this.waiter_id else {
             return Poll::Ready(Ok(()));

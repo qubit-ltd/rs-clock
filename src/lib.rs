@@ -54,41 +54,21 @@ pub mod wall;
 
 #[cfg(feature = "tokio")]
 pub use error::TokioRuntimeError;
-pub use error::{
-    TimeError,
-    TimerUnavailableError,
-};
+pub use error::{TimeError, TimerUnavailableError};
 pub use monotonic::{
-    ClockDomain,
-    ManualDeadlineFuture,
-    ManualMonotonicClock,
-    ManualWaiterFuture,
-    MonotonicClock,
-    MonotonicInstant,
-    StdMonotonicClock,
+    ClockDomain, ManualDeadlineFuture, ManualMonotonicClock, ManualWaiterFuture, MonotonicClock,
+    MonotonicInstant, StdMonotonicClock,
 };
 pub use sleep::BlockingSleeper;
-pub use timer::{
-    ManualTimer,
-    StdTimer,
-    Timer,
-    TimerFuture,
-};
-pub use wall::{
-    FixedWallClock,
-    ManualWallClock,
-    StdWallClock,
-    WallClock,
-};
+pub use timer::{ManualTimer, StdTimer, Timer, TimerFuture};
+pub use wall::{FixedWallClock, ManualWallClock, StdWallClock, WallClock};
 
 // qubit-style: allow coverage-cfg
 #[doc(hidden)]
 #[cfg(coverage)]
 pub use timer::internal::std_timer_scheduler::{
-    fail_next_std_timer_worker_spawn,
-    panic_next_std_timer_worker,
-    reset_std_timer_worker_notification_count,
-    std_timer_worker_notification_count,
+    fail_next_std_timer_worker_spawn, panic_next_std_timer_worker,
+    reset_std_timer_worker_notification_count, std_timer_worker_notification_count,
 };
 
 #[doc(hidden)]

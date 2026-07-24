@@ -9,12 +9,9 @@
 //! Stores deadline waiters and waiter-count observers for a manual clock.
 
 use crate::monotonic::clock_domain::next_identifier_state;
+use qubit_collections::OrderedIndexMap;
 use std::collections::HashMap;
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
 /// Allocates the current nonzero registry identifier and advances its state.
@@ -36,13 +33,9 @@ use std::time::Duration;
 /// Panics with `exhausted_message` when the allocator is already exhausted.
 #[must_use = "the allocated identifier must be retained by its registration"]
 #[inline]
-pub(crate) fn allocate_identifier(
-    next_identifier: &mut u64,
-    exhausted_message: &str,
-) -> u64 {
+pub(crate) fn allocate_identifier(next_identifier: &mut u64, exhausted_message: &str) -> u64 {
     let identifier = *next_identifier;
-    *next_identifier =
-        next_identifier_state(identifier).expect(exhausted_message);
+    *next_identifier = next_identifier_state(identifier).expect(exhausted_message);
     identifier
 }
 
@@ -51,7 +44,7 @@ pub(crate) struct ManualWaiterRegistry {
     /// Next identifier assigned to a timer waiter.
     next_timer_waiter_id: u64,
     /// Timer deadlines and optional task wakers keyed by registration ID.
-    timer_waiters: HashMap<u64, (Duration, Option<Waker>)>,
+    timer_waiters: OrderedIndexMap<u64, Duration, Option<Waker>>,
     /// Next identifier assigned to a waiter-registration observer.
     next_observer_id: u64,
     /// Waiter-count observers keyed by registration identifier.
@@ -71,7 +64,7 @@ impl ManualWaiterRegistry {
     pub(crate) fn new() -> Self {
         Self {
             next_timer_waiter_id: 1,
-            timer_waiters: HashMap::new(),
+            timer_waiters: OrderedIndexMap::new(),
             next_observer_id: 1,
             count_observers: HashMap::new(),
             deadline_observers: HashMap::new(),
@@ -100,7 +93,11 @@ impl ManualWaiterRegistry {
             &mut self.next_timer_waiter_id,
             "manual timer waiter identifiers exhausted",
         );
-        self.timer_waiters.insert(waiter_id, (deadline, None));
+        let previous = self.timer_waiters.insert(waiter_id, deadline, None);
+        assert!(
+            previous.is_none(),
+            "manual timer waiter identifier must be unique",
+        );
         waiter_id
     }
 
@@ -118,13 +115,10 @@ impl ManualWaiterRegistry {
     /// `None` when the waiter was absent, `Some(None)` for an unpolled waiter,
     /// or `Some(Some(waker))` for a waiter with a registered task waker.
     #[inline(always)]
-    pub(crate) fn unregister_timer(
-        &mut self,
-        waiter_id: u64,
-    ) -> Option<Option<Waker>> {
+    pub(crate) fn unregister_timer(&mut self, waiter_id: u64) -> Option<Option<Waker>> {
         self.timer_waiters
             .remove(&waiter_id)
-            .map(|(_, waker)| waker)
+            .map(|(_deadline, waker)| waker)
     }
 
     /// Returns the earliest deadline strictly after elapsed.
@@ -136,16 +130,10 @@ impl ManualWaiterRegistry {
     /// # Returns
     ///
     /// The earliest future deadline, or `None` when none is registered.
-    pub(crate) fn next_future_deadline(
-        &self,
-        elapsed: Duration,
-    ) -> Option<Duration> {
-        self.timer_waiters
-            .values()
-            .map(|(deadline, _)| deadline)
-            .filter(|deadline| **deadline > elapsed)
-            .min()
-            .copied()
+    pub(crate) fn next_future_deadline(&self, elapsed: Duration) -> Option<Duration> {
+        let deadline = self.timer_waiters.first_order_key().copied();
+        debug_assert!(deadline.is_none_or(|deadline| deadline > elapsed));
+        deadline
     }
 
     /// Takes task wakers for timer deadlines reached by elapsed.
@@ -162,14 +150,16 @@ impl ManualWaiterRegistry {
     ///
     /// Every stored waker whose deadline is at or before `elapsed`.
     #[must_use = "due wakers should be invoked after unlocking"]
-    pub(crate) fn take_due_timer_wakers(
-        &mut self,
-        elapsed: Duration,
-    ) -> Vec<Waker> {
-        self.timer_waiters
-            .values_mut()
-            .filter(|(deadline, _)| *deadline <= elapsed)
-            .filter_map(|(_, waker)| waker.take())
+    pub(crate) fn take_due_timer_wakers(&mut self, elapsed: Duration) -> Vec<Waker> {
+        let due_waiter_ids = self.timer_waiters.unindex_through(&elapsed);
+        due_waiter_ids
+            .into_iter()
+            .filter_map(|waiter_id| {
+                self.timer_waiters
+                    .get_mut(&waiter_id)
+                    .expect("unindexed manual timer waiter must remain registered")
+                    .take()
+            })
             .collect()
     }
 
@@ -193,11 +183,7 @@ impl ManualWaiterRegistry {
     ///
     /// Panics when the observer identifier space is exhausted.
     #[inline]
-    pub(crate) fn register_observer(
-        &mut self,
-        expected_count: usize,
-        count: usize,
-    ) -> Option<u64> {
+    pub(crate) fn register_observer(&mut self, expected_count: usize, count: usize) -> Option<u64> {
         if count >= expected_count {
             return None;
         }
@@ -249,9 +235,7 @@ impl ManualWaiterRegistry {
         observer_id: u64,
         context: &Context<'_>,
     ) -> (Poll<()>, Option<Waker>) {
-        let Some((_, registered_waker)) =
-            self.count_observers.get_mut(&observer_id)
-        else {
+        let Some((_, registered_waker)) = self.count_observers.get_mut(&observer_id) else {
             return (Poll::Ready(()), None);
         };
         let replaced_waker = if registered_waker
@@ -293,13 +277,10 @@ impl ManualWaiterRegistry {
             panic!("manual deadline observer {observer_id} is not registered");
         }
         if let Some(deadline) = self.next_future_deadline(elapsed) {
-            let removed_waker =
-                self.deadline_observers.remove(&observer_id).flatten();
+            let removed_waker = self.deadline_observers.remove(&observer_id).flatten();
             return (Poll::Ready(deadline), removed_waker);
         }
-        let Some(registered_waker) =
-            self.deadline_observers.get_mut(&observer_id)
-        else {
+        let Some(registered_waker) = self.deadline_observers.get_mut(&observer_id) else {
             unreachable!("deadline observer existence was checked above");
         };
         let replaced_waker = if registered_waker
@@ -324,10 +305,7 @@ impl ManualWaiterRegistry {
     ///
     /// Its stored task waker, or `None` when absent or not yet polled.
     #[inline]
-    pub(crate) fn unregister_observer(
-        &mut self,
-        observer_id: u64,
-    ) -> Option<Waker> {
+    pub(crate) fn unregister_observer(&mut self, observer_id: u64) -> Option<Waker> {
         if let Some((_, waker)) = self.count_observers.remove(&observer_id) {
             return waker;
         }
@@ -374,12 +352,14 @@ impl ManualWaiterRegistry {
         elapsed: Duration,
         context: &Context<'_>,
     ) -> (Poll<()>, Option<Waker>) {
-        let Some((deadline, registered_waker)) =
-            self.timer_waiters.get_mut(&waiter_id)
-        else {
+        let Some(deadline) = self.timer_waiters.order_key(&waiter_id).copied() else {
             panic!("manual timer waiter {waiter_id} is not registered");
         };
-        if elapsed < *deadline {
+        if elapsed < deadline {
+            let registered_waker = self
+                .timer_waiters
+                .get_mut(&waiter_id)
+                .expect("manual timer waiter must remain registered");
             let replaced_waker = if registered_waker
                 .as_ref()
                 .is_none_or(|waker| !waker.will_wake(context.waker()))
@@ -393,7 +373,7 @@ impl ManualWaiterRegistry {
         let removed_waker = self
             .timer_waiters
             .remove(&waiter_id)
-            .and_then(|(_, waker)| waker);
+            .and_then(|(_deadline, waker)| waker);
         (Poll::Ready(()), removed_waker)
     }
 
@@ -408,10 +388,7 @@ impl ManualWaiterRegistry {
     ///
     /// Stored task wakers for every observer whose threshold has been reached.
     #[must_use = "reached observer wakers should be invoked after unlocking"]
-    pub(crate) fn reached_observer_wakers(
-        &mut self,
-        elapsed: Duration,
-    ) -> Vec<Waker> {
+    pub(crate) fn reached_observer_wakers(&mut self, elapsed: Duration) -> Vec<Waker> {
         let count = self.count();
         let next_deadline = self.next_future_deadline(elapsed);
         let mut wakers = Vec::new();

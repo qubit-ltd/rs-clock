@@ -9,32 +9,16 @@
 // qubit-style: allow coverage-cfg
 
 #[cfg(coverage)]
-use qubit_clock::{
-    StdMonotonicClock,
-    StdTimer,
-    Timer,
-    panic_next_std_timer_worker,
-};
+use qubit_clock::{StdMonotonicClock, StdTimer, Timer, panic_next_std_timer_worker};
 #[cfg(coverage)]
-use qubit_clock::{
-    TimeError,
-    TimerUnavailableError,
-};
+use qubit_clock::{TimeError, TimerUnavailableError};
 #[cfg(coverage)]
 use std::sync::{
     Arc,
-    mpsc::{
-        SyncSender,
-        sync_channel,
-    },
+    mpsc::{SyncSender, sync_channel},
 };
 #[cfg(coverage)]
-use std::task::{
-    Context,
-    Poll,
-    Wake,
-    Waker,
-};
+use std::task::{Context, Poll, Wake, Waker};
 #[cfg(coverage)]
 use std::time::Duration;
 

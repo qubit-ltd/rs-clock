@@ -10,14 +10,7 @@
 use crate::timer::internal::std_timer_future::StdTimerFuture;
 use crate::timer::internal::std_timer_scheduler::StdTimerScheduler;
 use crate::timer::internal::std_timer_waiter::StdTimerWaiter;
-use crate::{
-    MonotonicClock,
-    MonotonicInstant,
-    StdMonotonicClock,
-    TimeError,
-    Timer,
-    TimerFuture,
-};
+use crate::{MonotonicClock, MonotonicInstant, StdMonotonicClock, TimeError, Timer, TimerFuture};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -83,10 +76,7 @@ impl StdTimer {
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline and
     /// [`TimeError::InstantOverflow`] when conversion overflows.
-    fn native_deadline(
-        &self,
-        deadline: MonotonicInstant,
-    ) -> Result<Instant, TimeError> {
+    fn native_deadline(&self, deadline: MonotonicInstant) -> Result<Instant, TimeError> {
         deadline.validate_domain(self.clock.domain())?;
         self.clock
             .origin()
@@ -174,8 +164,7 @@ impl Timer for StdTimer {
             return Ok(Box::pin(std::future::ready(Ok(()))));
         }
         let waiter = Arc::new(StdTimerWaiter::new());
-        let waiter_id =
-            self.scheduler.register(deadline, Arc::clone(&waiter))?;
+        let waiter_id = self.scheduler.register(deadline, Arc::clone(&waiter))?;
         Ok(Box::pin(StdTimerFuture::new(
             Arc::clone(&self.scheduler),
             waiter_id,

@@ -7,10 +7,7 @@
 // =============================================================================
 //! Defines a monotonic instant scoped to one clock domain.
 
-use crate::{
-    ClockDomain,
-    TimeError,
-};
+use crate::{ClockDomain, TimeError};
 use std::cmp::Ordering;
 use std::time::Duration;
 
@@ -125,12 +122,12 @@ impl MonotonicInstant {
     #[inline]
     pub fn duration_since(self, earlier: Self) -> Result<Duration, TimeError> {
         earlier.validate_domain(self.domain)?;
-        self.elapsed.checked_sub(earlier.elapsed).ok_or(
-            TimeError::InvalidInstantOrder {
+        self.elapsed
+            .checked_sub(earlier.elapsed)
+            .ok_or(TimeError::InvalidInstantOrder {
                 current_elapsed: self.elapsed,
                 earlier_elapsed: earlier.elapsed,
-            },
-        )
+            })
     }
 
     /// Verifies that this instant belongs to `expected_domain`.
@@ -150,10 +147,7 @@ impl MonotonicInstant {
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] when the domains differ.
     #[inline]
-    pub fn validate_domain(
-        self,
-        expected_domain: ClockDomain,
-    ) -> Result<(), TimeError> {
+    pub fn validate_domain(self, expected_domain: ClockDomain) -> Result<(), TimeError> {
         if self.domain == expected_domain {
             Ok(())
         } else {

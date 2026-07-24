@@ -7,12 +7,7 @@
 // =============================================================================
 //! Defines the asynchronous timer capability.
 
-use crate::{
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    TimerFuture,
-};
+use crate::{MonotonicClock, MonotonicInstant, TimeError, TimerFuture};
 use std::time::Duration;
 
 /// Creates asynchronous notifications in one monotonic clock domain.

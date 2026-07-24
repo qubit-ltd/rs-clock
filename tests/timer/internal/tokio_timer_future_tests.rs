@@ -10,10 +10,7 @@
 
 #[cfg(coverage)]
 use qubit_clock::panic_next_tokio_timer_sleep_poll;
-use qubit_clock::{
-    Timer,
-    TokioTimer,
-};
+use qubit_clock::{Timer, TokioTimer};
 use std::time::Duration;
 
 /// Verifies the concrete Tokio timer future completes its native sleep.
@@ -49,9 +46,8 @@ fn test_tokio_timer_future_does_not_mask_unexpected_sleep_panic() {
         .expect("future deadline should register");
     panic_next_tokio_timer_sleep_poll();
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        runtime.block_on(future)
-    }));
+    let result =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| runtime.block_on(future)));
 
     assert!(result.is_err(), "unexpected Tokio sleep panic must resume");
 }

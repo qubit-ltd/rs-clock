@@ -7,15 +7,9 @@
 // =============================================================================
 //! Defines unique monotonic clock domains.
 
-use std::fmt::{
-    Display,
-    Formatter,
-};
+use std::fmt::{Display, Formatter};
 use std::num::NonZeroU64;
-use std::sync::atomic::{
-    AtomicU64,
-    Ordering,
-};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Next unallocated clock domain identifier; zero marks exhaustion.
 static NEXT_CLOCK_DOMAIN: AtomicU64 = AtomicU64::new(1);
@@ -35,8 +29,7 @@ static NEXT_CLOCK_DOMAIN: AtomicU64 = AtomicU64::new(1);
 /// The next allocator state, or `None` when `identifier` is already zero.
 #[inline(always)]
 pub(crate) fn next_identifier_state(identifier: u64) -> Option<u64> {
-    NonZeroU64::new(identifier)
-        .map(|identifier| identifier.get().wrapping_add(1))
+    NonZeroU64::new(identifier).map(|identifier| identifier.get().wrapping_add(1))
 }
 
 /// Allocates an identifier from `next` without wrapping into a reused value.
@@ -58,12 +51,8 @@ pub(crate) fn next_identifier_state(identifier: u64) -> Option<u64> {
 #[must_use = "the allocated domain identifier must initialize a clock domain"]
 #[inline]
 fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
-    next.fetch_update(
-        Ordering::Relaxed,
-        Ordering::Relaxed,
-        next_identifier_state,
-    )
-    .expect("monotonic clock domain identifiers exhausted")
+    next.fetch_update(Ordering::Relaxed, Ordering::Relaxed, next_identifier_state)
+        .expect("monotonic clock domain identifiers exhausted")
 }
 
 /// Identifies one monotonic clock timeline within this process.

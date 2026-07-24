@@ -312,9 +312,14 @@ dependencies = [
  "criterion",
  "loom",
  "pin-project-lite",
+ "qubit-collections",
  "thiserror",
  "tokio",
 ]
+
+[[package]]
+name = "qubit-collections"
+version = "0.1.0"
 
 [[package]]
 name = "quote"

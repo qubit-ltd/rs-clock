@@ -27,7 +27,4 @@ mod tokio_runtime_shutdown_state_tests;
 #[cfg(feature = "tokio")]
 mod tokio_timer_future_tests;
 
-pub(super) use panicking_waker_tests::{
-    DestructorPanickingWaker,
-    PanickingWaker,
-};
+pub(super) use panicking_waker_tests::{DestructorPanickingWaker, PanickingWaker};

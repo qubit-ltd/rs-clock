@@ -9,20 +9,12 @@
 
 use super::TimerFailurePoint;
 use crate::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
+    ManualMonotonicClock, MonotonicClock, MonotonicInstant, TimeError, Timer, TimerFuture,
     TimerUnavailableError,
 };
 use std::{
     io,
-    sync::atomic::{
-        AtomicUsize,
-        Ordering,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 /// A deterministic Timer fixture that fails registration or completion.
@@ -186,9 +178,7 @@ impl Timer for FaultInjectingTimer {
         let error = (self.error_factory)();
         match self.failure_point {
             TimerFailurePoint::Registration => Err(error),
-            TimerFailurePoint::Completion => {
-                Ok(Box::pin(std::future::ready(Err(error))))
-            }
+            TimerFailurePoint::Completion => Ok(Box::pin(std::future::ready(Err(error)))),
         }
     }
 }
