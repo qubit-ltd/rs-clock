@@ -13,14 +13,29 @@ use crate::timer::internal::tokio_runtime_liveness::TokioRuntimeLiveness;
 use crate::timer::internal::tokio_runtime_liveness_registry::TokioRuntimeLivenessRegistry;
 use crate::timer::internal::tokio_timer_future::TokioTimerFuture;
 use crate::{
-    MonotonicClock, MonotonicInstant, TimeError, Timer, TimerFuture, TimerUnavailableError,
-    TokioMonotonicClock, TokioRuntimeError,
+    MonotonicClock,
+    MonotonicInstant,
+    TimeError,
+    Timer,
+    TimerFuture,
+    TimerUnavailableError,
+    TokioMonotonicClock,
+    TokioRuntimeError,
 };
 #[cfg(coverage)]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{
+    AtomicBool,
+    Ordering,
+};
 use std::{
-    panic::{AssertUnwindSafe, catch_unwind},
-    sync::{Arc, OnceLock},
+    panic::{
+        AssertUnwindSafe,
+        catch_unwind,
+    },
+    sync::{
+        Arc,
+        OnceLock,
+    },
     time::Duration,
 };
 use tokio::runtime::Handle;
@@ -107,7 +122,9 @@ impl TokioTimer {
     #[track_caller]
     #[inline]
     pub fn current() -> Self {
-        Self::try_current().unwrap_or_else(|error| panic!("cannot create Tokio timer: {error}"))
+        Self::try_current().unwrap_or_else(|error| {
+            panic!("cannot create Tokio timer: {error}")
+        })
     }
 
     /// Tries to create a timer by capturing the current Tokio runtime.
@@ -165,7 +182,10 @@ impl TokioTimer {
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline and
     /// [`TimeError::InstantOverflow`] when conversion overflows.
-    fn native_deadline(&self, deadline: MonotonicInstant) -> Result<Instant, TimeError> {
+    fn native_deadline(
+        &self,
+        deadline: MonotonicInstant,
+    ) -> Result<Instant, TimeError> {
         deadline.validate_domain(self.clock.domain())?;
         self.clock
             .origin()
@@ -214,7 +234,11 @@ impl TokioTimer {
     ///
     /// Returns [`TimerUnavailableError::TimeDriverDisabled`] when a future
     /// deadline cannot be registered because Tokio time is disabled.
-    fn schedule(&self, deadline: Instant, now: Instant) -> Result<TimerFuture, TimeError> {
+    fn schedule(
+        &self,
+        deadline: Instant,
+        now: Instant,
+    ) -> Result<TimerFuture, TimeError> {
         if deadline <= now {
             return Ok(Box::pin(std::future::ready(Ok(()))));
         }
@@ -224,11 +248,12 @@ impl TokioTimer {
         // cannot recover. Temporarily replacing the global hook would race
         // with application panic handling, so this library deliberately does
         // not attempt to suppress that observable side effect.
-        let sleep = catch_unwind(AssertUnwindSafe(|| tokio::time::sleep_until(deadline))).map_err(
-            |_| TimeError::TimerUnavailable {
-                source: TimerUnavailableError::TimeDriverDisabled,
-            },
-        )?;
+        let sleep = catch_unwind(AssertUnwindSafe(|| {
+            tokio::time::sleep_until(deadline)
+        }))
+        .map_err(|_| TimeError::TimerUnavailable {
+            source: TimerUnavailableError::TimeDriverDisabled,
+        })?;
         // Criterion's `tokio_timer` benchmark showed that 10,240 legacy
         // per-deadline sentinels retained 10,240 tasks and made registration
         // more than 20% slower than native sleeps. One lazy sentinel per

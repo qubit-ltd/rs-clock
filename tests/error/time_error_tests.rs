@@ -6,8 +6,15 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{ClockDomain, TimeError, TimerUnavailableError};
-use std::{io, time::Duration};
+use qubit_clock::{
+    ClockDomain,
+    TimeError,
+    TimerUnavailableError,
+};
+use std::{
+    io,
+    time::Duration,
+};
 
 #[test]
 fn test_time_error_clock_domain_mismatch_display() {
@@ -66,7 +73,8 @@ fn test_time_error_implements_std_error() {
 
 #[test]
 fn test_timer_unavailable_error_converts_to_time_error() {
-    let error: TimeError = TimerUnavailableError::SchedulerWorkerTerminated.into();
+    let error: TimeError =
+        TimerUnavailableError::SchedulerWorkerTerminated.into();
 
     assert!(matches!(
         error,

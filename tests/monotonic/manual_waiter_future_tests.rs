@@ -6,15 +6,32 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{BlockingSleeper, ManualMonotonicClock, MonotonicClock, Timer};
+use qubit_clock::{
+    BlockingSleeper,
+    ManualMonotonicClock,
+    MonotonicClock,
+    Timer,
+};
 use std::future::Future;
 use std::pin::pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{
-    Arc, Weak,
-    mpsc::{SyncSender, sync_channel},
+use std::sync::atomic::{
+    AtomicUsize,
+    Ordering,
 };
-use std::task::{Context, Poll, Wake, Waker};
+use std::sync::{
+    Arc,
+    Weak,
+    mpsc::{
+        SyncSender,
+        sync_channel,
+    },
+};
+use std::task::{
+    Context,
+    Poll,
+    Wake,
+    Waker,
+};
 use std::thread;
 use std::time::Duration;
 
