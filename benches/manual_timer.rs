@@ -7,24 +7,9 @@
 // =============================================================================
 //! Benchmarks manual-timer registration, cancellation, and deadline delivery.
 
-use criterion::{
-    BatchSize,
-    BenchmarkId,
-    Criterion,
-    Throughput,
-    criterion_group,
-    criterion_main,
-};
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimerFuture,
-};
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use qubit_clock::{ManualMonotonicClock, MonotonicClock, TimerFuture};
+use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
 /// Timer populations spanning small tests through high-cardinality workloads.
@@ -53,8 +38,7 @@ fn require_ready(future: &mut TimerFuture, context: &mut Context<'_>) {
 
 /// Benchmarks eager registration followed by cancellation through `Drop`.
 fn benchmark_registration_and_cancellation(criterion: &mut Criterion) {
-    let mut group =
-        criterion.benchmark_group("manual_timer/registration_and_cancellation");
+    let mut group = criterion.benchmark_group("manual_timer/registration_and_cancellation");
     for waiter_count in WAITER_COUNTS {
         let clock = ManualMonotonicClock::new_shared();
         let timer = clock.new_timer();
@@ -82,8 +66,7 @@ fn benchmark_registration_and_cancellation(criterion: &mut Criterion) {
 
 /// Benchmarks waking and completing many waiters at one shared deadline.
 fn benchmark_batch_deadline_completion(criterion: &mut Criterion) {
-    let mut group =
-        criterion.benchmark_group("manual_timer/batch_deadline_completion");
+    let mut group = criterion.benchmark_group("manual_timer/batch_deadline_completion");
     for waiter_count in WAITER_COUNTS {
         group.throughput(Throughput::Elements(waiter_count as u64));
         group.bench_with_input(
@@ -96,9 +79,9 @@ fn benchmark_batch_deadline_completion(criterion: &mut Criterion) {
                         let timer = clock.new_timer();
                         let futures = (0..waiter_count)
                             .map(|_| {
-                                timer.after(BATCH_DEADLINE).expect(
-                                    "benchmark deadline should register",
-                                )
+                                timer
+                                    .after(BATCH_DEADLINE)
+                                    .expect("benchmark deadline should register")
                             })
                             .collect::<Vec<_>>();
                         (clock, futures)
@@ -123,8 +106,7 @@ fn benchmark_batch_deadline_completion(criterion: &mut Criterion) {
 
 /// Benchmarks delivering staggered deadlines through repeated small advances.
 fn benchmark_sequential_deadline_completion(criterion: &mut Criterion) {
-    let mut group = criterion
-        .benchmark_group("manual_timer/sequential_deadline_completion");
+    let mut group = criterion.benchmark_group("manual_timer/sequential_deadline_completion");
     for waiter_count in WAITER_COUNTS {
         group.throughput(Throughput::Elements(waiter_count as u64));
         group.bench_with_input(
@@ -139,9 +121,7 @@ fn benchmark_sequential_deadline_completion(criterion: &mut Criterion) {
                             .map(|step| {
                                 timer
                                     .after(Duration::from_nanos(step as u64))
-                                    .expect(
-                                        "benchmark deadline should register",
-                                    )
+                                    .expect("benchmark deadline should register")
                             })
                             .collect::<Vec<_>>();
                         (clock, futures)

@@ -7,15 +7,8 @@
 // =============================================================================
 
 use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerUnavailableError,
-    TokioMonotonicClock,
-    TokioRuntimeError,
-    TokioTimer,
+    ManualMonotonicClock, MonotonicClock, MonotonicInstant, TimeError, Timer,
+    TimerUnavailableError, TokioMonotonicClock, TokioRuntimeError, TokioTimer,
 };
 use std::process::Command;
 use std::sync::Arc;
@@ -59,13 +52,12 @@ fn run_isolated_shutdown_test(child_variable: &str, test_path: &str) -> bool {
     if std::env::var_os(child_variable).is_some() {
         return false;
     }
-    let output = Command::new(
-        std::env::current_exe().expect("current test executable should exist"),
-    )
-    .args(["--exact", test_path, "--nocapture"])
-    .env(child_variable, "1")
-    .output()
-    .expect("isolated shutdown test should start");
+    let output =
+        Command::new(std::env::current_exe().expect("current test executable should exist"))
+            .args(["--exact", test_path, "--nocapture"])
+            .env(child_variable, "1")
+            .output()
+            .expect("isolated shutdown test should start");
     assert!(
         output.status.success(),
         "isolated shutdown test should pass: {}",
@@ -73,9 +65,7 @@ fn run_isolated_shutdown_test(child_variable: &str, test_path: &str) -> bool {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        !stderr.contains(
-            "A Tokio 1.x context was found, but it is being shutdown."
-        ),
+        !stderr.contains("A Tokio 1.x context was found, but it is being shutdown."),
         "runtime shutdown must not invoke the panic hook: {stderr}",
     );
     true
@@ -123,8 +113,7 @@ fn test_tokio_timer_current_panics_outside_runtime() {
 /// Verifies that fallible timer construction allocates a new clock domain.
 #[tokio::test]
 async fn test_tokio_timer_try_current_creates_independent_timer() {
-    let timer = TokioTimer::try_current()
-        .expect("entered runtime should create a Tokio timer");
+    let timer = TokioTimer::try_current().expect("entered runtime should create a Tokio timer");
     let other = TokioTimer::current();
 
     assert_ne!(timer.clock().now().domain(), other.clock().now().domain());
@@ -172,8 +161,7 @@ fn test_tokio_timer_arc_after_uses_retained_runtime() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .expect("runtime should build");
-    let timer: Arc<dyn Timer> =
-        Arc::new(TokioTimer::from_handle(runtime.handle().clone()));
+    let timer: Arc<dyn Timer> = Arc::new(TokioTimer::from_handle(runtime.handle().clone()));
     let future = timer
         .after(Duration::ZERO)
         .expect("Arc timer should register through its retained runtime");
@@ -189,8 +177,7 @@ fn test_tokio_timer_box_after_uses_retained_runtime() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .expect("runtime should build");
-    let timer: Box<dyn Timer> =
-        Box::new(TokioTimer::from_handle(runtime.handle().clone()));
+    let timer: Box<dyn Timer> = Box::new(TokioTimer::from_handle(runtime.handle().clone()));
     let future = timer
         .after(Duration::ZERO)
         .expect("boxed timer should register through its retained runtime");
@@ -241,8 +228,7 @@ fn test_tokio_timer_reports_native_instant_overflow() {
         .expect("runtime should build");
     let (timer, deadline) = runtime.block_on(async {
         let clock = TokioMonotonicClock::current();
-        let deadline =
-            MonotonicInstant::new(clock.now().domain(), Duration::MAX);
+        let deadline = MonotonicInstant::new(clock.now().domain(), Duration::MAX);
         (TokioTimer::from_clock(&clock), deadline)
     });
 
@@ -374,8 +360,7 @@ fn test_tokio_timer_reports_retained_runtime_shutdown_without_panicking() {
 /// Verifies first registration after retained-runtime shutdown remains typed
 /// and does not invoke the process panic hook.
 #[test]
-fn test_tokio_timer_registers_after_retained_runtime_shutdown_without_panicking()
- {
+fn test_tokio_timer_registers_after_retained_runtime_shutdown_without_panicking() {
     if run_isolated_shutdown_test(
         TOKIO_POST_SHUTDOWN_REGISTRATION_CHILD,
         TOKIO_POST_SHUTDOWN_REGISTRATION_TEST,

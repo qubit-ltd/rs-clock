@@ -13,24 +13,11 @@ use super::std_timer_scheduler_state::StdTimerSchedulerState;
 use super::std_timer_waiter::StdTimerWaiter;
 use super::std_timer_worker_guard::StdTimerWorkerGuard;
 use crate::internal::PanicFanout;
-use crate::{
-    TimeError,
-    TimerUnavailableError,
-};
+use crate::{TimeError, TimerUnavailableError};
 use std::io;
 #[cfg(coverage)]
-use std::sync::atomic::{
-    AtomicBool,
-    AtomicUsize,
-    Ordering,
-};
-use std::sync::{
-    Arc,
-    Condvar,
-    Mutex,
-    MutexGuard,
-    OnceLock,
-};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use std::time::Instant;
 
 #[cfg(coverage)]
@@ -174,8 +161,7 @@ impl StdTimerScheduler {
         let mut state = self.lock_state();
         let previous_deadline = state.next_deadline();
         let waiter = state.cancel(waiter_id);
-        let next_deadline_changed =
-            waiter.is_some() && state.next_deadline() != previous_deadline;
+        let next_deadline_changed = waiter.is_some() && state.next_deadline() != previous_deadline;
         drop(state);
         drop(waiter);
         if next_deadline_changed {
@@ -199,8 +185,7 @@ impl StdTimerScheduler {
         let waiters = self
             .lock_state()
             .stop_worker_and_take_waiters(worker_generation);
-        let wakers =
-            waiters.iter().filter_map(|waiter| waiter.fail()).collect();
+        let wakers = waiters.iter().filter_map(|waiter| waiter.fail()).collect();
         drop(waiters);
         let mut fanout = PanicFanout::new();
         fanout.wake_all(wakers);
@@ -247,8 +232,7 @@ impl StdTimerScheduler {
         worker_generation: u64,
     ) -> Result<u64, TimeError> {
         let scheduler = Arc::clone(self);
-        let spawn_result =
-            Self::spawn_native_worker(scheduler, worker_generation);
+        let spawn_result = Self::spawn_native_worker(scheduler, worker_generation);
         if let Err(source) = spawn_result {
             return Err(Self::rollback_failed_worker_start(
                 &mut state,
@@ -289,10 +273,7 @@ impl StdTimerScheduler {
         std::thread::Builder::new()
             .name("qubit-clock-timer".to_owned())
             .spawn(move || {
-                let startup_guard = StdTimerWorkerGuard::new(
-                    scheduler.as_ref(),
-                    worker_generation,
-                );
+                let startup_guard = StdTimerWorkerGuard::new(scheduler.as_ref(), worker_generation);
                 let _worker_guard = startup_guard.handoff();
                 scheduler.run();
             })
@@ -347,9 +328,9 @@ impl StdTimerScheduler {
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
                 continue;
             }
-            let deadline = state.next_deadline().expect(
-                "active standard Timer registration must have a deadline",
-            );
+            let deadline = state
+                .next_deadline()
+                .expect("active standard Timer registration must have a deadline");
             let now = Instant::now();
             if deadline > now {
                 let duration = deadline.duration_since(now);

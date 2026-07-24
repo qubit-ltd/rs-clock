@@ -6,12 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    TimeError,
-    Timer,
-    TimerUnavailableError,
-    TokioTimer,
-};
+use qubit_clock::{TimeError, Timer, TimerUnavailableError, TokioTimer};
 use std::time::Duration;
 
 /// Verifies dropping the runtime sentinel publishes structured shutdown.

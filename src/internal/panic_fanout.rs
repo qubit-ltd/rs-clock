@@ -8,11 +8,7 @@
 //! Attempts every Waker while retaining at most one panic payload.
 
 use std::any::Any;
-use std::panic::{
-    AssertUnwindSafe,
-    catch_unwind,
-    resume_unwind,
-};
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::task::Waker;
 
 /// Panic payload retained while a notification fanout attempts every target.
@@ -72,9 +68,7 @@ impl PanicFanout {
         let Some(payload) = self.first_panic.take() else {
             return;
         };
-        if let Err(drop_panic) =
-            catch_unwind(AssertUnwindSafe(|| drop(payload)))
-        {
+        if let Err(drop_panic) = catch_unwind(AssertUnwindSafe(|| drop(payload))) {
             std::mem::forget(drop_panic);
         }
     }

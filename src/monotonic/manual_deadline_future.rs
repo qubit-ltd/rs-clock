@@ -7,17 +7,11 @@
 // =============================================================================
 //! Defines a future that observes the next manual deadline registration.
 
-use crate::{
-    ManualMonotonicClock,
-    MonotonicInstant,
-};
+use crate::{ManualMonotonicClock, MonotonicInstant};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-};
+use std::task::{Context, Poll};
 
 /// A future that observes a manual clock's earliest active future deadline.
 ///
@@ -82,10 +76,7 @@ impl Future for ManualDeadlineFuture {
     ///
     /// Panics if the observer registration is unexpectedly missing or if
     /// destroying a replaced custom task waker panics.
-    fn poll(
-        mut self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let Some(observer_id) = self.observer_id else {
             panic!("manual deadline future polled after completion");
         };

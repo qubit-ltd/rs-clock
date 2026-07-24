@@ -9,15 +9,9 @@
 
 use std::sync::{
     Arc,
-    atomic::{
-        AtomicBool,
-        Ordering,
-    },
+    atomic::{AtomicBool, Ordering},
 };
-use tokio::sync::{
-    Notify,
-    futures::OwnedNotified,
-};
+use tokio::sync::{Notify, futures::OwnedNotified};
 
 /// Shared shutdown flag and asynchronous notification.
 #[derive(Debug)]

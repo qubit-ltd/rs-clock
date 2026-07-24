@@ -9,10 +9,7 @@
 
 use super::std_timer_registration::StdTimerRegistration;
 use super::std_timer_waiter::StdTimerWaiter;
-use std::collections::{
-    BTreeSet,
-    HashMap,
-};
+use qubit_collections::OrderedIndexMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -20,10 +17,8 @@ use std::time::Instant;
 pub(super) struct StdTimerSchedulerState {
     /// Next nonzero registration identifier.
     next_waiter_id: u64,
-    /// Active deadline keys ordered from earliest to latest.
-    deadlines: BTreeSet<(Instant, u64)>,
-    /// Active registrations keyed by registration identifier.
-    registrations: HashMap<u64, StdTimerRegistration>,
+    /// Registrations keyed by ID and ordered by active deadline.
+    registrations: OrderedIndexMap<u64, Instant, StdTimerRegistration>,
     /// Whether a scheduler worker is currently running.
     worker_running: bool,
     /// Generation identifying the most recently started worker.
@@ -41,14 +36,13 @@ impl StdTimerSchedulerState {
     pub(super) fn new() -> Self {
         Self {
             next_waiter_id: 1,
-            deadlines: BTreeSet::new(),
-            registrations: HashMap::new(),
+            registrations: OrderedIndexMap::new(),
             worker_running: false,
             worker_generation: 0,
         }
     }
 
-    /// Registers `waiter` at `deadline` in both exact indexes.
+    /// Registers `waiter` at `deadline` in the indexed collection.
     ///
     /// # Parameters
     ///
@@ -64,24 +58,21 @@ impl StdTimerSchedulerState {
     /// Panics after all nonzero identifiers have been allocated or when an
     /// internal index invariant is violated.
     #[must_use = "the registration identifier is required for cancellation"]
-    pub(super) fn register(
-        &mut self,
-        deadline: Instant,
-        waiter: Arc<StdTimerWaiter>,
-    ) -> u64 {
+    pub(super) fn register(&mut self, deadline: Instant, waiter: Arc<StdTimerWaiter>) -> u64 {
         let waiter_id = self.allocate_waiter_id();
-        let deadline_inserted = self.deadlines.insert((deadline, waiter_id));
-        let previous = self
-            .registrations
-            .insert(waiter_id, StdTimerRegistration::new(deadline, waiter));
+        let previous = self.registrations.insert(
+            waiter_id,
+            deadline,
+            StdTimerRegistration::new(deadline, waiter),
+        );
         assert!(
-            deadline_inserted && previous.is_none(),
-            "standard Timer registration indexes must remain one-to-one",
+            previous.is_none(),
+            "standard Timer waiter identifier must be unique",
         );
         waiter_id
     }
 
-    /// Cancels one active registration in both exact indexes.
+    /// Cancels one active registration by identifier.
     ///
     /// # Parameters
     ///
@@ -94,19 +85,10 @@ impl StdTimerSchedulerState {
     ///
     /// # Panics
     ///
-    /// Panics when the registration index contains an entry without its exact
-    /// deadline key.
-    pub(super) fn cancel(
-        &mut self,
-        waiter_id: u64,
-    ) -> Option<Arc<StdTimerWaiter>> {
-        let registration = self.registrations.remove(&waiter_id)?;
-        let removed =
-            self.deadlines.remove(&(registration.deadline(), waiter_id));
-        assert!(
-            removed,
-            "active standard Timer registration must have a deadline key",
-        );
+    /// Panics when the indexed collection invariants are violated.
+    pub(super) fn cancel(&mut self, waiter_id: u64) -> Option<Arc<StdTimerWaiter>> {
+        let (deadline, registration) = self.registrations.remove(&waiter_id)?;
+        debug_assert_eq!(deadline, registration.deadline());
         Some(registration.into_waiter())
     }
 
@@ -122,22 +104,18 @@ impl StdTimerSchedulerState {
     ///
     /// # Panics
     ///
-    /// Panics when a deadline key does not have its matching registration.
-    pub(super) fn take_due(
-        &mut self,
-        now: Instant,
-    ) -> Vec<Arc<StdTimerWaiter>> {
+    /// Panics when the indexed collection invariants are violated.
+    pub(super) fn take_due(&mut self, now: Instant) -> Vec<Arc<StdTimerWaiter>> {
         let mut due_waiters = Vec::new();
-        while let Some((deadline, waiter_id)) = self.deadlines.first().copied()
+        while self
+            .registrations
+            .first_order_key()
+            .is_some_and(|deadline| *deadline <= now)
         {
-            if deadline > now {
-                break;
-            }
-            self.deadlines.pop_first();
-            let registration = self
+            let (_waiter_id, deadline, registration) = self
                 .registrations
-                .remove(&waiter_id)
-                .expect("standard Timer deadline must have a registration");
+                .pop_first()
+                .expect("due standard Timer registration must exist");
             debug_assert_eq!(deadline, registration.deadline());
             due_waiters.push(registration.into_waiter());
         }
@@ -152,25 +130,22 @@ impl StdTimerSchedulerState {
     #[must_use]
     #[inline(always)]
     pub(super) fn next_deadline(&self) -> Option<Instant> {
-        self.deadlines.first().map(|(deadline, _)| *deadline)
+        self.registrations.first_order_key().copied()
     }
 
     /// Reports whether no active registrations remain.
     ///
     /// # Returns
     ///
-    /// `true` when both exact indexes are empty.
+    /// `true` when no active registration remains.
     ///
     /// # Panics
     ///
-    /// Panics in debug builds when the two indexes disagree about emptiness.
+    /// Panics in debug builds when an active registration has been unindexed.
     #[must_use]
     #[inline(always)]
     pub(super) fn is_empty(&self) -> bool {
-        debug_assert_eq!(
-            self.deadlines.is_empty(),
-            self.registrations.is_empty()
-        );
+        debug_assert_eq!(self.registrations.len(), self.registrations.indexed_len());
         self.registrations.is_empty()
     }
 
@@ -221,7 +196,7 @@ impl StdTimerSchedulerState {
 
     /// Stops a matching worker and removes every registration it owned.
     ///
-    /// The running flag and both registration indexes change under the same
+    /// The running flag and indexed registrations change under the same
     /// scheduler lock. A zero or stale generation leaves the active generation
     /// untouched.
     ///
@@ -243,11 +218,11 @@ impl StdTimerSchedulerState {
             return Vec::new();
         }
         self.worker_running = false;
-        self.deadlines.clear();
-        self.registrations
-            .drain()
-            .map(|(_, registration)| registration.into_waiter())
-            .collect()
+        let mut waiters = Vec::with_capacity(self.registrations.len());
+        while let Some((_waiter_id, _deadline, registration)) = self.registrations.pop_first() {
+            waiters.push(registration.into_waiter());
+        }
+        waiters
     }
 
     /// Allocates a nonzero waiter identifier without reuse after exhaustion.

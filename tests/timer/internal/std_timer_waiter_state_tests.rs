@@ -6,24 +6,12 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    StdMonotonicClock,
-    StdTimer,
-    Timer,
-};
+use qubit_clock::{StdMonotonicClock, StdTimer, Timer};
 use std::sync::{
     Arc,
-    atomic::{
-        AtomicUsize,
-        Ordering,
-    },
+    atomic::{AtomicUsize, Ordering},
 };
-use std::task::{
-    Context,
-    Poll,
-    Wake,
-    Waker,
-};
+use std::task::{Context, Poll, Wake, Waker};
 use std::time::Duration;
 
 #[derive(Default)]
