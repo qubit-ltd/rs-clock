@@ -7,11 +7,26 @@
 // =============================================================================
 //! Measures Tokio Timer registration, cancellation, and completion costs.
 
-use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use qubit_clock::{Timer, TimerFuture, TokioTimer};
+use criterion::{
+    BatchSize,
+    BenchmarkId,
+    Criterion,
+    Throughput,
+    criterion_group,
+    criterion_main,
+};
+use qubit_clock::{
+    Timer,
+    TimerFuture,
+    TokioTimer,
+};
 use std::{
     convert::Infallible,
-    future::{Future, pending, poll_fn},
+    future::{
+        Future,
+        pending,
+        poll_fn,
+    },
     task::Poll,
     time::Duration,
 };
@@ -275,9 +290,10 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
     let native_tasks = resident_task_increase(largest_batch, &runtime, || {
         native_sleep(CANCELLATION_DEADLINE)
     });
-    let sentinel_tasks = resident_task_increase(largest_batch, &runtime, || {
-        sleep_with_per_deadline_sentinel(CANCELLATION_DEADLINE)
-    });
+    let sentinel_tasks =
+        resident_task_increase(largest_batch, &runtime, || {
+            sleep_with_per_deadline_sentinel(CANCELLATION_DEADLINE)
+        });
     let timer_tasks = resident_task_increase(largest_batch, &runtime, || {
         timer
             .after(CANCELLATION_DEADLINE)
@@ -287,7 +303,8 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
         "resident task increase at {largest_batch} futures: native={native_tasks}, per_deadline_sentinel={sentinel_tasks}, tokio_timer={timer_tasks}",
     );
     let largest_timer_count = TIMER_COUNTS[TIMER_COUNTS.len() - 1];
-    let many_timer_tasks = many_timer_resident_task_increase(largest_timer_count);
+    let many_timer_tasks =
+        many_timer_resident_task_increase(largest_timer_count);
     eprintln!(
         "resident task increase at {largest_timer_count} independent timers: \
          tokio_timer={many_timer_tasks}",
@@ -340,8 +357,9 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
         .start_paused(true)
         .build()
         .expect("many-timer benchmark runtime should build");
-    let mut many_timer_group =
-        criterion.benchmark_group("tokio_timer/many_timer_registration_and_cancellation");
+    let mut many_timer_group = criterion.benchmark_group(
+        "tokio_timer/many_timer_registration_and_cancellation",
+    );
     for timer_count in TIMER_COUNTS {
         many_timer_group.throughput(Throughput::Elements(timer_count as u64));
         many_timer_group.bench_with_input(
@@ -351,7 +369,10 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
                 bencher.iter_batched(
                     || create_timers(timer_count, &many_timer_runtime),
                     |timers| {
-                        register_and_cancel_many_timers(timers, &many_timer_runtime);
+                        register_and_cancel_many_timers(
+                            timers,
+                            &many_timer_runtime,
+                        );
                     },
                     BatchSize::SmallInput,
                 );
@@ -360,7 +381,8 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
     }
     many_timer_group.finish();
 
-    let mut completion_group = criterion.benchmark_group("tokio_timer/deadline_completion");
+    let mut completion_group =
+        criterion.benchmark_group("tokio_timer/deadline_completion");
     for batch_size in BATCH_SIZES {
         completion_group.throughput(Throughput::Elements(batch_size as u64));
         completion_group.bench_with_input(

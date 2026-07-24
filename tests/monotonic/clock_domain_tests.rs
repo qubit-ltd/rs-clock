@@ -6,7 +6,12 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{ClockDomain, ManualMonotonicClock, MonotonicClock, MonotonicInstant};
+use qubit_clock::{
+    ClockDomain,
+    ManualMonotonicClock,
+    MonotonicClock,
+    MonotonicInstant,
+};
 use std::collections::HashSet;
 use std::time::Duration;
 

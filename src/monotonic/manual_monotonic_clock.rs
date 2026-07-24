@@ -8,14 +8,31 @@
 //! Defines an explicitly advanced monotonic clock for deterministic tests.
 
 use crate::internal::PanicFanout;
-use crate::monotonic::internal::{AdvanceEffects, ManualTimeDomain, WaiterRegistrationGuard};
+use crate::monotonic::internal::{
+    AdvanceEffects,
+    ManualTimeDomain,
+    WaiterRegistrationGuard,
+};
 use crate::{
-    ClockDomain, ManualDeadlineFuture, ManualTimer, ManualWaiterFuture, ManualWallClock,
-    MonotonicClock, MonotonicInstant, TimeError, Timer,
+    ClockDomain,
+    ManualDeadlineFuture,
+    ManualTimer,
+    ManualWaiterFuture,
+    ManualWallClock,
+    MonotonicClock,
+    MonotonicInstant,
+    TimeError,
+    Timer,
 };
 use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::{Duration, SystemTime};
+use std::task::{
+    Context,
+    Poll,
+};
+use std::time::{
+    Duration,
+    SystemTime,
+};
 
 /// A monotonic clock that advances only when explicitly instructed.
 ///
@@ -94,7 +111,10 @@ impl ManualMonotonicClock {
     /// A wall clock anchored to `wall_time` and driven by this exact clock.
     #[must_use]
     #[inline]
-    pub fn new_wall_clock(self: &Arc<Self>, wall_time: SystemTime) -> Arc<ManualWallClock> {
+    pub fn new_wall_clock(
+        self: &Arc<Self>,
+        wall_time: SystemTime,
+    ) -> Arc<ManualWallClock> {
         Arc::new(ManualWallClock::from_clock(wall_time, Arc::clone(self)))
     }
 
@@ -156,7 +176,10 @@ impl ManualMonotonicClock {
     /// this advance is attempted before the first panic is resumed. The
     /// logical-time update is already committed and is not rolled back during
     /// unwinding.
-    pub fn advance_to(&self, target: MonotonicInstant) -> Result<(), TimeError> {
+    pub fn advance_to(
+        &self,
+        target: MonotonicInstant,
+    ) -> Result<(), TimeError> {
         target.validate_domain(self.domain)?;
         let target_elapsed = target.elapsed_since_origin();
         if let Some(effects) = self.time_domain.advance_to(target_elapsed)? {
@@ -216,7 +239,10 @@ impl ManualMonotonicClock {
     /// represented.
     #[must_use]
     #[inline(always)]
-    pub fn wait_for_next_deadline(&self, real_timeout: Duration) -> Option<MonotonicInstant> {
+    pub fn wait_for_next_deadline(
+        &self,
+        real_timeout: Duration,
+    ) -> Option<MonotonicInstant> {
         self.time_domain
             .wait_for_next_deadline(real_timeout)
             .map(|elapsed| MonotonicInstant::new(self.domain, elapsed))
@@ -280,7 +306,9 @@ impl ManualMonotonicClock {
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
     #[inline(always)]
-    pub fn wait_for_next_deadline_async(self: &Arc<Self>) -> ManualDeadlineFuture {
+    pub fn wait_for_next_deadline_async(
+        self: &Arc<Self>,
+    ) -> ManualDeadlineFuture {
         ManualDeadlineFuture::new(Arc::clone(self))
     }
 
@@ -301,7 +329,8 @@ impl ManualMonotonicClock {
     /// logical-time update is already committed and is not rolled back during
     /// unwinding.
     pub fn advance_to_next_deadline(&self) -> Option<MonotonicInstant> {
-        let (target_elapsed, effects) = self.time_domain.advance_to_next_deadline()?;
+        let (target_elapsed, effects) =
+            self.time_domain.advance_to_next_deadline()?;
         let target = MonotonicInstant::new(self.domain, target_elapsed);
         Self::notify_time_changed(effects);
         Some(target)
@@ -344,9 +373,11 @@ impl ManualMonotonicClock {
         expected_count: usize,
         real_timeout: Duration,
     ) -> Option<MonotonicInstant> {
-        let (target_elapsed, effects) = self
-            .time_domain
-            .advance_to_next_deadline_after_waiters(expected_count, real_timeout)?;
+        let (target_elapsed, effects) =
+            self.time_domain.advance_to_next_deadline_after_waiters(
+                expected_count,
+                real_timeout,
+            )?;
         let target = MonotonicInstant::new(self.domain, target_elapsed);
         Self::notify_time_changed(effects);
         Some(target)
@@ -372,7 +403,9 @@ impl ManualMonotonicClock {
     ///
     /// Panics if waiter-observer identifiers are exhausted or if waking a
     /// registered task panics.
-    pub async fn advance_to_next_deadline_async(self: &Arc<Self>) -> MonotonicInstant {
+    pub async fn advance_to_next_deadline_async(
+        self: &Arc<Self>,
+    ) -> MonotonicInstant {
         loop {
             let _ = self.wait_for_next_deadline_async().await;
             if let Some(deadline) = self.advance_to_next_deadline() {
@@ -407,7 +440,10 @@ impl ManualMonotonicClock {
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
     #[inline(always)]
-    pub fn wait_for_waiters_async(self: &Arc<Self>, expected_count: usize) -> ManualWaiterFuture {
+    pub fn wait_for_waiters_async(
+        self: &Arc<Self>,
+        expected_count: usize,
+    ) -> ManualWaiterFuture {
         ManualWaiterFuture::new(Arc::clone(self), expected_count)
     }
 
@@ -439,7 +475,11 @@ impl ManualMonotonicClock {
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
     #[inline(always)]
-    pub fn wait_for_waiters(&self, expected_count: usize, real_timeout: Duration) -> bool {
+    pub fn wait_for_waiters(
+        &self,
+        expected_count: usize,
+        real_timeout: Duration,
+    ) -> bool {
         self.time_domain
             .wait_for_waiters(expected_count, real_timeout)
     }
@@ -504,7 +544,10 @@ impl ManualMonotonicClock {
     ///
     /// Panics when the observer identifier space is exhausted.
     #[inline]
-    pub(crate) fn register_waiter_observer(&self, expected_count: usize) -> Option<u64> {
+    pub(crate) fn register_waiter_observer(
+        &self,
+        expected_count: usize,
+    ) -> Option<u64> {
         self.time_domain.register_waiter_observer(expected_count)
     }
 
@@ -568,7 +611,11 @@ impl ManualMonotonicClock {
     /// Panics after releasing the clock state lock if destroying a replaced
     /// custom task waker panics.
     #[inline]
-    pub(crate) fn poll_waiter_observer(&self, observer_id: u64, context: &Context<'_>) -> Poll<()> {
+    pub(crate) fn poll_waiter_observer(
+        &self,
+        observer_id: u64,
+        context: &Context<'_>,
+    ) -> Poll<()> {
         let (poll_result, replaced_waker) =
             self.time_domain.poll_waiter_observer(observer_id, context);
         drop(replaced_waker);
@@ -587,7 +634,8 @@ impl ManualMonotonicClock {
     /// observer's custom task waker panics.
     #[inline]
     pub(crate) fn unregister_waiter_observer(&self, observer_id: u64) {
-        let removed_waker = self.time_domain.unregister_waiter_observer(observer_id);
+        let removed_waker =
+            self.time_domain.unregister_waiter_observer(observer_id);
         drop(removed_waker);
     }
 
@@ -607,8 +655,13 @@ impl ManualMonotonicClock {
     ///
     /// Panics if `waiter_id` no longer identifies a registered timer waiter or
     /// if destroying a replaced custom task waker panics after unlocking.
-    pub(crate) fn poll_timer_waiter(&self, waiter_id: u64, context: &Context<'_>) -> Poll<()> {
-        let (poll_result, replaced_waker) = self.time_domain.poll_timer_waiter(waiter_id, context);
+    pub(crate) fn poll_timer_waiter(
+        &self,
+        waiter_id: u64,
+        context: &Context<'_>,
+    ) -> Poll<()> {
+        let (poll_result, replaced_waker) =
+            self.time_domain.poll_timer_waiter(waiter_id, context);
         drop(replaced_waker);
         poll_result
     }
@@ -625,7 +678,8 @@ impl ManualMonotonicClock {
     /// custom task waker panics.
     #[inline]
     pub(crate) fn unregister_timer_waiter(&self, waiter_id: u64) {
-        let removed_waiter = self.time_domain.unregister_timer_waiter(waiter_id);
+        let removed_waiter =
+            self.time_domain.unregister_timer_waiter(waiter_id);
         drop(removed_waiter);
     }
 

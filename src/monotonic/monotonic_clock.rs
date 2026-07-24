@@ -11,7 +11,10 @@
 //! [`MonotonicInstant`] values used for timeouts, deadlines, and elapsed-time
 //! measurements. Wall time belongs on [`WallClock`](crate::WallClock) instead.
 
-use crate::{MonotonicInstant, Timer};
+use crate::{
+    MonotonicInstant,
+    Timer,
+};
 use std::sync::Arc;
 
 /// Provides the current instant in a stable, non-decreasing clock domain.

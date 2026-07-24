@@ -8,9 +8,18 @@
 //! Defines a blocking adapter over the asynchronous Timer capability.
 
 use super::internal::ThreadWaker;
-use crate::{MonotonicInstant, TimeError, Timer, TimerFuture};
+use crate::{
+    MonotonicInstant,
+    TimeError,
+    Timer,
+    TimerFuture,
+};
 use std::sync::Arc;
-use std::task::{Context, Poll, Waker};
+use std::task::{
+    Context,
+    Poll,
+    Waker,
+};
 use std::time::Duration;
 
 /// Adapts any [`Timer`] into synchronous blocking sleep operations.
@@ -87,7 +96,10 @@ impl BlockingSleeper {
     /// Parks the calling thread while the composed timer is pending. The timer
     /// backend must be driven independently during that interval.
     #[inline(always)]
-    pub fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
+    pub fn sleep_until(
+        &self,
+        deadline: MonotonicInstant,
+    ) -> Result<(), TimeError> {
         let future = self.timer.at(deadline)?;
         Self::block_on(future)
     }

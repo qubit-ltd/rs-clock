@@ -7,7 +7,10 @@
 // =============================================================================
 
 #[cfg(all(loom, feature = "loom-model"))]
-use loom::{sync::Arc, thread};
+use loom::{
+    sync::Arc,
+    thread,
+};
 #[cfg(all(loom, feature = "loom-model"))]
 use qubit_clock::test_util::loom::LoomNotificationLatch;
 

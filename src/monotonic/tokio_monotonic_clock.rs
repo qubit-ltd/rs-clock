@@ -7,7 +7,14 @@
 // =============================================================================
 //! Defines the Tokio monotonic clock implementation.
 
-use crate::{ClockDomain, MonotonicClock, MonotonicInstant, Timer, TokioRuntimeError, TokioTimer};
+use crate::{
+    ClockDomain,
+    MonotonicClock,
+    MonotonicInstant,
+    Timer,
+    TokioRuntimeError,
+    TokioTimer,
+};
 use std::sync::Arc;
 use tokio::runtime::Handle;
 use tokio::time::Instant;
@@ -28,7 +35,8 @@ use tokio::time::Instant;
 /// The value returned by `operation`.
 #[inline]
 fn within_runtime<R>(runtime: &Handle, operation: impl FnOnce() -> R) -> R {
-    let is_current = Handle::try_current().is_ok_and(|current| current.id() == runtime.id());
+    let is_current =
+        Handle::try_current().is_ok_and(|current| current.id() == runtime.id());
     if is_current {
         return operation();
     }
@@ -104,8 +112,9 @@ impl TokioMonotonicClock {
     #[track_caller]
     #[inline]
     pub fn current() -> Self {
-        Self::try_current()
-            .unwrap_or_else(|error| panic!("cannot create Tokio monotonic clock: {error}"))
+        Self::try_current().unwrap_or_else(|error| {
+            panic!("cannot create Tokio monotonic clock: {error}")
+        })
     }
 
     /// Tries to create a Tokio clock by capturing the current runtime.
@@ -124,8 +133,8 @@ impl TokioMonotonicClock {
     /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline]
     pub fn try_current() -> Result<Self, TokioRuntimeError> {
-        let runtime =
-            Handle::try_current().map_err(|source| TokioRuntimeError::NotEntered { source })?;
+        let runtime = Handle::try_current()
+            .map_err(|source| TokioRuntimeError::NotEntered { source })?;
         Ok(Self::from_handle(runtime))
     }
 

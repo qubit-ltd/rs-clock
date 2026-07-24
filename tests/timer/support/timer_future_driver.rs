@@ -10,9 +10,17 @@
 use qubit_clock::TimerFuture;
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, Ordering},
+    atomic::{
+        AtomicBool,
+        Ordering,
+    },
 };
-use std::task::{Context, Poll, Wake, Waker};
+use std::task::{
+    Context,
+    Poll,
+    Wake,
+    Waker,
+};
 
 /// Notifies a thread that is synchronously polling one Timer future.
 struct ThreadWaker {

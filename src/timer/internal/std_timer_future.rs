@@ -9,11 +9,17 @@
 
 use super::std_timer_scheduler::StdTimerScheduler;
 use super::std_timer_waiter::StdTimerWaiter;
-use crate::{TimeError, TimerUnavailableError};
+use crate::{
+    TimeError,
+    TimerUnavailableError,
+};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::task::{
+    Context,
+    Poll,
+};
 
 /// A cancellation-safe future backed by one shared standard scheduler.
 pub(crate) struct StdTimerFuture {
@@ -66,7 +72,10 @@ impl Future for StdTimerFuture {
     /// [`Poll::Ready(Ok)`] after the native deadline,
     /// [`Poll::Ready(Err)`] if the scheduler worker exits, otherwise
     /// [`Poll::Pending`].
-    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(
+        self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<Self::Output> {
         let this = self.get_mut();
         match this.waiter.poll(context) {
             Poll::Pending => Poll::Pending,

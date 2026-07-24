@@ -7,15 +7,33 @@
 // =============================================================================
 
 use criterion::{
-    BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
+    BenchmarkGroup,
+    BenchmarkId,
+    Criterion,
+    Throughput,
+    criterion_group,
+    criterion_main,
     measurement::WallTime,
 };
-use qubit_clock::{MonotonicClock, StdMonotonicClock, TimerFuture};
-use std::sync::{
-    Arc, Barrier,
-    atomic::{AtomicBool, Ordering},
+use qubit_clock::{
+    MonotonicClock,
+    StdMonotonicClock,
+    TimerFuture,
 };
-use std::task::{Context, Poll, Wake, Waker};
+use std::sync::{
+    Arc,
+    Barrier,
+    atomic::{
+        AtomicBool,
+        Ordering,
+    },
+};
+use std::task::{
+    Context,
+    Poll,
+    Wake,
+    Waker,
+};
 use std::time::Duration;
 
 /// Persistent caller-thread counts used to expose scheduler scaling behavior.
@@ -113,7 +131,9 @@ fn block_on_timer_future(mut future: TimerFuture) {
 /// # Panics
 ///
 /// Panics when a deadline cannot be registered or a benchmark worker panics.
-fn benchmark_parallel_registration_and_cancellation(group: &mut BenchmarkGroup<'_, WallTime>) {
+fn benchmark_parallel_registration_and_cancellation(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+) {
     for worker_count in CONCURRENT_WORKER_COUNTS {
         let timer = StdMonotonicClock::new().new_timer();
         let start = Arc::new(Barrier::new(worker_count + 1));
@@ -134,12 +154,13 @@ fn benchmark_parallel_registration_and_cancellation(group: &mut BenchmarkGroup<'
                         if stopping.load(Ordering::Acquire) {
                             return;
                         }
-                        let mut futures = Vec::with_capacity(REGISTRATIONS_PER_WORKER);
+                        let mut futures =
+                            Vec::with_capacity(REGISTRATIONS_PER_WORKER);
                         for _ in 0..REGISTRATIONS_PER_WORKER {
                             futures.push(
-                                timer
-                                    .after(CANCELLATION_DEADLINE)
-                                    .expect("benchmark deadline should register"),
+                                timer.after(CANCELLATION_DEADLINE).expect(
+                                    "benchmark deadline should register",
+                                ),
                             );
                         }
                         registered.wait();
@@ -152,7 +173,10 @@ fn benchmark_parallel_registration_and_cancellation(group: &mut BenchmarkGroup<'
             let elements = (worker_count * REGISTRATIONS_PER_WORKER) as u64;
             group.throughput(Throughput::Elements(elements));
             group.bench_with_input(
-                BenchmarkId::new("lock_style_registration_and_cancellation", worker_count),
+                BenchmarkId::new(
+                    "lock_style_registration_and_cancellation",
+                    worker_count,
+                ),
                 &worker_count,
                 |bencher, _worker_count| {
                     bencher.iter(|| {
@@ -177,7 +201,9 @@ fn benchmark_parallel_registration_and_cancellation(group: &mut BenchmarkGroup<'
 /// # Panics
 ///
 /// Panics when a deadline cannot be registered or a benchmark worker panics.
-fn benchmark_parallel_deadline_completion(group: &mut BenchmarkGroup<'_, WallTime>) {
+fn benchmark_parallel_deadline_completion(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+) {
     for worker_count in CONCURRENT_WORKER_COUNTS {
         let timer = StdMonotonicClock::new().new_timer();
         let start = Arc::new(Barrier::new(worker_count + 1));

@@ -7,11 +7,25 @@
 // =============================================================================
 //! Stores the shared mutable state of one manual monotonic time domain.
 
-use super::{AdvanceEffects, ManualMonotonicState};
+use super::{
+    AdvanceEffects,
+    ManualMonotonicState,
+};
 use crate::TimeError;
-use std::sync::{Condvar, Mutex, MutexGuard};
-use std::task::{Context, Poll, Waker};
-use std::time::{Duration, Instant};
+use std::sync::{
+    Condvar,
+    Mutex,
+    MutexGuard,
+};
+use std::task::{
+    Context,
+    Poll,
+    Waker,
+};
+use std::time::{
+    Duration,
+    Instant,
+};
 
 /// Shared synchronization state retained by same-domain manual clock handles.
 pub(crate) struct ManualTimeDomain {
@@ -60,7 +74,10 @@ impl ManualTimeDomain {
     /// # Errors
     ///
     /// Returns [`TimeError::InstantOverflow`] when elapsed time overflows.
-    pub(crate) fn advance(&self, duration: Duration) -> Result<Option<AdvanceEffects>, TimeError> {
+    pub(crate) fn advance(
+        &self,
+        duration: Duration,
+    ) -> Result<Option<AdvanceEffects>, TimeError> {
         if duration.is_zero() {
             return Ok(None);
         }
@@ -138,14 +155,20 @@ impl ManualTimeDomain {
     /// The future deadline's elapsed duration, or `None` after timeout or
     /// timeout-representation overflow.
     #[must_use]
-    pub(crate) fn wait_for_next_deadline(&self, real_timeout: Duration) -> Option<Duration> {
+    pub(crate) fn wait_for_next_deadline(
+        &self,
+        real_timeout: Duration,
+    ) -> Option<Duration> {
         let mut state = self.lock_state();
-        if let Some(deadline) = state.waiters.next_future_deadline(state.elapsed) {
+        if let Some(deadline) =
+            state.waiters.next_future_deadline(state.elapsed)
+        {
             return Some(deadline);
         }
         let real_deadline = Instant::now().checked_add(real_timeout)?;
         loop {
-            let remaining = real_deadline.saturating_duration_since(Instant::now());
+            let remaining =
+                real_deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 return None;
             }
@@ -154,7 +177,9 @@ impl ManualTimeDomain {
                 .wait_timeout(state, remaining)
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             state = next_state;
-            if let Some(deadline) = state.waiters.next_future_deadline(state.elapsed) {
+            if let Some(deadline) =
+                state.waiters.next_future_deadline(state.elapsed)
+            {
                 return Some(deadline);
             }
             if wait_result.timed_out() {
@@ -169,9 +194,12 @@ impl ManualTimeDomain {
     ///
     /// The reached elapsed duration and due effects, or `None` when no future
     /// deadline is registered.
-    pub(crate) fn advance_to_next_deadline(&self) -> Option<(Duration, AdvanceEffects)> {
+    pub(crate) fn advance_to_next_deadline(
+        &self,
+    ) -> Option<(Duration, AdvanceEffects)> {
         let mut state = self.lock_state();
-        let target_elapsed = state.waiters.next_future_deadline(state.elapsed)?;
+        let target_elapsed =
+            state.waiters.next_future_deadline(state.elapsed)?;
         state.elapsed = target_elapsed;
         let effects = Self::collect_advance_effects(&mut state);
         Some((target_elapsed, effects))
@@ -201,12 +229,15 @@ impl ManualTimeDomain {
         real_timeout: Duration,
     ) -> Option<(Duration, AdvanceEffects)> {
         let mut state = self.lock_state();
-        if let Some(advance) = Self::advance_if_waiters_ready(&mut state, expected_count) {
+        if let Some(advance) =
+            Self::advance_if_waiters_ready(&mut state, expected_count)
+        {
             return Some(advance);
         }
         let real_deadline = Instant::now().checked_add(real_timeout)?;
         loop {
-            let remaining = real_deadline.saturating_duration_since(Instant::now());
+            let remaining =
+                real_deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 return None;
             }
@@ -215,7 +246,9 @@ impl ManualTimeDomain {
                 .wait_timeout(state, remaining)
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             state = next_state;
-            if let Some(advance) = Self::advance_if_waiters_ready(&mut state, expected_count) {
+            if let Some(advance) =
+                Self::advance_if_waiters_ready(&mut state, expected_count)
+            {
                 return Some(advance);
             }
             if wait_result.timed_out() {
@@ -239,20 +272,28 @@ impl ManualTimeDomain {
     /// # Panics
     ///
     /// Panics when observer identifiers are exhausted.
-    pub(crate) fn wait_for_waiters(&self, expected_count: usize, real_timeout: Duration) -> bool {
+    pub(crate) fn wait_for_waiters(
+        &self,
+        expected_count: usize,
+        real_timeout: Duration,
+    ) -> bool {
         let mut state = self.lock_state();
         let count = state.waiter_count();
         if count >= expected_count {
             return true;
         }
-        let Some(real_deadline) = Instant::now().checked_add(real_timeout) else {
+        let Some(real_deadline) = Instant::now().checked_add(real_timeout)
+        else {
             return false;
         };
-        let Some(observer_id) = state.waiters.register_observer(expected_count, count) else {
+        let Some(observer_id) =
+            state.waiters.register_observer(expected_count, count)
+        else {
             return true;
         };
         loop {
-            let remaining = real_deadline.saturating_duration_since(Instant::now());
+            let remaining =
+                real_deadline.saturating_duration_since(Instant::now());
             let (next_state, wait_result) = self
                 .waiters_changed
                 .wait_timeout(state, remaining)
@@ -262,7 +303,8 @@ impl ManualTimeDomain {
                 return true;
             }
             if wait_result.timed_out() {
-                let removed_waker = state.waiters.unregister_observer(observer_id);
+                let removed_waker =
+                    state.waiters.unregister_observer(observer_id);
                 drop(state);
                 drop(removed_waker);
                 return false;
@@ -312,7 +354,10 @@ impl ManualTimeDomain {
     ///
     /// Panics when observer identifiers are exhausted.
     #[inline]
-    pub(crate) fn register_waiter_observer(&self, expected_count: usize) -> Option<u64> {
+    pub(crate) fn register_waiter_observer(
+        &self,
+        expected_count: usize,
+    ) -> Option<u64> {
         let mut state = self.lock_state();
         let count = state.waiter_count();
         state.waiters.register_observer(expected_count, count)
@@ -388,7 +433,10 @@ impl ManualTimeDomain {
     ///
     /// The observer's registered waker, or `None`.
     #[inline]
-    pub(crate) fn unregister_waiter_observer(&self, observer_id: u64) -> Option<Waker> {
+    pub(crate) fn unregister_waiter_observer(
+        &self,
+        observer_id: u64,
+    ) -> Option<Waker> {
         self.lock_state().waiters.unregister_observer(observer_id)
     }
 
@@ -429,8 +477,12 @@ impl ManualTimeDomain {
     /// # Returns
     ///
     /// The removed waiter's optional waker, or `None` when it was absent.
-    pub(crate) fn unregister_timer_waiter(&self, waiter_id: u64) -> Option<Option<Waker>> {
-        let removed_waiter = self.lock_state().waiters.unregister_timer(waiter_id);
+    pub(crate) fn unregister_timer_waiter(
+        &self,
+        waiter_id: u64,
+    ) -> Option<Option<Waker>> {
+        let removed_waiter =
+            self.lock_state().waiters.unregister_timer(waiter_id);
         if removed_waiter.is_some() {
             self.notify_waiters_changed();
         }
@@ -474,7 +526,8 @@ impl ManualTimeDomain {
         if state.waiter_count() < expected_count {
             return None;
         }
-        let target_elapsed = state.waiters.next_future_deadline(state.elapsed)?;
+        let target_elapsed =
+            state.waiters.next_future_deadline(state.elapsed)?;
         state.elapsed = target_elapsed;
         let effects = Self::collect_advance_effects(state);
         Some((target_elapsed, effects))
@@ -490,7 +543,9 @@ impl ManualTimeDomain {
     ///
     /// Owned effects ready for delivery after unlocking.
     #[inline]
-    fn collect_advance_effects(state: &mut ManualMonotonicState) -> AdvanceEffects {
+    fn collect_advance_effects(
+        state: &mut ManualMonotonicState,
+    ) -> AdvanceEffects {
         let elapsed = state.elapsed;
         let due_wakers = state.waiters.take_due_timer_wakers(elapsed);
         AdvanceEffects { due_wakers }
