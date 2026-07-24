@@ -58,7 +58,11 @@ impl StdTimerSchedulerState {
     /// Panics after all nonzero identifiers have been allocated or when an
     /// internal index invariant is violated.
     #[must_use = "the registration identifier is required for cancellation"]
-    pub(super) fn register(&mut self, deadline: Instant, waiter: Arc<StdTimerWaiter>) -> u64 {
+    pub(super) fn register(
+        &mut self,
+        deadline: Instant,
+        waiter: Arc<StdTimerWaiter>,
+    ) -> u64 {
         let waiter_id = self.allocate_waiter_id();
         let previous = self.registrations.insert(
             waiter_id,
@@ -86,9 +90,13 @@ impl StdTimerSchedulerState {
     /// # Panics
     ///
     /// Panics when the indexed collection invariants are violated.
-    pub(super) fn cancel(&mut self, waiter_id: u64) -> Option<Arc<StdTimerWaiter>> {
-        let (deadline, registration) = self.registrations.remove(&waiter_id)?;
-        debug_assert_eq!(deadline, registration.deadline());
+    pub(super) fn cancel(
+        &mut self,
+        waiter_id: u64,
+    ) -> Option<Arc<StdTimerWaiter>> {
+        let entry = self.registrations.remove(&waiter_id)?;
+        debug_assert_eq!(*entry.order(), entry.value().deadline());
+        let registration = entry.into_value();
         Some(registration.into_waiter())
     }
 
@@ -105,21 +113,17 @@ impl StdTimerSchedulerState {
     /// # Panics
     ///
     /// Panics when the indexed collection invariants are violated.
-    pub(super) fn take_due(&mut self, now: Instant) -> Vec<Arc<StdTimerWaiter>> {
-        let mut due_waiters = Vec::new();
-        while self
-            .registrations
-            .first_order_key()
-            .is_some_and(|deadline| *deadline <= now)
-        {
-            let (_waiter_id, deadline, registration) = self
-                .registrations
-                .pop_first()
-                .expect("due standard Timer registration must exist");
-            debug_assert_eq!(deadline, registration.deadline());
-            due_waiters.push(registration.into_waiter());
-        }
-        due_waiters
+    pub(super) fn take_due(
+        &mut self,
+        now: Instant,
+    ) -> Vec<Arc<StdTimerWaiter>> {
+        self.registrations
+            .extract_range(..=now)
+            .map(|entry| {
+                debug_assert_eq!(*entry.order(), entry.value().deadline());
+                entry.into_value().into_waiter()
+            })
+            .collect()
     }
 
     /// Returns the earliest active deadline.
@@ -130,7 +134,7 @@ impl StdTimerSchedulerState {
     #[must_use]
     #[inline(always)]
     pub(super) fn next_deadline(&self) -> Option<Instant> {
-        self.registrations.first_order_key().copied()
+        self.registrations.first().map(|entry| *entry.order())
     }
 
     /// Reports whether no active registrations remain.
@@ -145,7 +149,10 @@ impl StdTimerSchedulerState {
     #[must_use]
     #[inline(always)]
     pub(super) fn is_empty(&self) -> bool {
-        debug_assert_eq!(self.registrations.len(), self.registrations.indexed_len());
+        debug_assert_eq!(
+            self.registrations.len(),
+            self.registrations.attached_len()
+        );
         self.registrations.is_empty()
     }
 
@@ -219,8 +226,8 @@ impl StdTimerSchedulerState {
         }
         self.worker_running = false;
         let mut waiters = Vec::with_capacity(self.registrations.len());
-        while let Some((_waiter_id, _deadline, registration)) = self.registrations.pop_first() {
-            waiters.push(registration.into_waiter());
+        while let Some(entry) = self.registrations.pop_first() {
+            waiters.push(entry.into_value().into_waiter());
         }
         waiters
     }
