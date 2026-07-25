@@ -101,9 +101,9 @@ impl ManualWaiterRegistry {
             &mut self.next_timer_waiter_id,
             "manual timer waiter identifiers exhausted",
         );
-        let previous = self.timer_waiters.insert(waiter_id, deadline, None);
+        let inserted = self.timer_waiters.try_insert(waiter_id, deadline, None);
         assert!(
-            previous.is_none(),
+            inserted.is_ok(),
             "manual timer waiter identifier must be unique",
         );
         waiter_id
