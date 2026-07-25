@@ -64,13 +64,13 @@ impl StdTimerSchedulerState {
         waiter: Arc<StdTimerWaiter>,
     ) -> u64 {
         let waiter_id = self.allocate_waiter_id();
-        let previous = self.registrations.insert(
+        let inserted = self.registrations.try_insert(
             waiter_id,
             deadline,
             StdTimerRegistration::new(deadline, waiter),
         );
         assert!(
-            previous.is_none(),
+            inserted.is_ok(),
             "standard Timer waiter identifier must be unique",
         );
         waiter_id
