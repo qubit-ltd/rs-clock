@@ -10,16 +10,9 @@
 use crate::timer::internal::std_timer_future::StdTimerFuture;
 use crate::timer::internal::std_timer_scheduler::StdTimerScheduler;
 use crate::timer::internal::std_timer_waiter::StdTimerWaiter;
-use crate::{
-    MonotonicClock,
-    MonotonicInstant,
-    StdMonotonicClock,
-    TimeError,
-    Timer,
-    TimerFuture,
-};
+use crate::{MonotonicClock, MonotonicInstant, StdMonotonicClock, TimeError, Timer, TimerFuture};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// A real-time asynchronous timer backed by [`std::time::Instant`].
 ///
@@ -83,15 +76,46 @@ impl StdTimer {
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline and
     /// [`TimeError::InstantOverflow`] when conversion overflows.
-    fn native_deadline(
-        &self,
-        deadline: MonotonicInstant,
-    ) -> Result<Instant, TimeError> {
+    fn native_deadline(&self, deadline: MonotonicInstant) -> Result<Instant, TimeError> {
         deadline.validate_domain(self.clock.domain())?;
         self.clock
             .origin()
             .checked_add(deadline.elapsed_since_origin())
             .ok_or(TimeError::InstantOverflow)
+    }
+
+    /// Registers a native deadline with the shared scheduler.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Native deadline to register.
+    /// * `now` - Native instant sampled for this registration.
+    ///
+    /// # Returns
+    ///
+    /// A cancellation-safe future whose registration is already active, or an
+    /// immediately ready future when the deadline has been reached.
+    ///
+    /// # Errors
+    ///
+    /// Returns a scheduler startup error before returning a future.
+    ///
+    /// # Panics
+    ///
+    /// Panics when scheduler registration identifiers or worker generations
+    /// are exhausted, or an internal scheduler index invariant is violated.
+    #[inline]
+    fn schedule(&self, deadline: Instant, now: Instant) -> Result<TimerFuture, TimeError> {
+        if deadline <= now {
+            return Ok(Box::pin(std::future::ready(Ok(()))));
+        }
+        let waiter = Arc::new(StdTimerWaiter::new());
+        let waiter_id = self.scheduler.register(deadline, Arc::clone(&waiter))?;
+        Ok(Box::pin(StdTimerFuture::new(
+            Arc::clone(&self.scheduler),
+            waiter_id,
+            waiter,
+        )))
     }
 }
 
@@ -170,16 +194,37 @@ impl Timer for StdTimer {
     /// are exhausted, or an internal scheduler index invariant is violated.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let deadline = self.native_deadline(deadline)?;
-        if deadline <= Instant::now() {
-            return Ok(Box::pin(std::future::ready(Ok(()))));
-        }
-        let waiter = Arc::new(StdTimerWaiter::new());
-        let waiter_id =
-            self.scheduler.register(deadline, Arc::clone(&waiter))?;
-        Ok(Box::pin(StdTimerFuture::new(
-            Arc::clone(&self.scheduler),
-            waiter_id,
-            waiter,
-        )))
+        self.schedule(deadline, Instant::now())
+    }
+
+    /// Eagerly registers a relative deadline with the shared scheduler.
+    ///
+    /// This implementation samples the native instant once, avoiding the
+    /// monotonic-domain conversion required by the default trait method.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Delay before the future becomes ready.
+    ///
+    /// # Returns
+    ///
+    /// A cancellation-safe future whose registration is already active, or an
+    /// immediately ready future for a zero duration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::InstantOverflow`] when the native deadline cannot
+    /// be represented, or a scheduler startup error before returning a future.
+    ///
+    /// # Panics
+    ///
+    /// Panics when scheduler registration identifiers or worker generations
+    /// are exhausted, or an internal scheduler index invariant is violated.
+    fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
+        let now = Instant::now();
+        let deadline = now
+            .checked_add(duration)
+            .ok_or(TimeError::InstantOverflow)?;
+        self.schedule(deadline, now)
     }
 }
