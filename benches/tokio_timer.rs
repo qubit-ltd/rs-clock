@@ -7,26 +7,12 @@
 // =============================================================================
 //! Measures Tokio Timer registration, cancellation, and completion costs.
 
-use criterion::{
-    BatchSize,
-    BenchmarkId,
-    Criterion,
-    Throughput,
-    criterion_group,
-    criterion_main,
-};
-use qubit_clock::{
-    Timer,
-    TimerFuture,
-    TokioTimer,
-};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use qubit_clock::{Timer, TimerFuture, TokioTimer};
 use std::{
+    cell::Cell,
     convert::Infallible,
-    future::{
-        Future,
-        pending,
-        poll_fn,
-    },
+    future::{Future, pending, poll_fn},
     task::Poll,
     time::Duration,
 };
@@ -102,22 +88,31 @@ fn sleep_with_per_deadline_sentinel(duration: Duration) -> TimerFuture {
 ///
 /// * `batch_size` - Number of futures created in the measured batch.
 /// * `runtime` - Current-thread runtime that owns native timer state and tasks.
-/// * `register` - Factory creating one Timer-shaped future.
+/// * `register` - Factory registering one Timer-shaped future.
 ///
-/// # Panics
+/// # Returns
 ///
-/// Panics when the runtime cannot drive cancellation cleanup.
+/// `true` when every deadline registers successfully.
+///
 fn register_and_cancel_batch(
     batch_size: usize,
     runtime: &Runtime,
-    mut register: impl FnMut() -> TimerFuture,
-) {
+    mut register: impl FnMut() -> Result<TimerFuture, ()>,
+) -> bool {
     let futures = {
         let _runtime_guard = runtime.enter();
-        (0..batch_size).map(|_| register()).collect::<Vec<_>>()
+        let mut futures = Vec::with_capacity(batch_size);
+        for _ in 0..batch_size {
+            match register() {
+                Ok(future) => futures.push(future),
+                Err(()) => return false,
+            }
+        }
+        futures
     };
     drop(futures);
     runtime.block_on(tokio::task::yield_now());
+    true
 }
 
 /// Registers and completes one batch using paused Tokio time.
@@ -126,27 +121,38 @@ fn register_and_cancel_batch(
 ///
 /// * `batch_size` - Number of futures completed in the measured batch.
 /// * `runtime` - Current-thread runtime that owns native timer state and tasks.
-/// * `register` - Factory creating one Timer-shaped future.
+/// * `register` - Factory registering one Timer-shaped future.
 ///
-/// # Panics
+/// # Returns
 ///
-/// Panics when registration or completion reports an error.
+/// `true` when every deadline registers and completes successfully.
+///
 fn complete_deadline_batch(
     batch_size: usize,
     runtime: &Runtime,
-    mut register: impl FnMut() -> TimerFuture,
-) {
+    mut register: impl FnMut() -> Result<TimerFuture, ()>,
+) -> bool {
     let futures = {
         let _runtime_guard = runtime.enter();
-        (0..batch_size).map(|_| register()).collect::<Vec<_>>()
+        let mut futures = Vec::with_capacity(batch_size);
+        for _ in 0..batch_size {
+            match register() {
+                Ok(future) => futures.push(future),
+                Err(()) => return false,
+            }
+        }
+        futures
     };
     runtime.block_on(async move {
         tokio::time::advance(COMPLETION_DEADLINE).await;
         for future in futures {
-            future.await.expect("benchmark deadline should complete");
+            if future.await.is_err() {
+                return false;
+            }
         }
         tokio::task::yield_now().await;
-    });
+        true
+    })
 }
 
 /// Counts Tokio tasks retained while one future batch remains resident.
@@ -207,24 +213,25 @@ fn create_timers(timer_count: usize, runtime: &Runtime) -> Vec<TokioTimer> {
 /// * `timers` - Independent timers used for deadline registration.
 /// * `runtime` - Runtime that owns the timer state and cleanup tasks.
 ///
-/// # Panics
+/// # Returns
 ///
-/// Panics when a deadline cannot be registered or cleanup cannot be driven.
-fn register_and_cancel_many_timers(timers: Vec<TokioTimer>, runtime: &Runtime) {
+/// `true` when every deadline registers successfully.
+fn register_and_cancel_many_timers(timers: Vec<TokioTimer>, runtime: &Runtime) -> bool {
     let futures = {
         let _runtime_guard = runtime.enter();
-        timers
-            .iter()
-            .map(|timer| {
-                timer
-                    .after(CANCELLATION_DEADLINE)
-                    .expect("Tokio Timer deadline should register")
-            })
-            .collect::<Vec<_>>()
+        let mut futures = Vec::with_capacity(timers.len());
+        for timer in &timers {
+            match timer.after(CANCELLATION_DEADLINE) {
+                Ok(future) => futures.push(future),
+                Err(_) => return false,
+            }
+        }
+        futures
     };
     drop(futures);
     drop(timers);
     runtime.block_on(tokio::task::yield_now());
+    true
 }
 
 /// Counts retained tasks for independent timers on one fresh runtime.
@@ -290,10 +297,9 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
     let native_tasks = resident_task_increase(largest_batch, &runtime, || {
         native_sleep(CANCELLATION_DEADLINE)
     });
-    let sentinel_tasks =
-        resident_task_increase(largest_batch, &runtime, || {
-            sleep_with_per_deadline_sentinel(CANCELLATION_DEADLINE)
-        });
+    let sentinel_tasks = resident_task_increase(largest_batch, &runtime, || {
+        sleep_with_per_deadline_sentinel(CANCELLATION_DEADLINE)
+    });
     let timer_tasks = resident_task_increase(largest_batch, &runtime, || {
         timer
             .after(CANCELLATION_DEADLINE)
@@ -303,8 +309,7 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
         "resident task increase at {largest_batch} futures: native={native_tasks}, per_deadline_sentinel={sentinel_tasks}, tokio_timer={timer_tasks}",
     );
     let largest_timer_count = TIMER_COUNTS[TIMER_COUNTS.len() - 1];
-    let many_timer_tasks =
-        many_timer_resident_task_increase(largest_timer_count);
+    let many_timer_tasks = many_timer_resident_task_increase(largest_timer_count);
     eprintln!(
         "resident task increase at {largest_timer_count} independent timers: \
          tokio_timer={many_timer_tasks}",
@@ -318,35 +323,54 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
             BenchmarkId::new("native_sleep", batch_size),
             &batch_size,
             |bencher, batch_size| {
+                let registration_succeeded = Cell::new(true);
                 bencher.iter(|| {
-                    register_and_cancel_batch(*batch_size, &runtime, || {
-                        native_sleep(CANCELLATION_DEADLINE)
-                    });
+                    if !register_and_cancel_batch(*batch_size, &runtime, || {
+                        Ok(native_sleep(CANCELLATION_DEADLINE))
+                    }) {
+                        registration_succeeded.set(false);
+                    }
                 });
+                assert!(
+                    registration_succeeded.get(),
+                    "benchmark deadline should register"
+                );
             },
         );
         registration_group.bench_with_input(
             BenchmarkId::new("per_deadline_sentinel", batch_size),
             &batch_size,
             |bencher, batch_size| {
+                let registration_succeeded = Cell::new(true);
                 bencher.iter(|| {
-                    register_and_cancel_batch(*batch_size, &runtime, || {
-                        sleep_with_per_deadline_sentinel(CANCELLATION_DEADLINE)
-                    });
+                    if !register_and_cancel_batch(*batch_size, &runtime, || {
+                        Ok(sleep_with_per_deadline_sentinel(CANCELLATION_DEADLINE))
+                    }) {
+                        registration_succeeded.set(false);
+                    }
                 });
+                assert!(
+                    registration_succeeded.get(),
+                    "benchmark deadline should register"
+                );
             },
         );
         registration_group.bench_with_input(
             BenchmarkId::new("tokio_timer", batch_size),
             &batch_size,
             |bencher, batch_size| {
+                let registration_succeeded = Cell::new(true);
                 bencher.iter(|| {
-                    register_and_cancel_batch(*batch_size, &runtime, || {
-                        timer
-                            .after(CANCELLATION_DEADLINE)
-                            .expect("Tokio Timer deadline should register")
-                    });
+                    if !register_and_cancel_batch(*batch_size, &runtime, || {
+                        timer.after(CANCELLATION_DEADLINE).map_err(|_| ())
+                    }) {
+                        registration_succeeded.set(false);
+                    }
                 });
+                assert!(
+                    registration_succeeded.get(),
+                    "Tokio Timer deadline should register"
+                );
             },
         );
     }
@@ -357,67 +381,88 @@ fn benchmark_tokio_timer(criterion: &mut Criterion) {
         .start_paused(true)
         .build()
         .expect("many-timer benchmark runtime should build");
-    let mut many_timer_group = criterion.benchmark_group(
-        "tokio_timer/many_timer_registration_and_cancellation",
-    );
+    let mut many_timer_group =
+        criterion.benchmark_group("tokio_timer/many_timer_registration_and_cancellation");
     for timer_count in TIMER_COUNTS {
         many_timer_group.throughput(Throughput::Elements(timer_count as u64));
         many_timer_group.bench_with_input(
             BenchmarkId::from_parameter(timer_count),
             &timer_count,
             |bencher, &timer_count| {
+                let registration_succeeded = Cell::new(true);
                 bencher.iter_batched(
                     || create_timers(timer_count, &many_timer_runtime),
                     |timers| {
-                        register_and_cancel_many_timers(
-                            timers,
-                            &many_timer_runtime,
-                        );
+                        if !register_and_cancel_many_timers(timers, &many_timer_runtime) {
+                            registration_succeeded.set(false);
+                        }
                     },
                     BatchSize::SmallInput,
+                );
+                assert!(
+                    registration_succeeded.get(),
+                    "Tokio Timer deadline should register"
                 );
             },
         );
     }
     many_timer_group.finish();
 
-    let mut completion_group =
-        criterion.benchmark_group("tokio_timer/deadline_completion");
+    let mut completion_group = criterion.benchmark_group("tokio_timer/deadline_completion");
     for batch_size in BATCH_SIZES {
         completion_group.throughput(Throughput::Elements(batch_size as u64));
         completion_group.bench_with_input(
             BenchmarkId::new("native_sleep", batch_size),
             &batch_size,
             |bencher, batch_size| {
+                let completion_succeeded = Cell::new(true);
                 bencher.iter(|| {
-                    complete_deadline_batch(*batch_size, &runtime, || {
-                        native_sleep(COMPLETION_DEADLINE)
-                    });
+                    if !complete_deadline_batch(*batch_size, &runtime, || {
+                        Ok(native_sleep(COMPLETION_DEADLINE))
+                    }) {
+                        completion_succeeded.set(false);
+                    }
                 });
+                assert!(
+                    completion_succeeded.get(),
+                    "benchmark deadline should complete"
+                );
             },
         );
         completion_group.bench_with_input(
             BenchmarkId::new("per_deadline_sentinel", batch_size),
             &batch_size,
             |bencher, batch_size| {
+                let completion_succeeded = Cell::new(true);
                 bencher.iter(|| {
-                    complete_deadline_batch(*batch_size, &runtime, || {
-                        sleep_with_per_deadline_sentinel(COMPLETION_DEADLINE)
-                    });
+                    if !complete_deadline_batch(*batch_size, &runtime, || {
+                        Ok(sleep_with_per_deadline_sentinel(COMPLETION_DEADLINE))
+                    }) {
+                        completion_succeeded.set(false);
+                    }
                 });
+                assert!(
+                    completion_succeeded.get(),
+                    "benchmark deadline should complete"
+                );
             },
         );
         completion_group.bench_with_input(
             BenchmarkId::new("tokio_timer", batch_size),
             &batch_size,
             |bencher, batch_size| {
+                let completion_succeeded = Cell::new(true);
                 bencher.iter(|| {
-                    complete_deadline_batch(*batch_size, &runtime, || {
-                        timer
-                            .after(COMPLETION_DEADLINE)
-                            .expect("Tokio Timer deadline should register")
-                    });
+                    if !complete_deadline_batch(*batch_size, &runtime, || {
+                        timer.after(COMPLETION_DEADLINE).map_err(|_| ())
+                    }) {
+                        completion_succeeded.set(false);
+                    }
                 });
+                assert!(
+                    completion_succeeded.get(),
+                    "Tokio Timer deadline should complete"
+                );
             },
         );
     }
