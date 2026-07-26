@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-为 Rust 提供可注入的 wall clock、monotonic clock 和可确定性测试的 timer。
+为 Rust 提供可注入的墙上时钟、monotonic clock 和可确定性测试的 timer。
 
 详细文档：
 
@@ -19,12 +19,12 @@
 
 | 需求 | Trait | 真实时间实现 | 确定性测试实现 |
 |---|---|---|---|
-| 民用时间戳 | `WallClock` | `StdWallClock` | `FixedWallClock`、`ManualWallClock` |
+| 现实世界时间戳 | `WallClock` | `StdWallClock` | `FixedWallClock`、`ManualWallClock` |
 | 耗时与 deadline | `MonotonicClock` | `StdMonotonicClock`、`TokioMonotonicClock` | `ManualMonotonicClock` |
 | 异步 deadline | `Timer` | `StdTimer`、`TokioTimer` | `ManualTimer` |
 | 阻塞等待 | `BlockingSleeper` 适配器 | 组合可独立推进的 timer | 组合由外部推进的 manual timer |
 
-Wall time 可能跳变，适合表示对外有意义的时间戳。一个 clock domain 内的 monotonic
+墙上时钟时间可能跳变，适合表示对外有意义的时间戳。一个 clock domain 内的 monotonic
 time 永不倒退，适合测量耗时、实现 retry 和 timeout。每个 clock 都可通过
 `clock.new_timer()` 直接创建同域 timer。
 

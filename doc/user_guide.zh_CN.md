@@ -1,18 +1,18 @@
 # Qubit Clock 用户手册
 
-`qubit-clock` 将民用时间与单调调度分离，并让二者都可注入。应用代码无需区分生产与
+`qubit-clock` 将墙上时钟时间与单调调度分离，并让二者都可注入。应用代码无需区分生产与
 测试：生产环境注入真实时间，集成测试注入 manual time 并主动推进逻辑时间。
 
 ## 能力模型
 
 | 需求 | API | 生产实现 | 确定性测试实现 |
 |---|---|---|---|
-| 民用时间戳 | `WallClock` | `StdWallClock` | `FixedWallClock`、`ManualWallClock` |
+| 现实世界时间戳 | `WallClock` | `StdWallClock` | `FixedWallClock`、`ManualWallClock` |
 | 单调时刻 | `MonotonicClock` | `StdMonotonicClock`、`TokioMonotonicClock` | `ManualMonotonicClock` |
 | 异步 deadline | `Timer` | `StdTimer`、`TokioTimer` | `ManualTimer` |
 | 阻塞等待 | `BlockingSleeper` | 组合可独立推进的 timer | 组合由外部推进的 `ManualTimer` |
 
-Wall clock 可能跳变，适合表达对外有意义的时间戳。Monotonic instant 属于私有 clock
+墙上时钟时间可能跳变，适合表达对外有意义的时间戳。Monotonic instant 属于私有 clock
 domain，适合 timeout、retry delay 和耗时测量。
 
 ## 创建 Timer
@@ -182,9 +182,9 @@ poll。取消 observer 或 driver future 只会移除本次观察，不会取消
 移除 Tokio sleep；移动 future 不会把 deadline 的所有权转交给 polling runtime。
 保存 Handle 所指向的目标 runtime 必须保持存活并持续推进。
 
-## Wall Clock 投影与重新锚定
+## `WallClock` 投影与重新锚定
 
-Manual wall clock 从共享 monotonic timeline 投影民用时间：
+`ManualWallClock` 从共享的单调时间线投影现实世界时间：
 
 ```rust
 use qubit_clock::{ManualMonotonicClock, WallClock};
@@ -200,7 +200,7 @@ assert_eq!(UNIX_EPOCH + Duration::from_secs(100), wall_clock.now());
 # Ok::<_, qubit_clock::TimeError>(())
 ```
 
-`reanchor` 只改变 wall-time mapping，不会移动 monotonic timeline，也不会改变
+`reanchor` 只改变 `WallClock` 映射，不会移动 monotonic timeline，也不会改变
 deadline 或 timer 注册。
 
 ## 阻塞适配
