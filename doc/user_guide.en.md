@@ -1,14 +1,94 @@
 # Qubit Clock User Guide
 
-`qubit-clock` separates civil time from monotonic scheduling and makes both
-injectable. Applications use the same production code with real or manual time;
-tests advance logical time instead of waiting.
+Time-dependent code often hides its most important dependency. A component
+that calls `SystemTime::now()`, `Instant::now()`, or a sleep function directly
+has already chosen its clock and waiting mechanism. Unit tests then have to
+wait in real time, race the scheduler, or add mock-only branches to production
+code.
 
-## Capabilities
+`qubit-clock` provides clock and timer traits designed for dependency injection
+(IoC). Components depend on the capability they need; an application
+composition root supplies a standard or Tokio implementation in production,
+while tests supply fixed or manually advanced time. The component itself is
+unchanged.
+
+## A first example
+
+Consider a session that expires after a configured duration. It needs a
+monotonic clock because expiration is elapsed-time behavior and must not be
+affected by wall-clock adjustments:
+
+```rust
+use qubit_clock::{
+    ManualMonotonicClock, MonotonicClock, MonotonicInstant, StdMonotonicClock,
+    TimeError,
+};
+use std::{sync::Arc, time::Duration};
+
+struct Session {
+    clock: Arc<dyn MonotonicClock>,
+    expires_at: MonotonicInstant,
+}
+
+impl Session {
+    fn new(
+        clock: Arc<dyn MonotonicClock>,
+        ttl: Duration,
+    ) -> Result<Self, TimeError> {
+        let expires_at = clock.now().checked_add(ttl)?;
+        Ok(Self { clock, expires_at })
+    }
+
+    fn is_expired(&self) -> bool {
+        self.clock.now() >= self.expires_at
+    }
+}
+
+fn main() -> Result<(), TimeError> {
+    let _production = Session::new(
+        Arc::new(StdMonotonicClock::new()),
+        Duration::from_secs(30),
+    )?;
+
+    let clock = ManualMonotonicClock::new_shared();
+    let session = Session::new(clock.clone(), Duration::from_secs(30))?;
+    assert!(!session.is_expired());
+
+    clock.advance(Duration::from_secs(30))?;
+    assert!(session.is_expired());
+    Ok(())
+}
+```
+
+The production assembly uses `StdMonotonicClock`. The test retains
+`ManualMonotonicClock` as its control plane and injects another reference into
+the session. Advancing logical time reaches the exact expiration boundary
+immediately. There is no sleep, global clock override, mock flag, or duplicate
+expiration algorithm.
+
+## The injection pattern
+
+Use the narrowest dependency that expresses the component's actual behavior:
+
+- Inject `Arc<dyn WallClock>` when the component creates externally meaningful
+  timestamps.
+- Inject `Arc<dyn MonotonicClock>` when it samples elapsed time or checks
+  deadlines without waiting.
+- Inject `Arc<dyn Timer>` when it must asynchronously wait for a deadline. A
+  timer also exposes its same-domain monotonic clock.
+- Construct `BlockingSleeper` from an injected timer when synchronous code must
+  block.
+
+Keep concrete types in the composition root. Production assembly chooses
+`Std*` or `Tokio*`; tests choose `FixedWallClock` or a capability derived from
+`ManualMonotonicClock`. This is ordinary dependency injection, not a separate
+test mode.
+
+## Components
 
 | Need | API | Production | Deterministic test |
 |---|---|---|---|
-| Civil timestamps | `WallClock` | `StdWallClock` | `FixedWallClock`, `ManualWallClock` |
+| Externally meaningful timestamps | `WallClock` | `StdWallClock` | `FixedWallClock`, `ManualWallClock` |
 | Monotonic instants | `MonotonicClock` | `StdMonotonicClock`, `TokioMonotonicClock` | `ManualMonotonicClock` |
 | Async deadlines | `Timer` | `StdTimer`, `TokioTimer` | `ManualTimer` |
 | Blocking waits | `BlockingSleeper` | compose a timer with independent progress | compose an externally driven `ManualTimer` |
@@ -17,7 +97,58 @@ Wall-clock values may jump. Use them for externally meaningful timestamps.
 Monotonic instants belong to a private clock domain and must be used for
 timeouts, retry delays, and elapsed-time measurements.
 
-## Creating a timer
+### `WallClock`
+
+`WallClock::now()` returns `SystemTime` for values that leave the process or
+need a calendar meaning: creation times, audit records, protocol timestamps,
+and persisted metadata. Use `StdWallClock` in production, `FixedWallClock` when
+one constant value is enough for a test, and `ManualWallClock` when the value
+must move together with a manual monotonic timeline. Do not use wall-clock time
+to measure elapsed duration because it may jump.
+
+### `MonotonicClock`
+
+`MonotonicClock::now()` returns a domain-scoped `MonotonicInstant` that never
+moves backward within that domain. Use it for expiration, elapsed-time budgets,
+retry policies, and timeout calculations. Independent clock domains must not be
+mixed. Every monotonic clock can create a `Timer` in its own domain with
+`new_timer()`.
+
+### `Timer`
+
+`Timer` turns a monotonic deadline into a Future. `after(duration)` fixes a
+relative deadline when called; `at(instant)` accepts an absolute deadline from
+the same clock domain. Inject it into asynchronous components that need to wait,
+race an operation against a timeout, or schedule retry delays.
+
+### `BlockingSleeper`
+
+`BlockingSleeper` adapts a `Timer` for synchronous code by polling its Future
+and parking the calling thread. It does not create another timing model: the
+injected timer still owns deadline calculation and progress.
+
+## Installation
+
+The standard and manual implementations are available with the default feature
+set:
+
+```toml
+[dependencies]
+qubit-clock = "0.10"
+```
+
+Enable `tokio` when production code needs `TokioMonotonicClock` or
+`TokioTimer`:
+
+```toml
+[dependencies]
+qubit-clock = { version = "0.10", features = ["tokio"] }
+```
+
+Manual clocks, manual timers, and their coordination futures are
+executor-neutral and do not require this feature.
+
+## Using `Timer`
 
 Every monotonic clock creates a same-domain timer without consuming the clock:
 
@@ -207,7 +338,7 @@ polling runtime. The retained target runtime must remain alive and driven.
 
 ## Wall-clock projection and reanchoring
 
-A manual wall clock projects civil time from the shared monotonic timeline:
+A manual wall clock projects wall-clock time from the shared monotonic timeline:
 
 ```rust
 use qubit_clock::{ManualMonotonicClock, WallClock};
@@ -247,13 +378,21 @@ controller to advance the clock. `TokioTimer` requires its retained runtime to
 be driven independently; never block the sole driver thread of a
 current-thread runtime while waiting on that runtime's timer.
 
-## IoC assembly
+## Use in related libraries
 
-Application components should depend on `Arc<dyn WallClock>`,
-`Arc<dyn MonotonicClock>`, or `Arc<dyn Timer>` according to their actual need.
-Production assembly injects standard or Tokio implementations. Integration
-tests inject a manual clock's timer and drive that clock explicitly. No test
-mode or mock-specific branch is required in application code.
+`rs-lock` injects timers into timeout-aware monitor implementations. Production
+waits use a standard or Tokio timer; tests inject a timer created by
+`ManualMonotonicClock` and advance it to the timeout without an eight-second
+wall-clock delay.
+
+`rs-retry` uses an injected timer's monotonic clock for elapsed-time budgets and
+the same timer for retry delays and attempt timeouts. Its tests can therefore
+cover exponential backoff, exact timeout boundaries, and cancellation without
+waiting in real time.
+
+These libraries are larger applications of the same pattern shown by
+`Session`: depend on a trait, select the concrete clock at the composition root,
+and let tests retain the manual control plane.
 
 ## Benchmarking
 

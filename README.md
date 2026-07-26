@@ -7,7 +7,16 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-Injectable wall clocks, monotonic clocks, and deterministic timers for Rust.
+Time is a hidden dependency. Code that calls `SystemTime::now()`,
+`Instant::now()`, or a sleep function directly is tied to the machine clock:
+tests must really wait, boundary cases are hard to reach, and clock changes can
+make results nondeterministic.
+
+`qubit-clock` turns time into an injectable dependency. Application components
+depend on small clock and timer traits; the composition root supplies standard
+implementations in production and fixed or manually advanced implementations
+in tests. The same business code runs in both environments, with no test-only
+branch and no real delay.
 
 Detailed documentation:
 
@@ -15,16 +24,70 @@ Detailed documentation:
 - [中文用户手册](doc/user_guide.zh_CN.md)
 - [API documentation](https://docs.rs/qubit-clock)
 
-## Choose a capability
+## A first example
+
+This session records a monotonic deadline instead of reading the global clock.
+Its constructor accepts `Arc<dyn MonotonicClock>`, so the caller chooses how
+time progresses:
+
+```rust
+use qubit_clock::{
+    ManualMonotonicClock, MonotonicClock, MonotonicInstant, StdMonotonicClock,
+    TimeError,
+};
+use std::{sync::Arc, time::Duration};
+
+struct Session {
+    clock: Arc<dyn MonotonicClock>,
+    expires_at: MonotonicInstant,
+}
+
+impl Session {
+    fn new(
+        clock: Arc<dyn MonotonicClock>,
+        ttl: Duration,
+    ) -> Result<Self, TimeError> {
+        let expires_at = clock.now().checked_add(ttl)?;
+        Ok(Self { clock, expires_at })
+    }
+
+    fn is_expired(&self) -> bool {
+        self.clock.now() >= self.expires_at
+    }
+}
+
+fn main() -> Result<(), TimeError> {
+    // Production assembly uses the operating system's monotonic clock.
+    let _production = Session::new(
+        Arc::new(StdMonotonicClock::new()),
+        Duration::from_secs(30),
+    )?;
+
+    // A test injects manual time and reaches the boundary immediately.
+    let clock = ManualMonotonicClock::new_shared();
+    let session = Session::new(clock.clone(), Duration::from_secs(30))?;
+    assert!(!session.is_expired());
+
+    clock.advance(Duration::from_secs(30))?;
+    assert!(session.is_expired());
+    Ok(())
+}
+```
+
+The test covers an exact 30-second boundary without sleeping for 30 seconds.
+Only the assembly changes; `Session` contains no mock flag or test-specific
+logic.
+
+## Components at a glance
 
 | Need | Trait | Real time | Deterministic tests |
 |---|---|---|---|
-| Civil timestamps | `WallClock` | `StdWallClock` | `FixedWallClock`, `ManualWallClock` |
+| Externally meaningful timestamps | `WallClock` | `StdWallClock` | `FixedWallClock`, `ManualWallClock` |
 | Elapsed time and deadlines | `MonotonicClock` | `StdMonotonicClock`, `TokioMonotonicClock` | `ManualMonotonicClock` |
 | Async deadlines | `Timer` | `StdTimer`, `TokioTimer` | `ManualTimer` |
 | Blocking waits | `BlockingSleeper` adapter | compose a timer with independent progress | compose a manually driven timer |
 
-Wall time may jump and is intended for externally meaningful timestamps.
+Wall-clock time may jump and is intended for externally meaningful timestamps.
 Monotonic time never moves backward within one clock domain and is intended for
 elapsed time, retries, and timeouts. Every clock creates a same-domain timer
 directly with `clock.new_timer()`.
@@ -44,98 +107,30 @@ their runtime-related errors:
 qubit-clock = { version = "0.10", features = ["tokio"] }
 ```
 
-This feature exposes `TokioMonotonicClock`, `TokioTimer`, and runtime-related
-errors such as `TokioRuntimeError`. Manual timers and manual coordination
-futures are executor-neutral and do not require it. The async examples below
-choose Tokio only to run and spawn tasks. To copy them into tests, declare
-Tokio directly:
+The `tokio` feature exposes `TokioMonotonicClock`, `TokioTimer`, and their
+runtime-related errors. Manual time is executor-neutral and does not require
+this feature. Tests that need deterministic timer failures can enable the
+default-off `test-util` feature in a development dependency.
 
-```toml
-[dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt"] }
-```
+## Timers and waits
 
-Tokio clocks and timers retain a runtime `Handle`. `current()` and
-`try_current()` capture the ambient handle during construction;
-`from_handle(handle)` supports explicit injection. Later clock samples and
-timer registrations use that retained handle, so their futures may be polled
-from another runtime context. The target runtime owner must remain alive and
-its time driver must continue running until pending futures complete or are
-dropped. If it shuts down first, a pending `TokioTimer` future returns
-`TimeError::TimerUnavailable` with `TimerUnavailableError::RuntimeShuttingDown`.
-For a future deadline on a runtime without time enabled, Tokio exposes the
-condition through a panic. `TokioTimer` converts it to `TimeDriverDisabled` in
-unwind builds, but the process panic hook still observes it; `panic = "abort"`
-cannot be converted. Enable time on every injected runtime to avoid that side
-effect.
+Inject `Arc<dyn Timer>` when a component must await a deadline instead of only
+checking the current time. `Timer::after` creates a relative deadline and
+`Timer::at` accepts an absolute `MonotonicInstant`. A
+`ManualMonotonicClock` creates a same-domain manual timer, so tests can advance
+logical time instead of waiting for a scheduler or the operating system.
 
-For reusable timer-failure fixtures in downstream tests, enable the separate
-default-off `test-util` feature in a development dependency. It provides
-`FaultInjectingTimer` for deterministic registration or completion failures.
+`BlockingSleeper` adapts a timer for synchronous code. Its timer backend must
+be able to progress independently while the calling thread is parked. The
+[user guide](doc/user_guide.en.md) covers manual-time coordination, Tokio
+runtime ownership, wall-clock projection, cancellation, and error handling.
 
-## Real-time use
+## Use in related libraries
 
-```rust
-use qubit_clock::{BlockingSleeper, MonotonicClock, StdMonotonicClock, StdWallClock, WallClock};
-use std::time::Duration;
-
-let wall_clock = StdWallClock::new();
-let clock = StdMonotonicClock::new();
-let sleeper = BlockingSleeper::new(clock.new_timer());
-
-let started_at = wall_clock.now();
-sleeper
-    .sleep_for(Duration::from_millis(10))
-    .expect("the blocking sleep should complete");
-println!("started at {started_at:?}");
-```
-
-## Deterministic manual time
-
-Keep one shared manual clock as the test control plane and derive all consumer
-capabilities from it:
-
-Here, deterministic means that logical time, deadline selection, and deadline
-completion are controlled explicitly. The wake order of waiters sharing one
-deadline and the order in which an executor polls ready tasks are unspecified.
-
-```rust
-use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
-use std::time::Duration;
-
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let clock = ManualMonotonicClock::new_shared();
-    let timer = clock.new_timer();
-    let task = tokio::spawn(async move {
-        timer.after(Duration::from_secs(5))?.await?;
-        Ok::<_, qubit_clock::TimeError>(())
-    });
-
-    let reached = clock.advance_to_next_deadline_async().await;
-    assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
-    task.await??;
-    Ok(())
-}
-```
-
-`advance_to_next_deadline_async()` waits for an active future deadline and
-atomically advances to the earliest deadline still registered at that moment.
-Cancellation races are retried, and cancelling the driver future does not move
-manual time. The [user guide](doc/user_guide.en.md#manual-time-coordination)
-documents snapshots, count barriers, multi-stage coordination, runtime
-capabilities, wall reanchoring, trait-object injection, and errors.
-
-Synchronous driver threads can use
-`advance_to_next_deadline_after_waiters()` to wait for a current waiter-count
-condition and advance under the same clock-state lock, avoiding a cancellation
-gap between observation and advancement.
-
-`BlockingSleeper` parks its caller while polling the injected timer. Use it
-only when that timer can progress independently: the standard timer has a
-worker, while manual time must be advanced elsewhere. A Tokio timer must be
-driven by another runtime thread; blocking the sole driver of a current-thread
-runtime prevents its own deadline from firing.
+The same injection model is used by `rs-lock` to test timeout-aware waits and
+by `rs-retry` to test retry delays, attempt timeouts, and elapsed-time budgets.
+Those libraries inject a `Timer` or `MonotonicClock`; their production code
+does not contain a separate mock waiting algorithm.
 
 ## Testing
 
