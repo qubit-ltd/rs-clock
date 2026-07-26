@@ -7,7 +7,13 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-为 Rust 提供可注入的墙上时钟、monotonic clock 和可确定性测试的 timer。
+时间是一项容易被忽略的依赖。代码一旦直接调用 `SystemTime::now()`、
+`Instant::now()` 或休眠函数，就会与机器时钟绑定：测试不得不真实等待，时间边界难以
+覆盖，时钟跳变还可能让结果变得不确定。
+
+`qubit-clock` 将时间变成可注入的依赖。应用组件只依赖精简的时钟和定时器 trait；
+IoC 组装层在生产环境中提供标准实现，在测试中提供固定或可手动推进的实现。同一份
+业务代码可以在两种环境中运行，不需要测试专用分支，也不需要真实等待。
 
 详细文档：
 
@@ -15,18 +21,70 @@
 - [English User Guide](doc/user_guide.en.md)
 - [API 文档](https://docs.rs/qubit-clock)
 
-## 按能力选择
+## 第一个例子
+
+下面的会话对象保存单调时钟的截止时间，不直接读取全局时钟。构造函数接收
+`Arc<dyn MonotonicClock>`，因此时间如何推进由调用方决定：
+
+```rust
+use qubit_clock::{
+    ManualMonotonicClock, MonotonicClock, MonotonicInstant, StdMonotonicClock,
+    TimeError,
+};
+use std::{sync::Arc, time::Duration};
+
+struct Session {
+    clock: Arc<dyn MonotonicClock>,
+    expires_at: MonotonicInstant,
+}
+
+impl Session {
+    fn new(
+        clock: Arc<dyn MonotonicClock>,
+        ttl: Duration,
+    ) -> Result<Self, TimeError> {
+        let expires_at = clock.now().checked_add(ttl)?;
+        Ok(Self { clock, expires_at })
+    }
+
+    fn is_expired(&self) -> bool {
+        self.clock.now() >= self.expires_at
+    }
+}
+
+fn main() -> Result<(), TimeError> {
+    // 生产环境组装时使用操作系统提供的单调时钟。
+    let _production = Session::new(
+        Arc::new(StdMonotonicClock::new()),
+        Duration::from_secs(30),
+    )?;
+
+    // 测试注入手动时钟，可以立即到达时间边界。
+    let clock = ManualMonotonicClock::new_shared();
+    let session = Session::new(clock.clone(), Duration::from_secs(30))?;
+    assert!(!session.is_expired());
+
+    clock.advance(Duration::from_secs(30))?;
+    assert!(session.is_expired());
+    Ok(())
+}
+```
+
+这个测试无需等待 30 秒，就能覆盖恰好过期的边界。变化只发生在组装层；
+`Session` 内部没有 mock 开关或测试专用逻辑。
+
+## 组件概览
 
 | 需求 | Trait | 真实时间实现 | 确定性测试实现 |
 |---|---|---|---|
 | 现实世界时间戳 | `WallClock` | `StdWallClock` | `FixedWallClock`、`ManualWallClock` |
-| 耗时与 deadline | `MonotonicClock` | `StdMonotonicClock`、`TokioMonotonicClock` | `ManualMonotonicClock` |
-| 异步 deadline | `Timer` | `StdTimer`、`TokioTimer` | `ManualTimer` |
-| 阻塞等待 | `BlockingSleeper` 适配器 | 组合可独立推进的 timer | 组合由外部推进的 manual timer |
+| 耗时与截止时间 | `MonotonicClock` | `StdMonotonicClock`、`TokioMonotonicClock` | `ManualMonotonicClock` |
+| 异步截止时间 | `Timer` | `StdTimer`、`TokioTimer` | `ManualTimer` |
+| 阻塞等待 | `BlockingSleeper` 适配器 | 组合可独立推进的定时器 | 组合由测试推进的 `ManualTimer` |
 
-墙上时钟时间可能跳变，适合表示对外有意义的时间戳。一个 clock domain 内的 monotonic
-time 永不倒退，适合测量耗时、实现 retry 和 timeout。每个 clock 都可通过
-`clock.new_timer()` 直接创建同域 timer。
+墙上时钟时间可能跳变，适合表示对外有意义的时间戳。同一时钟域中的单调时间永不
+倒退，适合测量耗时、实现重试和超时。每个单调时钟都可通过
+`clock.new_timer()` 直接创建同域定时器。
 
 ## 安装
 
@@ -35,95 +93,33 @@ time 永不倒退，适合测量耗时、实现 retry 和 timeout。每个 clock
 qubit-clock = "0.10"
 ```
 
-需要 Tokio-backed clock、timer 类型及其 runtime 相关错误时启用对应 feature：
+需要基于 Tokio 的时钟、定时器及相关运行时错误时，启用 `tokio` feature：
 
 ```toml
 [dependencies]
 qubit-clock = { version = "0.10", features = ["tokio"] }
 ```
 
-该 feature 公开 `TokioMonotonicClock`、`TokioTimer` 以及
-`TokioRuntimeError` 等 runtime 相关错误。Manual timer 与 manual 协调 future
-不绑定 executor，也不需要启用该 feature。下文异步示例只选择 Tokio 来运行和
-派生任务；复制到测试中时，需要直接声明 Tokio：
+该 feature 提供 `TokioMonotonicClock`、`TokioTimer` 及相关运行时错误。手动时间与
+执行器无关，不需要启用它。测试如果需要确定性地模拟定时器故障，可以在开发依赖中
+启用默认关闭的 `test-util` feature。
 
-```toml
-[dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt"] }
-```
+## 定时器与等待
 
-Tokio clock 与 timer 会保存 runtime `Handle`。`current()` 和 `try_current()` 在
-构造时捕获当前 Handle，`from_handle(handle)` 则用于显式注入。后续 clock 采样和
-timer 注册都使用保存的 Handle，因此返回的 future 可以在其他 runtime context 中
-poll。只要仍有 pending future，目标 Runtime 的所有者就必须存活，并持续驱动其
-time driver，直到 future 完成或被丢弃。若 runtime 提前关闭，pending
-`TokioTimer` future 会返回携带
-`TimerUnavailableError::RuntimeShuttingDown` 的 `TimeError::TimerUnavailable`。
-当未启用 time 的 runtime 注册未来 deadline 时，Tokio 通过 panic 暴露该状态。
-`TokioTimer` 在 unwind 构建中会把它转换为 `TimeDriverDisabled`，但进程 panic hook
-仍会先观察到该 panic；`panic = "abort"` 则无法转换。为避免这一副作用，应为注入的
-runtime 始终启用 time。
+如果组件不仅要检查当前时间，还要等待截止时间，应注入 `Arc<dyn Timer>`。
+`Timer::after` 创建相对截止时间，`Timer::at` 接受绝对
+`MonotonicInstant`。`ManualMonotonicClock` 可以创建同域的手动定时器，测试只需推进
+逻辑时间，不必等待调度器或操作系统。
 
-下游测试若需要复用 timer 故障 fixture，可在开发依赖中启用默认关闭的独立
-`test-util` feature。它提供 `FaultInjectingTimer`，可确定性地注入注册或完成故障。
+`BlockingSleeper` 将定时器适配给同步代码。调用线程停驻后，定时器后端必须仍能独立
+推进。[用户手册](doc/user_guide.zh_CN.md)详细说明了手动时间协调、Tokio 运行时
+所有权、墙上时钟投影、取消和错误处理。
 
-## 使用真实时间
+## 在相关库中的应用
 
-```rust
-use qubit_clock::{BlockingSleeper, MonotonicClock, StdMonotonicClock, StdWallClock, WallClock};
-use std::time::Duration;
-
-let wall_clock = StdWallClock::new();
-let clock = StdMonotonicClock::new();
-let sleeper = BlockingSleeper::new(clock.new_timer());
-
-let started_at = wall_clock.now();
-sleeper
-    .sleep_for(Duration::from_millis(10))
-    .expect("阻塞 sleep 应正常完成");
-println!("started at {started_at:?}");
-```
-
-## 确定性 Manual Time
-
-保留一个共享 manual clock 作为测试控制面，并从它派生所有消费能力：
-
-这里的“确定性”是指逻辑时间、deadline 选择和 deadline 完成都由测试显式控制；
-相同 deadline 的 waiter 唤醒顺序，以及 executor poll 就绪任务的顺序均不作保证。
-
-```rust
-use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
-use std::time::Duration;
-
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let clock = ManualMonotonicClock::new_shared();
-    let timer = clock.new_timer();
-    let task = tokio::spawn(async move {
-        timer.after(Duration::from_secs(5))?.await?;
-        Ok::<_, qubit_clock::TimeError>(())
-    });
-
-    let reached = clock.advance_to_next_deadline_async().await;
-    assert_eq!(Duration::from_secs(5), reached.elapsed_since_origin());
-    task.await??;
-    Ok(())
-}
-```
-
-`advance_to_next_deadline_async()` 会等待有效的未来 deadline，再原子推进到该时刻
-仍然存在的最早 deadline。取消竞争会触发重新等待，取消 driver future 不会移动
-manual time。[用户手册](doc/user_guide.zh_CN.md#manual-time-coordination)详细说明了
-快照、count barrier、多阶段协调、runtime capability、wall reanchor、trait object
-注入和错误处理。
-
-同步 driver 线程可使用 `advance_to_next_deadline_after_waiters()`：它等待当前 waiter
-数量条件，并在同一个时钟状态锁内完成推进，从而消除观察与推进之间的取消窗口。
-
-`BlockingSleeper` 会在 poll 注入的 timer 时 park 调用线程，只能组合能独立推进的
-timer：standard timer 自带 worker，manual time 必须由其他线程或控制方 advance。
-Tokio timer 必须由其他 runtime 线程驱动；如果阻塞 current-thread runtime 的唯一
-驱动线程，它所等待的 deadline 将无法触发。
+`rs-lock` 使用相同的注入方式测试带超时的等待，`rs-retry` 用它测试重试间隔、单次
+尝试超时和总耗时预算。这些库注入 `Timer` 或 `MonotonicClock`，生产代码中不需要另写
+一套模拟等待算法。
 
 ## 测试
 
