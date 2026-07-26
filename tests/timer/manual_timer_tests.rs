@@ -6,18 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    ManualTimer,
-    MonotonicClock,
-    TimeError,
-    Timer,
-};
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use qubit_clock::{ManualMonotonicClock, ManualTimer, MonotonicClock, TimeError, Timer};
+use std::task::{Context, Poll, Waker};
 
 #[test]
 fn test_manual_timer_returns_ready_future_for_reached_deadline() {

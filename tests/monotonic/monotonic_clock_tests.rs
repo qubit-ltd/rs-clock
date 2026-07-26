@@ -7,12 +7,7 @@
 // =============================================================================
 
 use qubit_clock::{
-    ClockDomain,
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
+    ClockDomain, ManualMonotonicClock, MonotonicClock, MonotonicInstant, TimeError, Timer,
     TimerFuture,
 };
 use std::sync::Arc;
@@ -47,10 +42,7 @@ impl Timer for ExternalTimer {
         &self.clock
     }
 
-    fn at(
-        &self,
-        _deadline: MonotonicInstant,
-    ) -> Result<TimerFuture, TimeError> {
+    fn at(&self, _deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         Ok(Box::pin(std::future::ready(Ok(()))))
     }
 }

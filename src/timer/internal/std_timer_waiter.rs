@@ -12,11 +12,7 @@ use super::std_timer_waiter_state::StdTimerWaiterState;
 use loom::sync::Mutex;
 #[cfg(not(all(loom, feature = "loom-model")))]
 use std::sync::Mutex;
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use std::task::{Context, Poll, Waker};
 
 /// Completion latch and task waker shared by a future and scheduler worker.
 pub(crate) struct StdTimerWaiter {
@@ -64,15 +60,13 @@ impl StdTimerWaiter {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             match &mut *state {
                 StdTimerWaiterState::Pending(waker)
-                    if waker.as_ref().is_some_and(|value| {
-                        value.will_wake(context.waker())
-                    }) =>
+                    if waker
+                        .as_ref()
+                        .is_some_and(|value| value.will_wake(context.waker())) =>
                 {
                     None
                 }
-                StdTimerWaiterState::Pending(waker) => {
-                    waker.replace(context.waker().clone())
-                }
+                StdTimerWaiterState::Pending(waker) => waker.replace(context.waker().clone()),
                 StdTimerWaiterState::Ready => return Poll::Ready(Ok(())),
                 StdTimerWaiterState::WorkerFailed => {
                     return Poll::Ready(Err(()));
@@ -128,9 +122,7 @@ impl StdTimerWaiter {
                 *state = terminal;
                 detached
             }
-            StdTimerWaiterState::Ready | StdTimerWaiterState::WorkerFailed => {
-                None
-            }
+            StdTimerWaiterState::Ready | StdTimerWaiterState::WorkerFailed => None,
         }
     }
 }

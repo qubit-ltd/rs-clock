@@ -6,30 +6,18 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    ManualWallClock,
-    MonotonicClock,
-    WallClock,
-};
+use qubit_clock::{ManualMonotonicClock, ManualWallClock, MonotonicClock, WallClock};
 use std::sync::Arc;
 use std::sync::Barrier;
-use std::sync::atomic::{
-    AtomicBool,
-    Ordering,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::{
-    Duration,
-    UNIX_EPOCH,
-};
+use std::time::{Duration, UNIX_EPOCH};
 
 #[test]
 fn test_manual_wall_clock_starts_at_wall_anchor() {
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
     let start = UNIX_EPOCH + Duration::from_secs(100);
-    let wall_clock =
-        ManualWallClock::from_clock(start, Arc::clone(&monotonic_clock));
+    let wall_clock = ManualWallClock::from_clock(start, Arc::clone(&monotonic_clock));
 
     assert_eq!(start, wall_clock.now());
 }
@@ -37,8 +25,7 @@ fn test_manual_wall_clock_starts_at_wall_anchor() {
 #[test]
 fn test_manual_wall_clock_follows_monotonic_advance() {
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
-    let wall_clock =
-        ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
+    let wall_clock = ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
 
     monotonic_clock
         .advance(Duration::from_secs(600))
@@ -50,8 +37,7 @@ fn test_manual_wall_clock_follows_monotonic_advance() {
 #[test]
 fn test_manual_wall_clock_reanchor_changes_only_wall_mapping() {
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
-    let wall_clock =
-        ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
+    let wall_clock = ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
     monotonic_clock
         .advance(Duration::from_secs(10))
         .expect("short advance should succeed");
@@ -72,8 +58,7 @@ fn test_manual_wall_clock_reanchor_changes_only_wall_mapping() {
 #[test]
 fn test_manual_wall_clock_now_panics_when_system_time_overflows() {
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
-    let wall_clock =
-        ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
+    let wall_clock = ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
     monotonic_clock
         .advance(Duration::MAX)
         .expect("maximum duration should fit the manual monotonic clock");
@@ -111,17 +96,12 @@ fn test_manual_wall_clock_concurrent_reanchor_never_mixes_snapshots() {
                         UNIX_EPOCH
                     } else {
                         UNIX_EPOCH
-                            + Duration::from_secs(
-                                iteration * WALL_STRIDE_SECONDS,
-                            )
+                            + Duration::from_secs(iteration * WALL_STRIDE_SECONDS)
                             + Duration::from_nanos(1)
                     };
-                    let new_mapping = UNIX_EPOCH
-                        + Duration::from_secs(
-                            (iteration + 1) * WALL_STRIDE_SECONDS,
-                        );
-                    let new_mapping_after_advance =
-                        new_mapping + Duration::from_nanos(1);
+                    let new_mapping =
+                        UNIX_EPOCH + Duration::from_secs((iteration + 1) * WALL_STRIDE_SECONDS);
+                    let new_mapping_after_advance = new_mapping + Duration::from_nanos(1);
                     if observed != old_mapping
                         && observed != new_mapping
                         && observed != new_mapping_after_advance
@@ -136,10 +116,8 @@ fn test_manual_wall_clock_concurrent_reanchor_never_mixes_snapshots() {
 
     for iteration in 0..ITERATIONS {
         barrier.wait();
-        wall_clock.reanchor(
-            UNIX_EPOCH
-                + Duration::from_secs((iteration + 1) * WALL_STRIDE_SECONDS),
-        );
+        wall_clock
+            .reanchor(UNIX_EPOCH + Duration::from_secs((iteration + 1) * WALL_STRIDE_SECONDS));
         monotonic_clock
             .advance(Duration::from_nanos(1))
             .expect("small concurrent advance should succeed");

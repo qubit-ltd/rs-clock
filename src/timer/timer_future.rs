@@ -26,5 +26,4 @@ use crate::TimeError;
 /// A custom Timer implementation may document additional panic conditions.
 /// Built-in manual timers may also resume panics from registered task Wakers
 /// after notifying every affected Waker.
-pub type TimerFuture =
-    Pin<Box<dyn Future<Output = Result<(), TimeError>> + Send + 'static>>;
+pub type TimerFuture = Pin<Box<dyn Future<Output = Result<(), TimeError>> + Send + 'static>>;

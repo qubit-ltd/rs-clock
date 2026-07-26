@@ -6,24 +6,14 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    Timer,
-    TokioTimer,
-};
+use qubit_clock::{Timer, TokioTimer};
 #[cfg(tokio_unstable)]
 use std::sync::{
-    OnceLock,
-    Weak,
-    atomic::{
-        AtomicUsize,
-        Ordering,
-    },
+    OnceLock, Weak,
+    atomic::{AtomicUsize, Ordering},
 };
 use std::{
-    sync::{
-        Arc,
-        Barrier,
-    },
+    sync::{Arc, Barrier},
     thread,
     time::Duration,
 };
