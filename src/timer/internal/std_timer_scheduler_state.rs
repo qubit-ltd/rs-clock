@@ -58,7 +58,11 @@ impl StdTimerSchedulerState {
     /// Panics after all nonzero identifiers have been allocated or when an
     /// internal index invariant is violated.
     #[must_use = "the registration identifier is required for cancellation"]
-    pub(super) fn register(&mut self, deadline: Instant, waiter: Arc<StdTimerWaiter>) -> u64 {
+    pub(super) fn register(
+        &mut self,
+        deadline: Instant,
+        waiter: Arc<StdTimerWaiter>,
+    ) -> u64 {
         let waiter_id = self.allocate_waiter_id();
         let inserted = self.registrations.try_insert(
             waiter_id,
@@ -86,7 +90,10 @@ impl StdTimerSchedulerState {
     /// # Panics
     ///
     /// Panics when the indexed collection invariants are violated.
-    pub(super) fn cancel(&mut self, waiter_id: u64) -> Option<Arc<StdTimerWaiter>> {
+    pub(super) fn cancel(
+        &mut self,
+        waiter_id: u64,
+    ) -> Option<Arc<StdTimerWaiter>> {
         let entry = self.registrations.remove(&waiter_id)?;
         debug_assert_eq!(*entry.order(), entry.value().deadline());
         let registration = entry.into_value();
@@ -106,7 +113,10 @@ impl StdTimerSchedulerState {
     /// # Panics
     ///
     /// Panics when the indexed collection invariants are violated.
-    pub(super) fn take_due(&mut self, now: Instant) -> Vec<Arc<StdTimerWaiter>> {
+    pub(super) fn take_due(
+        &mut self,
+        now: Instant,
+    ) -> Vec<Arc<StdTimerWaiter>> {
         self.registrations
             .extract_range(..=now)
             .map(|entry| {
@@ -139,7 +149,10 @@ impl StdTimerSchedulerState {
     #[must_use]
     #[inline(always)]
     pub(super) fn is_empty(&self) -> bool {
-        debug_assert_eq!(self.registrations.len(), self.registrations.attached_len());
+        debug_assert_eq!(
+            self.registrations.len(),
+            self.registrations.attached_len()
+        );
         self.registrations.is_empty()
     }
 

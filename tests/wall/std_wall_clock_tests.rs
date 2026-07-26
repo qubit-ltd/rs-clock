@@ -6,7 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{StdWallClock, WallClock};
+use qubit_clock::{
+    StdWallClock,
+    WallClock,
+};
 use std::time::SystemTime;
 
 #[test]

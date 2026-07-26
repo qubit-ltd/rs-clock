@@ -6,7 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{ManualMonotonicClock, MonotonicClock, TimeError};
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+    TimeError,
+};
 use std::time::Duration;
 
 #[test]
@@ -69,7 +73,8 @@ fn test_monotonic_instant_rejects_foreign_domain() {
     let first = ManualMonotonicClock::new().now();
     let second = ManualMonotonicClock::new().now();
 
-    let Err(TimeError::ClockDomainMismatch { expected, actual }) = first.duration_since(second)
+    let Err(TimeError::ClockDomainMismatch { expected, actual }) =
+        first.duration_since(second)
     else {
         panic!("cross-domain duration should report a domain mismatch");
     };

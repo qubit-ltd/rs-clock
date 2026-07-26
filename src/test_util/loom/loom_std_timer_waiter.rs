@@ -9,7 +9,11 @@
 //! Exposes the production standard Timer waiter to external Loom models.
 
 use crate::timer::internal::std_timer_waiter::StdTimerWaiter;
-use std::task::{Context, Poll, Waker};
+use std::task::{
+    Context,
+    Poll,
+    Waker,
+};
 
 /// Loom-facing adapter around the production standard Timer waiter.
 pub struct LoomStdTimerWaiter {

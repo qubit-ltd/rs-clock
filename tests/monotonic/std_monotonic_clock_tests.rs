@@ -6,7 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{MonotonicClock, StdMonotonicClock};
+use qubit_clock::{
+    MonotonicClock,
+    StdMonotonicClock,
+};
 use std::thread;
 use std::time::Duration;
 

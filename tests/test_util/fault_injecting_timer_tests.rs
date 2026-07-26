@@ -7,15 +7,30 @@
 // =============================================================================
 
 use qubit_clock::{
-    ManualMonotonicClock, MonotonicClock, TimeError, Timer, TimerFuture, TimerUnavailableError,
-    test_util::{FaultInjectingTimer, TimerFailurePoint},
+    ManualMonotonicClock,
+    MonotonicClock,
+    TimeError,
+    Timer,
+    TimerFuture,
+    TimerUnavailableError,
+    test_util::{
+        FaultInjectingTimer,
+        TimerFailurePoint,
+    },
 };
 use std::{
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{
+            AtomicUsize,
+            Ordering,
+        },
     },
-    task::{Context, Poll, Waker},
+    task::{
+        Context,
+        Poll,
+        Waker,
+    },
     time::Duration,
 };
 
@@ -44,11 +59,12 @@ fn poll_ready(mut future: TimerFuture) -> Result<(), TimeError> {
 /// Verifies a registration fault is returned by `Timer::at` itself.
 #[test]
 fn test_fault_injecting_timer_fails_registration() {
-    let timer = FaultInjectingTimer::new(TimerFailurePoint::Registration, || {
-        TimeError::TimerUnavailable {
-            source: TimerUnavailableError::SchedulerWorkerTerminated,
-        }
-    });
+    let timer =
+        FaultInjectingTimer::new(TimerFailurePoint::Registration, || {
+            TimeError::TimerUnavailable {
+                source: TimerUnavailableError::SchedulerWorkerTerminated,
+            }
+        });
 
     let Err(error) = timer.after(Duration::from_secs(1)) else {
         panic!("registration failure should be returned immediately");
@@ -91,12 +107,13 @@ fn test_fault_injecting_timer_fails_completion() {
 fn test_fault_injecting_timer_rejects_foreign_domain_first() {
     let factory_calls = Arc::new(AtomicUsize::new(0));
     let observed_calls = Arc::clone(&factory_calls);
-    let timer = FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
-        observed_calls.fetch_add(1, Ordering::Relaxed);
-        TimeError::TimerUnavailable {
-            source: TimerUnavailableError::SchedulerWorkerTerminated,
-        }
-    });
+    let timer =
+        FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
+            observed_calls.fetch_add(1, Ordering::Relaxed);
+            TimeError::TimerUnavailable {
+                source: TimerUnavailableError::SchedulerWorkerTerminated,
+            }
+        });
     let foreign_deadline = ManualMonotonicClock::new().now();
 
     let Err(error) = timer.at(foreign_deadline) else {
@@ -113,12 +130,13 @@ fn test_fault_injecting_timer_rejects_foreign_domain_first() {
 fn test_fault_injecting_timer_completes_reached_deadline() {
     let factory_calls = Arc::new(AtomicUsize::new(0));
     let observed_calls = Arc::clone(&factory_calls);
-    let timer = FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
-        observed_calls.fetch_add(1, Ordering::Relaxed);
-        TimeError::TimerUnavailable {
-            source: TimerUnavailableError::SchedulerWorkerTerminated,
-        }
-    });
+    let timer =
+        FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
+            observed_calls.fetch_add(1, Ordering::Relaxed);
+            TimeError::TimerUnavailable {
+                source: TimerUnavailableError::SchedulerWorkerTerminated,
+            }
+        });
     let reached_deadline = timer.clock().now();
     let future = timer
         .at(reached_deadline)
@@ -134,12 +152,13 @@ fn test_fault_injecting_timer_completes_reached_deadline() {
 fn test_fault_injecting_timer_invokes_factory_per_registration() {
     let factory_calls = Arc::new(AtomicUsize::new(0));
     let observed_calls = Arc::clone(&factory_calls);
-    let timer = FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
-        observed_calls.fetch_add(1, Ordering::Relaxed);
-        TimeError::TimerUnavailable {
-            source: TimerUnavailableError::SchedulerWorkerTerminated,
-        }
-    });
+    let timer =
+        FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
+            observed_calls.fetch_add(1, Ordering::Relaxed);
+            TimeError::TimerUnavailable {
+                source: TimerUnavailableError::SchedulerWorkerTerminated,
+            }
+        });
 
     for _ in 0..2 {
         assert!(timer.after(Duration::from_secs(1)).is_err());

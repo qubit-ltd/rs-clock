@@ -6,8 +6,16 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{BlockingSleeper, ManualMonotonicClock, MonotonicClock, Timer};
-use std::sync::{Arc, Barrier};
+use qubit_clock::{
+    BlockingSleeper,
+    ManualMonotonicClock,
+    MonotonicClock,
+    Timer,
+};
+use std::sync::{
+    Arc,
+    Barrier,
+};
 use std::thread;
 use std::time::Duration;
 
