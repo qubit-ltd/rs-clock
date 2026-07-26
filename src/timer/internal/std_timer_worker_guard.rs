@@ -31,7 +31,10 @@ impl<'a> StdTimerWorkerGuard<'a> {
     ///
     /// A guard that restores scheduler state when the worker exits.
     #[inline(always)]
-    pub(super) const fn new(scheduler: &'a StdTimerScheduler, worker_generation: u64) -> Self {
+    pub(super) const fn new(
+        scheduler: &'a StdTimerScheduler,
+        worker_generation: u64,
+    ) -> Self {
         Self {
             scheduler,
             worker_generation,

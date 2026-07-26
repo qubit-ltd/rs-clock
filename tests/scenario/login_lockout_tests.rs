@@ -6,16 +6,25 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{ManualMonotonicClock, ManualWallClock, WallClock};
+use qubit_clock::{
+    ManualMonotonicClock,
+    ManualWallClock,
+    WallClock,
+};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{
+    Duration,
+    SystemTime,
+    UNIX_EPOCH,
+};
 
 const LOCK_DURATION: Duration = Duration::from_secs(10 * 60);
 
 #[test]
 fn test_login_unlocks_after_ten_minutes_of_manual_time() {
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
-    let wall_clock = ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
+    let wall_clock =
+        ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
     let locked_until = lock_after_five_failures(&wall_clock, 5);
 
     assert!(is_locked(&wall_clock, locked_until));
@@ -31,7 +40,10 @@ fn test_login_unlocks_after_ten_minutes_of_manual_time() {
 }
 
 /// Calculates the lock deadline after five consecutive failures.
-fn lock_after_five_failures(clock: &dyn WallClock, failure_count: usize) -> Option<SystemTime> {
+fn lock_after_five_failures(
+    clock: &dyn WallClock,
+    failure_count: usize,
+) -> Option<SystemTime> {
     (failure_count >= 5).then(|| {
         clock
             .now()

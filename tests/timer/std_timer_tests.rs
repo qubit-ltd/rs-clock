@@ -7,14 +7,25 @@
 // =============================================================================
 
 use qubit_clock::{
-    ManualMonotonicClock, MonotonicClock, MonotonicInstant, StdMonotonicClock, StdTimer, TimeError,
+    ManualMonotonicClock,
+    MonotonicClock,
+    MonotonicInstant,
+    StdMonotonicClock,
+    StdTimer,
+    TimeError,
     Timer,
 };
 use std::sync::Arc;
-use std::task::{Context, Waker};
+use std::task::{
+    Context,
+    Waker,
+};
 use std::time::Duration;
 
-use super::internal::{DestructorPanickingWaker, PanickingWaker};
+use super::internal::{
+    DestructorPanickingWaker,
+    PanickingWaker,
+};
 use super::support::block_on_timer_future;
 
 #[test]

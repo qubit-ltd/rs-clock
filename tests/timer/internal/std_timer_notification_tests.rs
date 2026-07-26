@@ -10,7 +10,10 @@
 
 #[cfg(coverage)]
 use qubit_clock::{
-    StdMonotonicClock, StdTimer, Timer, reset_std_timer_worker_notification_count,
+    StdMonotonicClock,
+    StdTimer,
+    Timer,
+    reset_std_timer_worker_notification_count,
     std_timer_worker_notification_count,
 };
 #[cfg(coverage)]

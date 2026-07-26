@@ -10,9 +10,17 @@
 use crate::timer::internal::tokio_runtime_liveness::TokioRuntimeLiveness;
 use std::{
     collections::HashMap,
-    sync::{Arc, LazyLock, Mutex, Weak},
+    sync::{
+        Arc,
+        LazyLock,
+        Mutex,
+        Weak,
+    },
 };
-use tokio::runtime::{Handle, Id};
+use tokio::runtime::{
+    Handle,
+    Id,
+};
 
 /// Process-wide runtime-liveness registry.
 static REGISTRY: LazyLock<TokioRuntimeLivenessRegistry> =
@@ -54,12 +62,12 @@ impl TokioRuntimeLivenessRegistry {
     /// Shared live state for `runtime_id`.
     fn get_or_create(&self, runtime_id: Id) -> Arc<TokioRuntimeLiveness> {
         let (liveness, release_notification) = {
-            let mut entries = self
-                .entries
-                .lock()
-                .expect("Tokio runtime-liveness registry lock should not be poisoned");
+            let mut entries = self.entries.lock().expect(
+                "Tokio runtime-liveness registry lock should not be poisoned",
+            );
             entries.retain(|_, liveness| liveness.strong_count() != 0);
-            if let Some(liveness) = entries.get(&runtime_id).and_then(Weak::upgrade)
+            if let Some(liveness) =
+                entries.get(&runtime_id).and_then(Weak::upgrade)
                 && !liveness.is_shutdown()
             {
                 return liveness;

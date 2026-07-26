@@ -7,7 +7,10 @@
 // =============================================================================
 //! Defines errors reported when a timer backend is unavailable.
 
-use std::{error::Error as StdError, io};
+use std::{
+    error::Error as StdError,
+    io,
+};
 
 use thiserror::Error;
 
@@ -46,7 +49,9 @@ pub enum TimerUnavailableError {
     /// completed.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    #[error("the asynchronous runtime shut down before the timer future completed")]
+    #[error(
+        "the asynchronous runtime shut down before the timer future completed"
+    )]
     RuntimeShuttingDown,
     /// A custom timer backend is unavailable.
     #[error("timer backend '{backend}' is unavailable: {source}")]

@@ -6,7 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{Timer, TokioTimer};
+use qubit_clock::{
+    Timer,
+    TokioTimer,
+};
 use std::time::Duration;
 
 /// Verifies registry reuse is observable across independent timers.
