@@ -9,12 +9,7 @@
 
 use crate::timer::internal::manual_timer_future::ManualTimerFuture;
 use crate::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
+    ManualMonotonicClock, MonotonicClock, MonotonicInstant, TimeError, Timer, TimerFuture,
 };
 use std::sync::Arc;
 
@@ -80,8 +75,7 @@ impl Timer for ManualTimer {
     /// observer waker panics during registration notification.
     #[inline]
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
-        let future =
-            ManualTimerFuture::register(Arc::clone(&self.clock), deadline)?;
+        let future = ManualTimerFuture::register(Arc::clone(&self.clock), deadline)?;
         Ok(Box::pin(future))
     }
 }

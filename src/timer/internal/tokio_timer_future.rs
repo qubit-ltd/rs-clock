@@ -12,29 +12,16 @@
 use crate::timer::internal::tokio_runtime_liveness::TokioRuntimeLiveness;
 #[cfg(coverage)]
 use crate::timer::tokio_timer::take_tokio_timer_sleep_poll_panic;
-use crate::{
-    TimeError,
-    TimerUnavailableError,
-};
+use crate::{TimeError, TimerUnavailableError};
 use pin_project_lite::pin_project;
 use std::{
     future::Future,
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-        resume_unwind,
-    },
+    panic::{AssertUnwindSafe, catch_unwind, resume_unwind},
     pin::Pin,
     sync::Arc,
-    task::{
-        Context,
-        Poll,
-    },
+    task::{Context, Poll},
 };
-use tokio::{
-    sync::futures::OwnedNotified,
-    time::Sleep,
-};
+use tokio::{sync::futures::OwnedNotified, time::Sleep};
 
 pin_project! {
     /// Tokio sleep paired with shared retained-runtime liveness.
@@ -63,10 +50,7 @@ impl TokioTimerFuture {
     ///
     /// A single allocation containing both wait conditions.
     #[must_use]
-    pub(crate) fn new(
-        sleep: Sleep,
-        liveness: Arc<TokioRuntimeLiveness>,
-    ) -> Self {
+    pub(crate) fn new(sleep: Sleep, liveness: Arc<TokioRuntimeLiveness>) -> Self {
         let shutdown = liveness.shutdown_notification();
         Self {
             sleep,
@@ -80,14 +64,9 @@ impl Future for TokioTimerFuture {
     type Output = Result<(), TimeError>;
 
     /// Polls shutdown before the native sleep and preserves unexpected panics.
-    fn poll(
-        self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
-        if this.liveness.is_shutdown()
-            || this.shutdown.as_mut().poll(context).is_ready()
-        {
+        if this.liveness.is_shutdown() || this.shutdown.as_mut().poll(context).is_ready() {
             return runtime_shutdown();
         }
         match catch_unwind(AssertUnwindSafe(|| {

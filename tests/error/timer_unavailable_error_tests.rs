@@ -6,24 +6,15 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    TimeError,
-    TimerUnavailableError,
-};
-use std::{
-    error::Error,
-    io,
-};
+use qubit_clock::{TimeError, TimerUnavailableError};
+use std::{error::Error, io};
 
 /// Verifies that worker-spawn failures retain their original I/O source.
 #[test]
 fn test_timer_unavailable_error_retains_worker_spawn_source() {
     let error = TimeError::TimerUnavailable {
         source: TimerUnavailableError::WorkerThreadSpawnFailed {
-            source: io::Error::new(
-                io::ErrorKind::OutOfMemory,
-                "scheduler capacity exhausted",
-            ),
+            source: io::Error::new(io::ErrorKind::OutOfMemory, "scheduler capacity exhausted"),
         },
     };
 

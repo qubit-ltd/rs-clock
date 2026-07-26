@@ -10,11 +10,7 @@
 
 #[cfg(coverage)]
 use qubit_clock::{
-    StdMonotonicClock,
-    StdTimer,
-    TimeError,
-    Timer,
-    TimerUnavailableError,
+    StdMonotonicClock, StdTimer, TimeError, Timer, TimerUnavailableError,
     fail_next_std_timer_worker_spawn,
 };
 #[cfg(coverage)]

@@ -10,11 +10,7 @@
 
 use crate::monotonic::internal::manual_waiter_registry::ManualWaiterRegistry;
 use std::{
-    task::{
-        Context,
-        Poll,
-        Waker,
-    },
+    task::{Context, Poll, Waker},
     time::Duration,
 };
 
@@ -75,10 +71,7 @@ impl LoomManualWaiterRegistry {
     /// `Some` containing the optional detached Waker when the waiter existed,
     /// or `None` when it had already been removed.
     #[inline(always)]
-    pub fn unregister_timer(
-        &mut self,
-        waiter_id: u64,
-    ) -> Option<Option<Waker>> {
+    pub fn unregister_timer(&mut self, waiter_id: u64) -> Option<Option<Waker>> {
         self.inner.unregister_timer(waiter_id)
     }
 

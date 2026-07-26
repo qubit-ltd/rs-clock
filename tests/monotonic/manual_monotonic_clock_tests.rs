@@ -7,29 +7,14 @@
 // =============================================================================
 
 use qubit_clock::{
-    BlockingSleeper,
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimeError,
-    Timer,
-    WallClock,
+    BlockingSleeper, ManualMonotonicClock, MonotonicClock, TimeError, Timer, WallClock,
 };
 use std::future::Future;
 use std::pin::pin;
-use std::sync::{
-    Arc,
-    mpsc,
-};
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use std::sync::{Arc, mpsc};
+use std::task::{Context, Poll, Waker};
 use std::thread;
-use std::time::{
-    Duration,
-    UNIX_EPOCH,
-};
+use std::time::{Duration, UNIX_EPOCH};
 
 #[test]
 fn test_manual_monotonic_clock_shared_helpers_use_same_timeline() {
@@ -299,8 +284,7 @@ fn test_manual_monotonic_clock_waits_then_advances_after_waiter() {
         started_sender
             .send(())
             .expect("driver start should be observable");
-        driver_clock
-            .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
+        driver_clock.advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
     });
     started_receiver
         .recv()
@@ -384,10 +368,7 @@ fn test_manual_monotonic_clock_waiter_driver_waits_for_guard_timeout() {
 
     assert_eq!(
         None,
-        clock.advance_to_next_deadline_after_waiters(
-            1,
-            Duration::from_millis(100),
-        ),
+        clock.advance_to_next_deadline_after_waiters(1, Duration::from_millis(100),),
     );
     assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
 }
@@ -425,13 +406,10 @@ fn test_manual_monotonic_clock_zero_waiter_count_requires_deadline() {
 }
 
 #[tokio::test]
-async fn test_manual_monotonic_clock_waits_and_advances_to_next_deadline_async()
-{
+async fn test_manual_monotonic_clock_waits_and_advances_to_next_deadline_async() {
     let clock = ManualMonotonicClock::new_shared();
     let driver_clock = Arc::clone(&clock);
-    let driver = tokio::spawn(async move {
-        driver_clock.advance_to_next_deadline_async().await
-    });
+    let driver = tokio::spawn(async move { driver_clock.advance_to_next_deadline_async().await });
     tokio::task::yield_now().await;
     assert!(!driver.is_finished());
 
@@ -446,8 +424,7 @@ async fn test_manual_monotonic_clock_waits_and_advances_to_next_deadline_async()
 }
 
 #[test]
-fn test_manual_monotonic_clock_async_driver_retries_after_deadline_cancellation()
- {
+fn test_manual_monotonic_clock_async_driver_retries_after_deadline_cancellation() {
     let clock = ManualMonotonicClock::new_shared();
     let timer = clock.new_timer();
     let mut driver = pin!(clock.advance_to_next_deadline_async());
@@ -479,8 +456,7 @@ fn test_manual_monotonic_clock_async_driver_retries_after_deadline_cancellation(
 }
 
 #[test]
-fn test_manual_monotonic_clock_async_driver_selects_current_earliest_deadline()
-{
+fn test_manual_monotonic_clock_async_driver_selects_current_earliest_deadline() {
     let clock = ManualMonotonicClock::new_shared();
     let timer = clock.new_timer();
     let mut driver = pin!(clock.advance_to_next_deadline_async());
