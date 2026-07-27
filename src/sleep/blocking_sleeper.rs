@@ -55,7 +55,6 @@ impl BlockingSleeper {
     ///
     /// A cloneable blocking sleeper composing `timer`.
     #[must_use]
-    #[inline(always)]
     pub const fn new(timer: Arc<dyn Timer>) -> Self {
         Self { timer }
     }
@@ -66,7 +65,6 @@ impl BlockingSleeper {
     ///
     /// The timer used to register blocking sleeps.
     #[must_use]
-    #[inline(always)]
     pub fn timer(&self) -> &dyn Timer {
         self.timer.as_ref()
     }
@@ -95,7 +93,6 @@ impl BlockingSleeper {
     ///
     /// Parks the calling thread while the composed timer is pending. The timer
     /// backend must be driven independently during that interval.
-    #[inline(always)]
     pub fn sleep_until(
         &self,
         deadline: MonotonicInstant,
@@ -131,7 +128,6 @@ impl BlockingSleeper {
     ///
     /// Parks the calling thread while the composed timer is pending. The timer
     /// backend must be driven independently during that interval.
-    #[inline(always)]
     pub fn sleep_for(&self, duration: Duration) -> Result<(), TimeError> {
         let future = self.timer.after(duration)?;
         Self::block_on(future)

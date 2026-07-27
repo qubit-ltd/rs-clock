@@ -147,7 +147,6 @@ impl Default for StdTimer {
     /// # Panics
     ///
     /// Panics if all process-wide clock-domain identifiers are exhausted.
-    #[inline(always)]
     fn default() -> Self {
         Self::new()
     }
