@@ -28,7 +28,6 @@ impl FixedWallClock {
     ///
     /// A wall clock fixed at `fixed_time`.
     #[must_use]
-    #[inline(always)]
     pub const fn new(fixed_time: SystemTime) -> Self {
         Self { fixed_time }
     }
@@ -39,7 +38,6 @@ impl FixedWallClock {
     ///
     /// The configured fixed wall-clock value.
     #[must_use]
-    #[inline(always)]
     pub const fn fixed_time(&self) -> SystemTime {
         self.fixed_time
     }
@@ -51,7 +49,6 @@ impl WallClock for FixedWallClock {
     /// # Returns
     ///
     /// The same fixed value for every call.
-    #[inline(always)]
     fn now(&self) -> SystemTime {
         self.fixed_time
     }

@@ -21,7 +21,6 @@ impl StdWallClock {
     ///
     /// A zero-sized wall clock backed by [`SystemTime::now`].
     #[must_use]
-    #[inline(always)]
     pub const fn new() -> Self {
         Self
     }
@@ -33,7 +32,6 @@ impl WallClock for StdWallClock {
     /// # Returns
     ///
     /// The value produced by [`SystemTime::now`].
-    #[inline(always)]
     fn now(&self) -> SystemTime {
         SystemTime::now()
     }

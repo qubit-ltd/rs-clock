@@ -199,7 +199,6 @@ impl ManualMonotonicClock {
     ///
     /// The total number of waiter registrations awaiting cleanup or completion.
     #[must_use]
-    #[inline(always)]
     pub fn pending_waiters(&self) -> usize {
         self.time_domain.waiter_count()
     }
@@ -305,7 +304,6 @@ impl ManualMonotonicClock {
     ///
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
-    #[inline(always)]
     pub fn wait_for_next_deadline_async(
         self: &Arc<Self>,
     ) -> ManualDeadlineFuture {
