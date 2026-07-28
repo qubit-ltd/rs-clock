@@ -118,6 +118,36 @@ fn test_timer_after_fixes_deadline_when_called() {
 }
 
 #[test]
+fn test_timer_deadline_after_fixes_an_unregistered_deadline() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    clock
+        .advance(Duration::from_secs(3))
+        .expect("manual time should advance");
+    let timer = RecordingTimer::new(Arc::clone(&clock));
+
+    let deadline = timer
+        .deadline_after(Duration::from_secs(5))
+        .expect("deadline should be representable");
+
+    assert_eq!(Duration::from_secs(8), deadline.elapsed_since_origin());
+    assert_eq!(None, timer.deadline());
+}
+
+#[test]
+fn test_timer_deadline_after_reports_duration_overflow() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    clock
+        .advance(Duration::from_nanos(1))
+        .expect("manual time should advance");
+    let timer = RecordingTimer::new(clock);
+
+    assert!(matches!(
+        timer.deadline_after(Duration::MAX),
+        Err(TimeError::InstantOverflow)
+    ));
+}
+
+#[test]
 fn test_timer_after_returns_registration_error_immediately() {
     let timer = FailingTimer {
         clock: Arc::new(ManualMonotonicClock::new()),
