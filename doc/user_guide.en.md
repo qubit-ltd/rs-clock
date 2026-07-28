@@ -134,7 +134,7 @@ set:
 
 ```toml
 [dependencies]
-qubit-clock = "0.10"
+qubit-clock = "0.11"
 ```
 
 Enable `tokio` when production code needs `TokioMonotonicClock` or
@@ -142,7 +142,7 @@ Enable `tokio` when production code needs `TokioMonotonicClock` or
 
 ```toml
 [dependencies]
-qubit-clock = { version = "0.10", features = ["tokio"] }
+qubit-clock = { version = "0.11", features = ["tokio"] }
 ```
 
 Manual clocks, manual timers, and their coordination futures are
