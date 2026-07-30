@@ -55,6 +55,13 @@ async fn test_tokio_monotonic_clock_try_current_creates_clock() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn test_tokio_monotonic_clock_domain_matches_sampled_instant() {
+    let clock = TokioMonotonicClock::current();
+
+    assert_eq!(clock.domain(), clock.now().domain());
+}
+
+#[tokio::test(start_paused = true)]
 async fn test_tokio_monotonic_clock_creates_same_domain_timer_directly() {
     let clock = TokioMonotonicClock::current();
 
