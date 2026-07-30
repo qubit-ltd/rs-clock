@@ -36,6 +36,13 @@ fn test_std_monotonic_clock_instances_have_distinct_domains() {
 }
 
 #[test]
+fn test_std_monotonic_clock_domain_matches_sampled_instant() {
+    let clock = StdMonotonicClock::new();
+
+    assert_eq!(clock.domain(), clock.now().domain());
+}
+
+#[test]
 fn test_std_monotonic_clock_default_creates_clock() {
     let clock = StdMonotonicClock::default();
     let other = StdMonotonicClock::new();
