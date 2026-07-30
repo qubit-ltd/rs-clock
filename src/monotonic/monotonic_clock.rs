@@ -12,10 +12,13 @@
 //! measurements. Wall time belongs on [`WallClock`](crate::WallClock) instead.
 
 use crate::{
+    ClockDomain,
     MonotonicInstant,
+    TimeError,
     Timer,
 };
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Provides the current instant in a stable, non-decreasing clock domain.
 ///
@@ -83,6 +86,17 @@ use std::sync::Arc;
 /// assert_eq!(Duration::ZERO, second.elapsed_since_origin());
 /// ```
 pub trait MonotonicClock: Send + Sync {
+    /// Returns this clock's stable monotonic domain identity.
+    ///
+    /// Unlike [`now()`](Self::now), this method does not sample the current
+    /// time. The returned domain remains unchanged for this clock's lifetime.
+    ///
+    /// # Returns
+    ///
+    /// The domain carried by every instant sampled from this clock.
+    #[must_use = "the clock domain should be used to validate monotonic instants"]
+    fn domain(&self) -> ClockDomain;
+
     /// Returns the current instant in this clock's domain.
     ///
     /// Successive calls on the same clock never return an earlier instant.
@@ -94,6 +108,32 @@ pub trait MonotonicClock: Send + Sync {
     ///
     /// The current domain-scoped monotonic instant.
     fn now(&self) -> MonotonicInstant;
+
+    /// Fixes a deadline after a relative duration.
+    ///
+    /// This method samples [`now()`](Self::now) exactly once while it runs,
+    /// then adds `duration` to that sampled instant. It does not create a
+    /// timer registration.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Duration from the sampled current instant.
+    ///
+    /// # Returns
+    ///
+    /// A fixed deadline in this clock's domain.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimeError::InstantOverflow`] when the resulting deadline
+    /// cannot be represented by [`Duration`].
+    #[inline]
+    fn deadline_after(
+        &self,
+        duration: Duration,
+    ) -> Result<MonotonicInstant, TimeError> {
+        self.now().checked_add(duration)
+    }
 
     /// Creates a timer in this clock's exact monotonic domain.
     ///
@@ -113,6 +153,16 @@ impl<T> MonotonicClock for std::sync::Arc<T>
 where
     T: MonotonicClock + ?Sized,
 {
+    /// Delegates the stable domain identity to the shared clock object.
+    ///
+    /// # Returns
+    ///
+    /// The domain returned by the wrapped clock.
+    #[inline(always)]
+    fn domain(&self) -> ClockDomain {
+        self.as_ref().domain()
+    }
+
     /// Delegates the current instant to the shared clock object.
     ///
     /// # Returns
@@ -121,6 +171,27 @@ where
     #[inline(always)]
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()
+    }
+
+    /// Delegates relative deadline calculation to the shared clock object.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Duration from the wrapped clock's sampled current time.
+    ///
+    /// # Returns
+    ///
+    /// The deadline returned by the wrapped clock.
+    ///
+    /// # Errors
+    ///
+    /// Returns any overflow error reported by the wrapped clock.
+    #[inline(always)]
+    fn deadline_after(
+        &self,
+        duration: Duration,
+    ) -> Result<MonotonicInstant, TimeError> {
+        self.as_ref().deadline_after(duration)
     }
 
     /// Delegates timer creation without consuming the shared clock pointer.
@@ -138,6 +209,16 @@ impl<T> MonotonicClock for Box<T>
 where
     T: MonotonicClock + ?Sized,
 {
+    /// Delegates the stable domain identity to the boxed clock object.
+    ///
+    /// # Returns
+    ///
+    /// The domain returned by the wrapped clock.
+    #[inline(always)]
+    fn domain(&self) -> ClockDomain {
+        self.as_ref().domain()
+    }
+
     /// Delegates the current instant to the boxed clock object.
     ///
     /// # Returns
@@ -146,6 +227,27 @@ where
     #[inline(always)]
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()
+    }
+
+    /// Delegates relative deadline calculation to the boxed clock object.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Duration from the wrapped clock's sampled current time.
+    ///
+    /// # Returns
+    ///
+    /// The deadline returned by the wrapped clock.
+    ///
+    /// # Errors
+    ///
+    /// Returns any overflow error reported by the wrapped clock.
+    #[inline(always)]
+    fn deadline_after(
+        &self,
+        duration: Duration,
+    ) -> Result<MonotonicInstant, TimeError> {
+        self.as_ref().deadline_after(duration)
     }
 
     /// Delegates timer creation without consuming the boxed clock.
