@@ -30,7 +30,7 @@ impl Session {
         clock: Arc<dyn MonotonicClock>,
         ttl: Duration,
     ) -> Result<Self, TimeError> {
-        let expires_at = clock.now().checked_add(ttl)?;
+        let expires_at = clock.deadline_after(ttl)?;
         Ok(Self { clock, expires_at })
     }
 
@@ -97,7 +97,9 @@ fn main() -> Result<(), TimeError> {
 
 `MonotonicClock::now()` 返回带时钟域的 `MonotonicInstant`，同一时钟域内的值永不
 倒退。它适合过期判断、耗时预算、重试策略和超时计算。不同单调时钟域中的时刻不能
-混用。每个单调时钟都能通过 `new_timer()` 创建同域的 `Timer`。
+混用。来自不同域的时刻没有顺序，因此 `<`、`<=`、`>` 和 `>=` 都会返回 `false`；需要
+明确诊断 `ClockDomainMismatch` 时，应使用 `duration_since()` 或 `validate_domain()`。
+每个单调时钟都能通过 `new_timer()` 创建同域的 `Timer`。
 
 ### `Timer`
 
@@ -336,6 +338,12 @@ sleeper.sleep_for(Duration::from_millis(10))?;
 线程上，阻塞等待绑定到该运行时的定时器。
 
 ## 在相关库中的应用
+
+`rs-command` 注入定时器来处理命令超时、耗时测量和可感知取消的轮询。测试使用
+`ManualMonotonicClock` 直接到达超时边界，无需按真实时间等待进程超时。
+
+`rs-id` 注入 `WallClock` 生成 ID 时间戳，并注入定时器处理阻塞或异步的 ID 分配等待。
+测试可以推进相应的时钟或定时器，不依赖机器时钟。
 
 `rs-lock` 向支持超时的 monitor 实现中注入定时器。生产环境使用标准或 Tokio
 定时器；测试注入 `ManualMonotonicClock` 创建的定时器并直接推进到超时点，无需真实

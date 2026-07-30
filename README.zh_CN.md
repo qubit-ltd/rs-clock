@@ -43,7 +43,7 @@ impl Session {
         clock: Arc<dyn MonotonicClock>,
         ttl: Duration,
     ) -> Result<Self, TimeError> {
-        let expires_at = clock.now().checked_add(ttl)?;
+        let expires_at = clock.deadline_after(ttl)?;
         Ok(Self { clock, expires_at })
     }
 
@@ -117,9 +117,10 @@ qubit-clock = { version = "0.12", features = ["tokio"] }
 
 ## 在相关库中的应用
 
-`rs-lock` 使用相同的注入方式测试带超时的等待，`rs-retry` 用它测试重试间隔、单次
-尝试超时和总耗时预算。这些库注入 `Timer` 或 `MonotonicClock`，生产代码中不需要另写
-一套模拟等待算法。
+`rs-command` 用相同的注入方式实现命令超时，无需真实等待；`rs-id` 则将 ID 时间戳与
+分配等待分离。`rs-lock` 用它测试带超时的等待，`rs-retry` 用它测试重试间隔、单次尝试
+超时和总耗时预算。这些库按需注入 `WallClock`、`Timer` 或 `MonotonicClock`，生产代码中
+不需要另写一套模拟等待算法。
 
 ## 测试
 

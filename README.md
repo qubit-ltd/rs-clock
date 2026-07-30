@@ -47,7 +47,7 @@ impl Session {
         clock: Arc<dyn MonotonicClock>,
         ttl: Duration,
     ) -> Result<Self, TimeError> {
-        let expires_at = clock.now().checked_add(ttl)?;
+        let expires_at = clock.deadline_after(ttl)?;
         Ok(Self { clock, expires_at })
     }
 
@@ -127,10 +127,13 @@ runtime ownership, wall-clock projection, cancellation, and error handling.
 
 ## Use in related libraries
 
-The same injection model is used by `rs-lock` to test timeout-aware waits and
-by `rs-retry` to test retry delays, attempt timeouts, and elapsed-time budgets.
-Those libraries inject a `Timer` or `MonotonicClock`; their production code
-does not contain a separate mock waiting algorithm.
+The same injection model is used by `rs-command` to enforce command timeouts
+without real waits and by `rs-id` to separate ID timestamps from allocation
+waits. `rs-lock` uses it to test timeout-aware waits, while `rs-retry` uses it
+to test retry delays, attempt timeouts, and elapsed-time budgets. These
+libraries inject the narrow capability they need (`WallClock`, `Timer`, or
+`MonotonicClock`); their production code does not contain a separate mock
+waiting algorithm.
 
 ## Testing
 
