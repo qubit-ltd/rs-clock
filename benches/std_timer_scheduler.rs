@@ -5,6 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+//! Measures standard timer scheduler scaling, cancellation, and completion.
 
 use criterion::{
     BenchmarkGroup,
