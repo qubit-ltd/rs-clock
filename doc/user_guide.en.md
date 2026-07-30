@@ -35,7 +35,7 @@ impl Session {
         clock: Arc<dyn MonotonicClock>,
         ttl: Duration,
     ) -> Result<Self, TimeError> {
-        let expires_at = clock.now().checked_add(ttl)?;
+        let expires_at = clock.deadline_after(ttl)?;
         Ok(Self { clock, expires_at })
     }
 
@@ -111,8 +111,10 @@ to measure elapsed duration because it may jump.
 `MonotonicClock::now()` returns a domain-scoped `MonotonicInstant` that never
 moves backward within that domain. Use it for expiration, elapsed-time budgets,
 retry policies, and timeout calculations. Independent clock domains must not be
-mixed. Every monotonic clock can create a `Timer` in its own domain with
-`new_timer()`.
+mixed. Instants from different domains are unordered, so `<`, `<=`, `>`, and
+`>=` all evaluate to `false`; use `duration_since()` or `validate_domain()`
+when a `ClockDomainMismatch` diagnosis is required. Every monotonic clock can
+create a `Timer` in its own domain with `new_timer()`.
 
 ### `Timer`
 
@@ -379,6 +381,14 @@ be driven independently; never block the sole driver thread of a
 current-thread runtime while waiting on that runtime's timer.
 
 ## Use in related libraries
+
+`rs-command` injects a timer for command timeouts, elapsed measurements, and
+cancellation-aware polling. Its tests use `ManualMonotonicClock` to reach
+timeout boundaries without waiting for a process timeout in wall-clock time.
+
+`rs-id` injects a `WallClock` for ID timestamps and a timer for blocking or
+asynchronous allocation waits. Its tests can advance the relevant clock or
+timer without relying on the machine clock.
 
 `rs-lock` injects timers into timeout-aware monitor implementations. Production
 waits use a standard or Tokio timer; tests inject a timer created by
