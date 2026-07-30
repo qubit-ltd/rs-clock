@@ -82,24 +82,6 @@ impl ManualMonotonicClock {
         Arc::new(Self::new())
     }
 
-    /// Creates a private handle retaining this exact manual time domain.
-    ///
-    /// This operation deliberately does not expose [`Clone`] publicly. It is
-    /// used by concrete time-domain components that must outlive the clock
-    /// value supplied to their constructors.
-    ///
-    /// # Returns
-    ///
-    /// A clock handle with the same domain identifier and shared state.
-    #[must_use]
-    #[inline]
-    pub(crate) fn same_domain_handle(&self) -> Self {
-        Self {
-            domain: self.domain,
-            time_domain: Arc::clone(&self.time_domain),
-        }
-    }
-
     /// Creates a shared wall clock projected from this clock's timeline.
     ///
     /// # Parameters
@@ -116,6 +98,24 @@ impl ManualMonotonicClock {
         wall_time: SystemTime,
     ) -> Arc<ManualWallClock> {
         Arc::new(ManualWallClock::from_clock(wall_time, Arc::clone(self)))
+    }
+
+    /// Creates a private handle retaining this exact manual time domain.
+    ///
+    /// This operation deliberately does not expose [`Clone`] publicly. It is
+    /// used by concrete time-domain components that must outlive the clock
+    /// value supplied to their constructors.
+    ///
+    /// # Returns
+    ///
+    /// A clock handle with the same domain identifier and shared state.
+    #[must_use]
+    #[inline]
+    pub(crate) fn same_domain_handle(&self) -> Self {
+        Self {
+            domain: self.domain,
+            time_domain: Arc::clone(&self.time_domain),
+        }
     }
 
     /// Advances this clock by `duration` and notifies time observers.
