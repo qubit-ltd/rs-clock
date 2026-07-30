@@ -90,14 +90,14 @@ fn main() -> Result<(), TimeError> {
 
 ```toml
 [dependencies]
-qubit-clock = "0.11"
+qubit-clock = "0.12"
 ```
 
 需要基于 Tokio 的时钟、定时器及相关运行时错误时，启用 `tokio` feature：
 
 ```toml
 [dependencies]
-qubit-clock = { version = "0.11", features = ["tokio"] }
+qubit-clock = { version = "0.12", features = ["tokio"] }
 ```
 
 该 feature 提供 `TokioMonotonicClock`、`TokioTimer` 及相关运行时错误。手动时间与
