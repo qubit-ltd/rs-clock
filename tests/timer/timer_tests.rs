@@ -59,6 +59,67 @@ struct FailingTimer {
     clock: Arc<ManualMonotonicClock>,
 }
 
+struct DeadlineOverrideClock {
+    domain: qubit_clock::ClockDomain,
+}
+
+impl DeadlineOverrideClock {
+    fn new() -> Self {
+        Self {
+            domain: qubit_clock::ClockDomain::new(),
+        }
+    }
+}
+
+impl MonotonicClock for DeadlineOverrideClock {
+    fn domain(&self) -> qubit_clock::ClockDomain {
+        self.domain
+    }
+
+    fn now(&self) -> MonotonicInstant {
+        MonotonicInstant::new(self.domain, Duration::ZERO)
+    }
+
+    fn deadline_after(
+        &self,
+        _duration: Duration,
+    ) -> Result<MonotonicInstant, TimeError> {
+        Ok(MonotonicInstant::new(self.domain, Duration::from_secs(9)))
+    }
+
+    fn new_timer(&self) -> Arc<dyn Timer> {
+        Arc::new(RecordingDeadlineTimer {
+            clock: DeadlineOverrideClock {
+                domain: self.domain,
+            },
+            deadline: Mutex::new(None),
+        })
+    }
+}
+
+struct RecordingDeadlineTimer {
+    clock: DeadlineOverrideClock,
+    deadline: Mutex<Option<MonotonicInstant>>,
+}
+
+impl RecordingDeadlineTimer {
+    fn deadline(&self) -> Option<MonotonicInstant> {
+        *self.deadline.lock().expect("deadline mutex is poisoned")
+    }
+}
+
+impl Timer for RecordingDeadlineTimer {
+    fn clock(&self) -> &dyn MonotonicClock {
+        &self.clock
+    }
+
+    fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
+        *self.deadline.lock().expect("deadline mutex is poisoned") =
+            Some(deadline);
+        Ok(Box::pin(future::ready(Ok(()))))
+    }
+}
+
 impl Timer for FailingTimer {
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
@@ -82,21 +143,21 @@ fn test_timer_supports_trait_object() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let timer: Arc<dyn Timer> = Arc::new(RecordingTimer::new(clock));
 
-    assert_eq!(Duration::ZERO, timer.now().elapsed_since_origin());
+    assert_eq!(Duration::ZERO, timer.clock().now().elapsed_since_origin());
     let _future = timer
         .after(Duration::from_secs(1))
         .expect("timer registration should succeed");
 }
 
 #[test]
-fn test_timer_now_forwards_to_its_clock() {
+fn test_timer_clock_exposes_its_clock() {
     let clock = Arc::new(ManualMonotonicClock::new());
     clock
         .advance(Duration::from_secs(3))
         .expect("manual time should advance");
     let timer = RecordingTimer::new(Arc::clone(&clock));
 
-    assert_eq!(clock.now(), timer.now());
+    assert_eq!(clock.now(), timer.clock().now());
 }
 
 #[test]
@@ -118,7 +179,7 @@ fn test_timer_after_fixes_deadline_when_called() {
 }
 
 #[test]
-fn test_timer_deadline_after_fixes_an_unregistered_deadline() {
+fn test_timer_clock_deadline_after_fixes_an_unregistered_deadline() {
     let clock = Arc::new(ManualMonotonicClock::new());
     clock
         .advance(Duration::from_secs(3))
@@ -126,6 +187,7 @@ fn test_timer_deadline_after_fixes_an_unregistered_deadline() {
     let timer = RecordingTimer::new(Arc::clone(&clock));
 
     let deadline = timer
+        .clock()
         .deadline_after(Duration::from_secs(5))
         .expect("deadline should be representable");
 
@@ -134,7 +196,7 @@ fn test_timer_deadline_after_fixes_an_unregistered_deadline() {
 }
 
 #[test]
-fn test_timer_deadline_after_reports_duration_overflow() {
+fn test_timer_clock_deadline_after_reports_duration_overflow() {
     let clock = Arc::new(ManualMonotonicClock::new());
     clock
         .advance(Duration::from_nanos(1))
@@ -142,9 +204,26 @@ fn test_timer_deadline_after_reports_duration_overflow() {
     let timer = RecordingTimer::new(clock);
 
     assert!(matches!(
-        timer.deadline_after(Duration::MAX),
+        timer.clock().deadline_after(Duration::MAX),
         Err(TimeError::InstantOverflow)
     ));
+}
+
+#[test]
+fn test_timer_after_delegates_deadline_calculation_to_its_clock() {
+    let timer = RecordingDeadlineTimer {
+        clock: DeadlineOverrideClock::new(),
+        deadline: Mutex::new(None),
+    };
+
+    let _future = timer
+        .after(Duration::from_secs(2))
+        .expect("timer registration should succeed");
+
+    assert_eq!(
+        Some(Duration::from_secs(9)),
+        timer.deadline().map(MonotonicInstant::elapsed_since_origin)
+    );
 }
 
 #[test]

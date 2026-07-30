@@ -61,45 +61,6 @@ pub trait Timer: Send + Sync {
     #[must_use = "the Timer clock should be used to sample or validate deadlines"]
     fn clock(&self) -> &dyn MonotonicClock;
 
-    /// Returns the current monotonic instant in this timer's clock domain.
-    ///
-    /// # Returns
-    ///
-    /// The current instant sampled from this timer's clock.
-    #[must_use = "the current timer instant should be used to measure or validate deadlines"]
-    #[inline(always)]
-    fn now(&self) -> MonotonicInstant {
-        self.clock().now()
-    }
-
-    /// Fixes an absolute deadline relative to the current timer instant.
-    ///
-    /// This method samples the timer clock while it runs and returns the
-    /// resulting deadline without registering a Timer waiter. Callers can
-    /// carry the returned deadline through lock acquisition or other
-    /// non-interruptible work while preserving one operation-wide budget.
-    /// It does not guarantee that such work returns before the deadline.
-    ///
-    /// # Parameters
-    ///
-    /// * duration - Duration from the current monotonic instant.
-    ///
-    /// # Returns
-    ///
-    /// The fixed deadline in this timer's clock domain.
-    ///
-    /// # Errors
-    ///
-    /// Returns TimeError::InstantOverflow when the deadline cannot be
-    /// represented.
-    #[inline(always)]
-    fn deadline_after(
-        &self,
-        duration: Duration,
-    ) -> Result<MonotonicInstant, TimeError> {
-        self.now().checked_add(duration)
-    }
-
     /// Creates a notification for an absolute monotonic deadline.
     ///
     /// The deadline is fixed before this method returns. A deadline at or
@@ -142,7 +103,7 @@ pub trait Timer: Send + Sync {
     /// for that deadline.
     #[inline]
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
-        let deadline = self.deadline_after(duration)?;
+        let deadline = self.clock().deadline_after(duration)?;
         self.at(deadline)
     }
 }

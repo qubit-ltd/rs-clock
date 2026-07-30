@@ -101,6 +101,16 @@ impl Default for StdMonotonicClock {
 }
 
 impl MonotonicClock for StdMonotonicClock {
+    /// Returns this clock's stable monotonic domain identity.
+    ///
+    /// # Returns
+    ///
+    /// This clock's process-unique domain.
+    #[inline(always)]
+    fn domain(&self) -> ClockDomain {
+        self.domain
+    }
+
     /// Returns the current instant in this clock's domain.
     ///
     /// # Returns
