@@ -116,14 +116,14 @@ fn main() -> Result<(), TimeError> {
 
 ```toml
 [dependencies]
-qubit-clock = "0.11"
+qubit-clock = "0.12"
 ```
 
 生产代码需要 `TokioMonotonicClock` 或 `TokioTimer` 时启用 `tokio`：
 
 ```toml
 [dependencies]
-qubit-clock = { version = "0.11", features = ["tokio"] }
+qubit-clock = { version = "0.12", features = ["tokio"] }
 ```
 
 手动时钟、手动定时器及其协调 Future 与执行器无关，不需要启用它。

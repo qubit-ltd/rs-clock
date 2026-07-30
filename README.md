@@ -96,7 +96,7 @@ directly with `clock.new_timer()`.
 
 ```toml
 [dependencies]
-qubit-clock = "0.11"
+qubit-clock = "0.12"
 ```
 
 Enable the `tokio` feature when you need Tokio-backed clock and timer types and
@@ -104,7 +104,7 @@ their runtime-related errors:
 
 ```toml
 [dependencies]
-qubit-clock = { version = "0.11", features = ["tokio"] }
+qubit-clock = { version = "0.12", features = ["tokio"] }
 ```
 
 The `tokio` feature exposes `TokioMonotonicClock`, `TokioTimer`, and their
