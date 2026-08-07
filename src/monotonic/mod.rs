@@ -26,6 +26,5 @@ pub use manual_waiter_future::ManualWaiterFuture;
 pub use monotonic_clock::MonotonicClock;
 pub use monotonic_instant::MonotonicInstant;
 pub use std_monotonic_clock::StdMonotonicClock;
-
 #[cfg(feature = "tokio")]
 pub use tokio_monotonic_clock::TokioMonotonicClock;

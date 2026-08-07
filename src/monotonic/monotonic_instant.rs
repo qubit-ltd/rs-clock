@@ -7,12 +7,11 @@
 // =============================================================================
 //! Defines a monotonic instant scoped to one clock domain.
 
-use crate::{
-    ClockDomain,
-    TimeError,
-};
 use std::cmp::Ordering;
 use std::time::Duration;
+
+use crate::ClockDomain;
+use crate::TimeError;
 
 /// A fixed point in one monotonic clock domain.
 ///

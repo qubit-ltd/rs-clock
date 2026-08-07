@@ -7,16 +7,15 @@
 // =============================================================================
 //! Defines a timer driven by explicitly advanced monotonic time.
 
-use crate::timer::internal::manual_timer_future::ManualTimerFuture;
-use crate::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-};
 use std::sync::Arc;
+
+use crate::ManualMonotonicClock;
+use crate::MonotonicClock;
+use crate::MonotonicInstant;
+use crate::TimeError;
+use crate::Timer;
+use crate::TimerFuture;
+use crate::timer::internal::manual_timer_future::ManualTimerFuture;
 
 /// An asynchronous timer driven by one manual monotonic time domain.
 ///

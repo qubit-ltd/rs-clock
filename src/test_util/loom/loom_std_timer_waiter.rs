@@ -8,12 +8,11 @@
 // qubit-style: allow source-test-pair
 //! Exposes the production standard Timer waiter to external Loom models.
 
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
+
 use crate::timer::internal::std_timer_waiter::StdTimerWaiter;
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
 
 /// Loom-facing adapter around the production standard Timer waiter.
 pub struct LoomStdTimerWaiter {

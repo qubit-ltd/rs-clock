@@ -7,15 +7,11 @@
 // =============================================================================
 //! Defines unique monotonic clock domains.
 
-use std::fmt::{
-    Display,
-    Formatter,
-};
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::num::NonZeroU64;
-use std::sync::atomic::{
-    AtomicU64,
-    Ordering,
-};
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 /// Next unallocated clock domain identifier; zero marks exhaustion.
 static NEXT_CLOCK_DOMAIN: AtomicU64 = AtomicU64::new(1);

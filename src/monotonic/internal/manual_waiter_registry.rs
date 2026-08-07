@@ -8,15 +8,15 @@
 // qubit-style: allow source-test-pair
 //! Stores deadline waiters and waiter-count observers for a manual clock.
 
-use crate::monotonic::clock_domain::next_identifier_state;
-use qubit_collections::map::OrderedIndexMap;
 use std::collections::HashMap;
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
 use std::time::Duration;
+
+use qubit_collections::map::OrderedIndexMap;
+
+use crate::monotonic::clock_domain::next_identifier_state;
 
 /// Allocates the current nonzero registry identifier and advances its state.
 ///

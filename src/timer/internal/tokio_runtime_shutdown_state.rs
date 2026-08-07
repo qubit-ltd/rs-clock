@@ -7,17 +7,12 @@
 // =============================================================================
 //! Publishes Tokio runtime shutdown without allocating per deadline.
 
-use std::sync::{
-    Arc,
-    atomic::{
-        AtomicBool,
-        Ordering,
-    },
-};
-use tokio::sync::{
-    Notify,
-    futures::OwnedNotified,
-};
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+
+use tokio::sync::Notify;
+use tokio::sync::futures::OwnedNotified;
 
 /// Shared shutdown flag and asynchronous notification.
 #[derive(Debug)]

@@ -7,15 +7,14 @@
 // =============================================================================
 //! Defines the standard-library monotonic clock implementation.
 
-use crate::{
-    ClockDomain,
-    MonotonicClock,
-    MonotonicInstant,
-    StdTimer,
-    Timer,
-};
 use std::sync::Arc;
 use std::time::Instant;
+
+use crate::ClockDomain;
+use crate::MonotonicClock;
+use crate::MonotonicInstant;
+use crate::StdTimer;
+use crate::Timer;
 
 /// A real monotonic clock backed by [`std::time::Instant`].
 ///

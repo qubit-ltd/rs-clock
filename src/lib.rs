@@ -52,50 +52,43 @@ pub mod test_util;
 pub mod timer;
 pub mod wall;
 
+pub use error::TimeError;
+pub use error::TimerUnavailableError;
 #[cfg(feature = "tokio")]
 pub use error::TokioRuntimeError;
-pub use error::{
-    TimeError,
-    TimerUnavailableError,
-};
-pub use monotonic::{
-    ClockDomain,
-    ManualDeadlineFuture,
-    ManualMonotonicClock,
-    ManualWaiterFuture,
-    MonotonicClock,
-    MonotonicInstant,
-    StdMonotonicClock,
-};
+pub use monotonic::ClockDomain;
+pub use monotonic::ManualDeadlineFuture;
+pub use monotonic::ManualMonotonicClock;
+pub use monotonic::ManualWaiterFuture;
+pub use monotonic::MonotonicClock;
+pub use monotonic::MonotonicInstant;
+pub use monotonic::StdMonotonicClock;
+#[cfg(feature = "tokio")]
+pub use monotonic::TokioMonotonicClock;
 pub use sleep::BlockingSleeper;
-pub use timer::{
-    ManualTimer,
-    StdTimer,
-    Timer,
-    TimerFuture,
-};
-pub use wall::{
-    FixedWallClock,
-    ManualWallClock,
-    StdWallClock,
-    WallClock,
-};
-
+pub use timer::ManualTimer;
+pub use timer::StdTimer;
+pub use timer::Timer;
+pub use timer::TimerFuture;
+#[cfg(feature = "tokio")]
+pub use timer::TokioTimer;
 // qubit-style: allow coverage-cfg
 #[doc(hidden)]
 #[cfg(coverage)]
-pub use timer::internal::std_timer_scheduler::{
-    fail_next_std_timer_worker_spawn,
-    panic_next_std_timer_worker,
-    reset_std_timer_worker_notification_count,
-    std_timer_worker_notification_count,
-};
-
+pub use timer::internal::std_timer_scheduler::fail_next_std_timer_worker_spawn;
+#[doc(hidden)]
+#[cfg(coverage)]
+pub use timer::internal::std_timer_scheduler::panic_next_std_timer_worker;
+#[doc(hidden)]
+#[cfg(coverage)]
+pub use timer::internal::std_timer_scheduler::reset_std_timer_worker_notification_count;
+#[doc(hidden)]
+#[cfg(coverage)]
+pub use timer::internal::std_timer_scheduler::std_timer_worker_notification_count;
 #[doc(hidden)]
 #[cfg(all(coverage, feature = "tokio"))]
 pub use timer::panic_next_tokio_timer_sleep_poll;
-
-#[cfg(feature = "tokio")]
-pub use monotonic::TokioMonotonicClock;
-#[cfg(feature = "tokio")]
-pub use timer::TokioTimer;
+pub use wall::FixedWallClock;
+pub use wall::ManualWallClock;
+pub use wall::StdWallClock;
+pub use wall::WallClock;

@@ -7,10 +7,12 @@
 // =============================================================================
 //! Defines errors produced by time-domain operations.
 
+use std::time::Duration;
+
+use thiserror::Error;
+
 use super::TimerUnavailableError;
 use crate::ClockDomain;
-use std::time::Duration;
-use thiserror::Error;
 
 /// Describes an invalid monotonic-time operation.
 ///

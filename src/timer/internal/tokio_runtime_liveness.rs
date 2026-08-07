@@ -7,13 +7,14 @@
 // =============================================================================
 //! Retains one liveness sentinel for a Tokio runtime.
 
+use std::sync::Arc;
+
+use tokio::spawn;
+use tokio::sync::futures::OwnedNotified;
+use tokio::sync::oneshot;
+
 use crate::timer::internal::tokio_runtime_shutdown_guard::TokioRuntimeShutdownGuard;
 use crate::timer::internal::tokio_runtime_shutdown_state::TokioRuntimeShutdownState;
-use std::sync::Arc;
-use tokio::sync::{
-    futures::OwnedNotified,
-    oneshot,
-};
 
 /// Runtime-liveness sentinel shared by timers retaining one runtime.
 #[derive(Debug)]
@@ -53,7 +54,7 @@ impl TokioRuntimeLiveness {
     pub(crate) fn start(&self, release_notification: oneshot::Receiver<()>) {
         let shutdown_guard =
             TokioRuntimeShutdownGuard::new(Arc::clone(&self.shutdown));
-        tokio::spawn(async move {
+        spawn(async move {
             let _shutdown_guard = shutdown_guard;
             let _ = release_notification.await;
         });

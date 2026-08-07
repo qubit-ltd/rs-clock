@@ -9,29 +9,26 @@
 
 // qubit-style: allow coverage-cfg
 
+use std::io;
+use std::sync::Arc;
+use std::sync::Condvar;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
+use std::sync::OnceLock;
+#[cfg(coverage)]
+use std::sync::atomic::AtomicBool;
+#[cfg(coverage)]
+use std::sync::atomic::AtomicUsize;
+#[cfg(coverage)]
+use std::sync::atomic::Ordering;
+use std::time::Instant;
+
 use super::std_timer_scheduler_state::StdTimerSchedulerState;
 use super::std_timer_waiter::StdTimerWaiter;
 use super::std_timer_worker_guard::StdTimerWorkerGuard;
+use crate::TimeError;
+use crate::TimerUnavailableError;
 use crate::internal::PanicFanout;
-use crate::{
-    TimeError,
-    TimerUnavailableError,
-};
-use std::io;
-#[cfg(coverage)]
-use std::sync::atomic::{
-    AtomicBool,
-    AtomicUsize,
-    Ordering,
-};
-use std::sync::{
-    Arc,
-    Condvar,
-    Mutex,
-    MutexGuard,
-    OnceLock,
-};
-use std::time::Instant;
 
 #[cfg(coverage)]
 static FAIL_NEXT_WORKER_SPAWN: AtomicBool = AtomicBool::new(false);

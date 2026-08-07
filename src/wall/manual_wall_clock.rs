@@ -7,18 +7,15 @@
 // =============================================================================
 //! Defines a manually re-anchorable wall-clock projection.
 
-use crate::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    WallClock,
-};
-use std::sync::{
-    Arc,
-    Mutex,
-    MutexGuard,
-};
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
 use std::time::SystemTime;
+
+use crate::ManualMonotonicClock;
+use crate::MonotonicClock;
+use crate::MonotonicInstant;
+use crate::WallClock;
 
 /// A wall clock projected from a shared [`ManualMonotonicClock`].
 ///

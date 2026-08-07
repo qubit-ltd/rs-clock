@@ -7,14 +7,13 @@
 // =============================================================================
 //! Defines a future that observes manual waiter registration.
 
-use crate::ManualMonotonicClock;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-};
+use std::task::Context;
+use std::task::Poll;
+
+use crate::ManualMonotonicClock;
 
 /// A future that completes when a manual clock has enough registered waiters.
 ///

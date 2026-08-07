@@ -7,25 +7,18 @@
 // =============================================================================
 //! Stores the shared mutable state of one manual monotonic time domain.
 
-use super::{
-    AdvanceEffects,
-    ManualMonotonicState,
-};
+use std::sync::Condvar;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
+use std::time::Duration;
+use std::time::Instant;
+
+use super::AdvanceEffects;
+use super::ManualMonotonicState;
 use crate::TimeError;
-use std::sync::{
-    Condvar,
-    Mutex,
-    MutexGuard,
-};
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
-use std::time::{
-    Duration,
-    Instant,
-};
 
 /// Shared synchronization state retained by same-domain manual clock handles.
 pub(crate) struct ManualTimeDomain {

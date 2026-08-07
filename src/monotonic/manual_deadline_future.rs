@@ -7,17 +7,14 @@
 // =============================================================================
 //! Defines a future that observes the next manual deadline registration.
 
-use crate::{
-    ManualMonotonicClock,
-    MonotonicInstant,
-};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-};
+use std::task::Context;
+use std::task::Poll;
+
+use crate::ManualMonotonicClock;
+use crate::MonotonicInstant;
 
 /// A future that observes a manual clock's earliest active future deadline.
 ///

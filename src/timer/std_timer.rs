@@ -7,22 +7,19 @@
 // =============================================================================
 //! Defines a standard-library timer with one shared scheduler worker.
 
+use std::sync::Arc;
+use std::time::Duration;
+use std::time::Instant;
+
+use crate::MonotonicClock;
+use crate::MonotonicInstant;
+use crate::StdMonotonicClock;
+use crate::TimeError;
+use crate::Timer;
+use crate::TimerFuture;
 use crate::timer::internal::std_timer_future::StdTimerFuture;
 use crate::timer::internal::std_timer_scheduler::StdTimerScheduler;
 use crate::timer::internal::std_timer_waiter::StdTimerWaiter;
-use crate::{
-    MonotonicClock,
-    MonotonicInstant,
-    StdMonotonicClock,
-    TimeError,
-    Timer,
-    TimerFuture,
-};
-use std::sync::Arc;
-use std::time::{
-    Duration,
-    Instant,
-};
 
 /// A real-time asynchronous timer backed by [`std::time::Instant`].
 ///

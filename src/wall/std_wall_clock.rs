@@ -7,8 +7,9 @@
 // =============================================================================
 //! Defines the standard system wall clock.
 
-use crate::WallClock;
 use std::time::SystemTime;
+
+use crate::WallClock;
 
 /// A zero-sized wall clock backed by [`SystemTime::now`].
 #[derive(Debug, Clone, Copy, Default)]

@@ -7,20 +7,16 @@
 // =============================================================================
 //! Shares Tokio runtime liveness across independent timers.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::LazyLock;
+use std::sync::Mutex;
+use std::sync::Weak;
+
+use tokio::runtime::Handle;
+use tokio::runtime::Id;
+
 use crate::timer::internal::tokio_runtime_liveness::TokioRuntimeLiveness;
-use std::{
-    collections::HashMap,
-    sync::{
-        Arc,
-        LazyLock,
-        Mutex,
-        Weak,
-    },
-};
-use tokio::runtime::{
-    Handle,
-    Id,
-};
 
 /// Process-wide runtime-liveness registry.
 static REGISTRY: LazyLock<TokioRuntimeLivenessRegistry> =

@@ -7,8 +7,9 @@
 // =============================================================================
 //! Stores mutable state for a manual monotonic clock.
 
-use super::manual_waiter_registry::ManualWaiterRegistry;
 use std::time::Duration;
+
+use super::manual_waiter_registry::ManualWaiterRegistry;
 
 /// Mutable time and waiter registrations protected by the owning clock.
 pub(crate) struct ManualMonotonicState {

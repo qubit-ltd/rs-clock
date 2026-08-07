@@ -8,15 +8,12 @@
 // qubit-style: allow source-test-pair
 //! Exposes the production manual waiter registry to external Loom models.
 
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
+use std::time::Duration;
+
 use crate::monotonic::internal::manual_waiter_registry::ManualWaiterRegistry;
-use std::{
-    task::{
-        Context,
-        Poll,
-        Waker,
-    },
-    time::Duration,
-};
 
 /// Loom-facing adapter around the production manual waiter registry.
 pub struct LoomManualWaiterRegistry {
