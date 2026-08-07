@@ -7,10 +7,11 @@
 // =============================================================================
 
 #[cfg(all(loom, feature = "loom-model"))]
-use loom::{
-    sync::Arc,
-    thread,
-};
+use loom::model;
+#[cfg(all(loom, feature = "loom-model"))]
+use loom::sync::Arc;
+#[cfg(all(loom, feature = "loom-model"))]
+use loom::thread;
 #[cfg(all(loom, feature = "loom-model"))]
 use qubit_clock::test_util::loom::LoomNotificationLatch;
 
@@ -18,7 +19,7 @@ use qubit_clock::test_util::loom::LoomNotificationLatch;
 #[cfg(all(loom, feature = "loom-model"))]
 #[test]
 fn test_loom_notification_latch_preserves_notify_racing_with_take() {
-    loom::model(|| {
+    model(|| {
         let latch = Arc::new(LoomNotificationLatch::new());
         let take_latch = Arc::clone(&latch);
         let notify_latch = Arc::clone(&latch);
@@ -40,7 +41,7 @@ fn test_loom_notification_latch_preserves_notify_racing_with_take() {
 #[cfg(all(loom, feature = "loom-model"))]
 #[test]
 fn test_loom_notification_latch_coalesces_concurrent_notifications() {
-    loom::model(|| {
+    model(|| {
         let latch = Arc::new(LoomNotificationLatch::new());
         let first_latch = Arc::clone(&latch);
         let second_latch = Arc::clone(&latch);

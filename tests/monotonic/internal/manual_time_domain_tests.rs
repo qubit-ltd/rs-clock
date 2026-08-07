@@ -6,18 +6,15 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    BlockingSleeper,
-    ManualMonotonicClock,
-    MonotonicClock,
-    Timer,
-};
-use std::sync::{
-    Arc,
-    Barrier,
-};
+use std::sync::Arc;
+use std::sync::Barrier;
 use std::thread;
 use std::time::Duration;
+
+use qubit_clock::BlockingSleeper;
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::Timer;
 
 #[tokio::test]
 async fn test_manual_time_domain_drives_mixed_waiters_in_deadline_order() {

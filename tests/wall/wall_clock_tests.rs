@@ -6,12 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    FixedWallClock,
-    WallClock,
-};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
+
+use qubit_clock::FixedWallClock;
+use qubit_clock::WallClock;
 
 #[test]
 fn test_wall_clock_supports_trait_object() {

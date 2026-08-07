@@ -7,26 +7,21 @@
 // =============================================================================
 //! Benchmarks manual-timer registration, cancellation, and deadline delivery.
 
-use criterion::{
-    BatchSize,
-    BenchmarkId,
-    Criterion,
-    Throughput,
-    criterion_group,
-    criterion_main,
-};
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimerFuture,
-};
 use std::cell::Cell;
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
 use std::time::Duration;
+
+use criterion::BatchSize;
+use criterion::BenchmarkId;
+use criterion::Criterion;
+use criterion::Throughput;
+use criterion::criterion_group;
+use criterion::criterion_main;
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::TimerFuture;
 
 /// Timer populations spanning small tests through high-cardinality workloads.
 const WAITER_COUNTS: [usize; 8] = [1, 8, 32, 63, 64, 65, 128, 1_024];

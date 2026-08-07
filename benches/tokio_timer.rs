@@ -7,30 +7,23 @@
 // =============================================================================
 //! Measures Tokio Timer registration, cancellation, and completion costs.
 
-use criterion::{
-    BatchSize,
-    BenchmarkId,
-    Criterion,
-    Throughput,
-    criterion_group,
-    criterion_main,
-};
-use qubit_clock::{
-    Timer,
-    TimerFuture,
-    TokioTimer,
-};
-use std::{
-    cell::Cell,
-    convert::Infallible,
-    future::{
-        Future,
-        pending,
-        poll_fn,
-    },
-    task::Poll,
-    time::Duration,
-};
+use std::cell::Cell;
+use std::convert::Infallible;
+use std::future::Future;
+use std::future::pending;
+use std::future::poll_fn;
+use std::task::Poll;
+use std::time::Duration;
+
+use criterion::BatchSize;
+use criterion::BenchmarkId;
+use criterion::Criterion;
+use criterion::Throughput;
+use criterion::criterion_group;
+use criterion::criterion_main;
+use qubit_clock::Timer;
+use qubit_clock::TimerFuture;
+use qubit_clock::TokioTimer;
 use tokio::runtime::Runtime;
 use tokio::task::JoinSet;
 

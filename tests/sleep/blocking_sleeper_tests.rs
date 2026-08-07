@@ -6,21 +6,20 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    BlockingSleeper,
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    StdMonotonicClock,
-    TimeError,
-    Timer,
-    TimerFuture,
-    TimerUnavailableError,
-};
 use std::io;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+
+use qubit_clock::BlockingSleeper;
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::StdMonotonicClock;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::TimerFuture;
+use qubit_clock::TimerUnavailableError;
 
 #[test]
 fn test_blocking_sleeper_uses_manual_timer_without_real_delay() {

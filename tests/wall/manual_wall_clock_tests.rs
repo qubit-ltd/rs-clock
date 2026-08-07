@@ -6,23 +6,18 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    ManualWallClock,
-    MonotonicClock,
-    WallClock,
-};
 use std::sync::Arc;
 use std::sync::Barrier;
-use std::sync::atomic::{
-    AtomicBool,
-    Ordering,
-};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::thread;
-use std::time::{
-    Duration,
-    UNIX_EPOCH,
-};
+use std::time::Duration;
+use std::time::UNIX_EPOCH;
+
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::ManualWallClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::WallClock;
 
 #[test]
 fn test_manual_wall_clock_starts_at_wall_anchor() {

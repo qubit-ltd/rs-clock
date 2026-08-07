@@ -9,15 +9,18 @@
 // qubit-style: allow coverage-cfg
 
 #[cfg(coverage)]
-use qubit_clock::{
-    StdMonotonicClock,
-    StdTimer,
-    Timer,
-    reset_std_timer_worker_notification_count,
-    std_timer_worker_notification_count,
-};
-#[cfg(coverage)]
 use std::time::Duration;
+
+#[cfg(coverage)]
+use qubit_clock::StdMonotonicClock;
+#[cfg(coverage)]
+use qubit_clock::StdTimer;
+#[cfg(coverage)]
+use qubit_clock::Timer;
+#[cfg(coverage)]
+use qubit_clock::reset_std_timer_worker_notification_count;
+#[cfg(coverage)]
+use qubit_clock::std_timer_worker_notification_count;
 
 /// Verifies the worker is notified only when the earliest deadline changes.
 #[cfg(coverage)]

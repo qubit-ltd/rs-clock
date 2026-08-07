@@ -9,16 +9,20 @@
 // qubit-style: allow coverage-cfg
 
 #[cfg(coverage)]
-use qubit_clock::{
-    StdMonotonicClock,
-    StdTimer,
-    TimeError,
-    Timer,
-    TimerUnavailableError,
-    fail_next_std_timer_worker_spawn,
-};
-#[cfg(coverage)]
 use std::time::Duration;
+
+#[cfg(coverage)]
+use qubit_clock::StdMonotonicClock;
+#[cfg(coverage)]
+use qubit_clock::StdTimer;
+#[cfg(coverage)]
+use qubit_clock::TimeError;
+#[cfg(coverage)]
+use qubit_clock::Timer;
+#[cfg(coverage)]
+use qubit_clock::TimerUnavailableError;
+#[cfg(coverage)]
+use qubit_clock::fail_next_std_timer_worker_spawn;
 
 /// Verifies native worker-spawn failure preserves its source, rolls back the
 /// attempted registration, and permits a later worker startup.

@@ -6,11 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-};
 use std::time::Duration;
+
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
 
 #[test]
 fn test_manual_monotonic_state_accumulates_multiple_advances() {

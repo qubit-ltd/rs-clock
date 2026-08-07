@@ -6,15 +6,14 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    BlockingSleeper,
-    ManualMonotonicClock,
-    MonotonicClock,
-    Timer,
-};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+
+use qubit_clock::BlockingSleeper;
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::Timer;
 
 #[test]
 fn test_blocking_lock_timeout_is_driven_by_manual_time() {

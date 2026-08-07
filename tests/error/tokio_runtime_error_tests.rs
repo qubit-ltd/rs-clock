@@ -6,11 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    TokioMonotonicClock,
-    TokioRuntimeError,
-};
 use std::error::Error;
+
+use qubit_clock::TokioMonotonicClock;
+use qubit_clock::TokioRuntimeError;
+use tokio::runtime::TryCurrentError;
 
 /// Verifies that ambient runtime lookup failures retain Tokio's source.
 #[test]
@@ -26,9 +26,7 @@ fn test_tokio_runtime_error_retains_runtime_lookup_source() {
     );
     let source = error
         .source()
-        .and_then(|source| {
-            source.downcast_ref::<tokio::runtime::TryCurrentError>()
-        })
+        .and_then(|source| source.downcast_ref::<TryCurrentError>())
         .expect("Tokio lookup error should remain in the source chain");
     assert!(source.is_missing_context());
 }

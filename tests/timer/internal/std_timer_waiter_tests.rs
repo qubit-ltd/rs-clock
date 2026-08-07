@@ -6,23 +6,19 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    StdMonotonicClock,
-    StdTimer,
-    Timer,
-};
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Wake,
-    Waker,
-};
-use std::time::Duration;
-
-#[cfg(all(loom, feature = "loom-model"))]
-use qubit_clock::test_util::loom::LoomStdTimerWaiter;
+use std::task::Context;
 #[cfg(all(loom, feature = "loom-model"))]
 use std::task::Poll;
+use std::task::Wake;
+use std::task::Waker;
+use std::time::Duration;
+
+use qubit_clock::StdMonotonicClock;
+use qubit_clock::StdTimer;
+use qubit_clock::Timer;
+#[cfg(all(loom, feature = "loom-model"))]
+use qubit_clock::test_util::loom::LoomStdTimerWaiter;
 
 /// Provides stable Waker identity without performing work when invoked.
 struct NoopWake;

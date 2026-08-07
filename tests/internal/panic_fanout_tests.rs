@@ -6,24 +6,17 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    ManualTimer,
-    Timer,
-};
-use std::sync::{
-    Arc,
-    atomic::{
-        AtomicUsize,
-        Ordering,
-    },
-};
-use std::task::{
-    Context,
-    Wake,
-    Waker,
-};
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::task::Context;
+use std::task::Wake;
+use std::task::Waker;
 use std::time::Duration;
+
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::ManualTimer;
+use qubit_clock::Timer;
 
 struct PanicWaker {
     attempts: Arc<AtomicUsize>,

@@ -6,12 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    MonotonicClock,
-    TokioMonotonicClock,
-    TokioRuntimeError,
-};
 use std::time::Duration;
+
+use qubit_clock::MonotonicClock;
+use qubit_clock::TokioMonotonicClock;
+use qubit_clock::TokioRuntimeError;
 
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monotonic_clock_follows_tokio_time() {

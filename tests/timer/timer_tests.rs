@@ -6,24 +6,20 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-    TimerUnavailableError,
-};
-use std::sync::{
-    Arc,
-    Mutex,
-};
+use std::future;
+use std::io;
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
-use std::{
-    future,
-    io,
-};
+
+use qubit_clock::ClockDomain;
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::TimerFuture;
+use qubit_clock::TimerUnavailableError;
 
 struct RecordingTimer {
     clock: Arc<ManualMonotonicClock>,
@@ -60,19 +56,19 @@ struct FailingTimer {
 }
 
 struct DeadlineOverrideClock {
-    domain: qubit_clock::ClockDomain,
+    domain: ClockDomain,
 }
 
 impl DeadlineOverrideClock {
     fn new() -> Self {
         Self {
-            domain: qubit_clock::ClockDomain::new(),
+            domain: ClockDomain::new(),
         }
     }
 }
 
 impl MonotonicClock for DeadlineOverrideClock {
-    fn domain(&self) -> qubit_clock::ClockDomain {
+    fn domain(&self) -> ClockDomain {
         self.domain
     }
 

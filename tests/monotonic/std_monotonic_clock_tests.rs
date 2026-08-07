@@ -6,12 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    MonotonicClock,
-    StdMonotonicClock,
-};
 use std::thread;
 use std::time::Duration;
+
+use qubit_clock::MonotonicClock;
+use qubit_clock::StdMonotonicClock;
 
 #[test]
 fn test_std_monotonic_clock_progresses_with_real_time() {

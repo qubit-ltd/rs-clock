@@ -6,15 +6,12 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ClockDomain,
-    TimeError,
-    TimerUnavailableError,
-};
-use std::{
-    io,
-    time::Duration,
-};
+use std::io;
+use std::time::Duration;
+
+use qubit_clock::ClockDomain;
+use qubit_clock::TimeError;
+use qubit_clock::TimerUnavailableError;
 
 #[test]
 fn test_time_error_clock_domain_mismatch_display() {
