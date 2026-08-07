@@ -8,13 +8,12 @@
 
 // qubit-style: allow coverage-cfg
 
+use std::time::Duration;
+
+use qubit_clock::Timer;
+use qubit_clock::TokioTimer;
 #[cfg(coverage)]
 use qubit_clock::panic_next_tokio_timer_sleep_poll;
-use qubit_clock::{
-    Timer,
-    TokioTimer,
-};
-use std::time::Duration;
 
 /// Verifies the concrete Tokio timer future completes its native sleep.
 #[test]

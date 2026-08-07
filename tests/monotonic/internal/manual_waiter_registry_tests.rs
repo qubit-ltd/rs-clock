@@ -7,30 +7,30 @@
 // =============================================================================
 
 #[cfg(all(loom, feature = "loom-model"))]
-use loom::{
-    sync::{
-        Arc,
-        Mutex,
-    },
-    thread,
-};
+use std::task::Context;
+#[cfg(all(loom, feature = "loom-model"))]
+use std::task::Poll;
+#[cfg(all(loom, feature = "loom-model"))]
+use std::task::Waker;
+#[cfg(all(loom, feature = "loom-model"))]
+use std::time::Duration;
+
+#[cfg(all(loom, feature = "loom-model"))]
+use loom::model;
+#[cfg(all(loom, feature = "loom-model"))]
+use loom::sync::Arc;
+#[cfg(all(loom, feature = "loom-model"))]
+use loom::sync::Mutex;
+#[cfg(all(loom, feature = "loom-model"))]
+use loom::thread;
 #[cfg(all(loom, feature = "loom-model"))]
 use qubit_clock::test_util::loom::LoomManualWaiterRegistry;
-#[cfg(all(loom, feature = "loom-model"))]
-use std::{
-    task::{
-        Context,
-        Poll,
-        Waker,
-    },
-    time::Duration,
-};
 
 /// Models the race between advancing a due timer and cancelling its future.
 #[cfg(all(loom, feature = "loom-model"))]
 #[test]
 fn test_loom_manual_waiter_registry_advance_races_with_cancellation() {
-    loom::model(|| {
+    model(|| {
         let mut registry = LoomManualWaiterRegistry::new();
         let waiter_id = registry.register_timer(Duration::from_secs(1));
         let context = Context::from_waker(Waker::noop());
@@ -78,7 +78,7 @@ fn test_loom_manual_waiter_registry_advance_races_with_cancellation() {
 #[test]
 fn test_loom_manual_waiter_registry_publication_races_with_observer_cancellation()
  {
-    loom::model(|| {
+    model(|| {
         let mut registry = LoomManualWaiterRegistry::new();
         let observer_id = registry.register_deadline_observer();
         let context = Context::from_waker(Waker::noop());

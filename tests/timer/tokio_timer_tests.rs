@@ -6,20 +6,19 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerUnavailableError,
-    TokioMonotonicClock,
-    TokioRuntimeError,
-    TokioTimer,
-};
 use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
+
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::TimerUnavailableError;
+use qubit_clock::TokioMonotonicClock;
+use qubit_clock::TokioRuntimeError;
+use qubit_clock::TokioTimer;
 
 /// Environment flag selecting the isolated runtime-shutdown child path.
 const TOKIO_SHUTDOWN_CHILD: &str = "QUBIT_CLOCK_TOKIO_SHUTDOWN_CHILD";

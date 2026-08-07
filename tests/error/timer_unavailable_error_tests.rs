@@ -6,14 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    TimeError,
-    TimerUnavailableError,
-};
-use std::{
-    error::Error,
-    io,
-};
+use std::error::Error;
+use std::io;
+
+use qubit_clock::TimeError;
+use qubit_clock::TimerUnavailableError;
 
 /// Verifies that worker-spawn failures retain their original I/O source.
 #[test]

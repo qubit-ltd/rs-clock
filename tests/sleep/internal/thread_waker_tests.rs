@@ -6,22 +6,19 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    BlockingSleeper,
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-};
+use std::task::Context;
+use std::task::Poll;
+
+use qubit_clock::BlockingSleeper;
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::TimerFuture;
 
 /// Returns pending once after synchronously waking its caller.
 struct WakeBeforeParkFuture {

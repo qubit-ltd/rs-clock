@@ -6,30 +6,23 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    BlockingSleeper,
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimeError,
-    Timer,
-    WallClock,
-};
 use std::future::Future;
 use std::pin::pin;
-use std::sync::{
-    Arc,
-    mpsc,
-};
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use std::sync::Arc;
+use std::sync::mpsc;
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
 use std::thread;
-use std::time::{
-    Duration,
-    UNIX_EPOCH,
-};
+use std::time::Duration;
+use std::time::UNIX_EPOCH;
+
+use qubit_clock::BlockingSleeper;
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::WallClock;
 
 #[test]
 fn test_manual_monotonic_clock_shared_helpers_use_same_timeline() {

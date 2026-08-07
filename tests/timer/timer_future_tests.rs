@@ -6,8 +6,9 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::TimerFuture;
 use std::future;
+
+use qubit_clock::TimerFuture;
 
 #[test]
 fn test_timer_future_is_send_and_static() {

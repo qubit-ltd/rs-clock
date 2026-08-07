@@ -7,36 +7,27 @@
 // =============================================================================
 //! Measures standard timer scheduler scaling, cancellation, and completion.
 
-use criterion::{
-    BenchmarkGroup,
-    BenchmarkId,
-    Criterion,
-    Throughput,
-    criterion_group,
-    criterion_main,
-    measurement::WallTime,
-};
-use qubit_clock::{
-    MonotonicClock,
-    StdMonotonicClock,
-    TimerFuture,
-};
 use std::cell::Cell;
-use std::sync::{
-    Arc,
-    Barrier,
-    atomic::{
-        AtomicBool,
-        Ordering,
-    },
-};
-use std::task::{
-    Context,
-    Poll,
-    Wake,
-    Waker,
-};
+use std::sync::Arc;
+use std::sync::Barrier;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::task::Context;
+use std::task::Poll;
+use std::task::Wake;
+use std::task::Waker;
 use std::time::Duration;
+
+use criterion::BenchmarkGroup;
+use criterion::BenchmarkId;
+use criterion::Criterion;
+use criterion::Throughput;
+use criterion::criterion_group;
+use criterion::criterion_main;
+use criterion::measurement::WallTime;
+use qubit_clock::MonotonicClock;
+use qubit_clock::StdMonotonicClock;
+use qubit_clock::TimerFuture;
 
 /// Persistent caller-thread counts used to expose scheduler scaling behavior.
 const CONCURRENT_WORKER_COUNTS: [usize; 5] = [1, 2, 4, 8, 16];

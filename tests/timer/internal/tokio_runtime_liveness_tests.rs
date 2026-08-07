@@ -6,27 +6,21 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    Timer,
-    TokioTimer,
-};
+use std::sync::Arc;
+use std::sync::Barrier;
 #[cfg(tokio_unstable)]
-use std::sync::{
-    OnceLock,
-    Weak,
-    atomic::{
-        AtomicUsize,
-        Ordering,
-    },
-};
-use std::{
-    sync::{
-        Arc,
-        Barrier,
-    },
-    thread,
-    time::Duration,
-};
+use std::sync::OnceLock;
+#[cfg(tokio_unstable)]
+use std::sync::Weak;
+#[cfg(tokio_unstable)]
+use std::sync::atomic::AtomicUsize;
+#[cfg(tokio_unstable)]
+use std::sync::atomic::Ordering;
+use std::thread;
+use std::time::Duration;
+
+use qubit_clock::Timer;
+use qubit_clock::TokioTimer;
 
 /// Number of registrations used to expose per-deadline liveness tasks.
 const LIVENESS_REGISTRATION_COUNT: usize = 1_024;

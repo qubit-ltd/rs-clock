@@ -9,34 +9,36 @@
 // qubit-style: allow coverage-cfg
 
 #[cfg(coverage)]
-use qubit_clock::{
-    StdMonotonicClock,
-    StdTimer,
-    Timer,
-    panic_next_std_timer_worker,
-};
+use std::sync::Arc;
 #[cfg(coverage)]
-use qubit_clock::{
-    TimeError,
-    TimerUnavailableError,
-};
+use std::sync::mpsc::SyncSender;
 #[cfg(coverage)]
-use std::sync::{
-    Arc,
-    mpsc::{
-        SyncSender,
-        sync_channel,
-    },
-};
+use std::sync::mpsc::sync_channel;
 #[cfg(coverage)]
-use std::task::{
-    Context,
-    Poll,
-    Wake,
-    Waker,
-};
+use std::task::Context;
+#[cfg(coverage)]
+use std::task::Poll;
+#[cfg(coverage)]
+use std::task::Wake;
+#[cfg(coverage)]
+use std::task::Waker;
 #[cfg(coverage)]
 use std::time::Duration;
+
+#[cfg(coverage)]
+use qubit_clock::StdMonotonicClock;
+#[cfg(coverage)]
+use qubit_clock::StdTimer;
+#[cfg(coverage)]
+use qubit_clock::TimeError;
+#[cfg(coverage)]
+use qubit_clock::Timer;
+#[cfg(coverage)]
+use qubit_clock::TimerFuture;
+#[cfg(coverage)]
+use qubit_clock::TimerUnavailableError;
+#[cfg(coverage)]
+use qubit_clock::panic_next_std_timer_worker;
 
 /// Maximum time allowed for a failed worker to notify its waiter.
 #[cfg(coverage)]
@@ -78,7 +80,7 @@ impl Wake for ThreadUnparker {
 /// The Timer completion result.
 #[cfg(coverage)]
 fn poll_until_terminal(
-    mut future: qubit_clock::TimerFuture,
+    mut future: TimerFuture,
     mut pending_sender: Option<SyncSender<()>>,
 ) -> Result<(), TimeError> {
     let thread_waker = Arc::new(ThreadUnparker {

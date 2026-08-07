@@ -6,26 +6,21 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    StdMonotonicClock,
-    StdTimer,
-    TimeError,
-    Timer,
-};
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Waker,
-};
+use std::task::Context;
+use std::task::Waker;
 use std::time::Duration;
 
-use super::internal::{
-    DestructorPanickingWaker,
-    PanickingWaker,
-};
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::StdMonotonicClock;
+use qubit_clock::StdTimer;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+
+use super::internal::DestructorPanickingWaker;
+use super::internal::PanickingWaker;
 use super::support::block_on_timer_future;
 
 #[test]

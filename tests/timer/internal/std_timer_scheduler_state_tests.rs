@@ -6,16 +6,13 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    StdMonotonicClock,
-    StdTimer,
-    Timer,
-};
 use std::sync::mpsc::sync_channel;
-use std::{
-    thread,
-    time::Duration,
-};
+use std::thread;
+use std::time::Duration;
+
+use qubit_clock::StdMonotonicClock;
+use qubit_clock::StdTimer;
+use qubit_clock::Timer;
 
 use super::super::support::block_on_timer_future;
 

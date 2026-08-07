@@ -6,32 +6,23 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    StdMonotonicClock,
-    StdTimer,
-    Timer,
-    TimerFuture,
-};
-use std::sync::{
-    Arc,
-    Barrier,
-    Mutex,
-    atomic::{
-        AtomicBool,
-        Ordering,
-    },
-};
-use std::task::{
-    Context,
-    Poll,
-    Wake,
-    Waker,
-};
-use std::thread::{
-    Thread,
-    ThreadId,
-};
+use std::sync::Arc;
+use std::sync::Barrier;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::task::Context;
+use std::task::Poll;
+use std::task::Wake;
+use std::task::Waker;
+use std::thread::Thread;
+use std::thread::ThreadId;
 use std::time::Duration;
+
+use qubit_clock::StdMonotonicClock;
+use qubit_clock::StdTimer;
+use qubit_clock::Timer;
+use qubit_clock::TimerFuture;
 
 /// Number of caller threads used by shared-scheduler concurrency tests.
 const CONCURRENT_WORKER_COUNT: usize = 16;

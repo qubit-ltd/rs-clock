@@ -6,13 +6,12 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    TimeError,
-    Timer,
-    TimerUnavailableError,
-    TokioTimer,
-};
 use std::time::Duration;
+
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::TimerUnavailableError;
+use qubit_clock::TokioTimer;
 
 /// Verifies one shutdown publication reaches every pending deadline.
 #[test]

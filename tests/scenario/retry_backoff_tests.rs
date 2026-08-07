@@ -6,20 +6,18 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    BlockingSleeper,
-    ManualMonotonicClock,
-    MonotonicClock,
-    Timer,
-};
 use std::future::pending;
 use std::sync::Arc;
-use std::sync::atomic::{
-    AtomicUsize,
-    Ordering,
-};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
+
+use qubit_clock::BlockingSleeper;
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::Timer;
 
 #[test]
 fn test_retry_exponential_backoff_uses_no_real_delay() {
@@ -70,7 +68,7 @@ fn test_retry_exponential_backoff_uses_no_real_delay() {
 /// coordination guard expires.
 fn wait_for_blocking_deadline(
     clock: &ManualMonotonicClock,
-    expected_deadline: qubit_clock::MonotonicInstant,
+    expected_deadline: MonotonicInstant,
 ) {
     assert_eq!(
         Some(expected_deadline),

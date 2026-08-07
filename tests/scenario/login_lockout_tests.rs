@@ -6,17 +6,14 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    ManualWallClock,
-    WallClock,
-};
 use std::sync::Arc;
-use std::time::{
-    Duration,
-    SystemTime,
-    UNIX_EPOCH,
-};
+use std::time::Duration;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
+
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::ManualWallClock;
+use qubit_clock::WallClock;
 
 const LOCK_DURATION: Duration = Duration::from_secs(10 * 60);
 

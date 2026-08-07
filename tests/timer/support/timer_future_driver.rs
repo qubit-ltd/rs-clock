@@ -7,20 +7,15 @@
 // =============================================================================
 //! Drives one Timer future to completion on the current thread.
 
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::task::Context;
+use std::task::Poll;
+use std::task::Wake;
+use std::task::Waker;
+
 use qubit_clock::TimerFuture;
-use std::sync::{
-    Arc,
-    atomic::{
-        AtomicBool,
-        Ordering,
-    },
-};
-use std::task::{
-    Context,
-    Poll,
-    Wake,
-    Waker,
-};
 
 /// Notifies a thread that is synchronously polling one Timer future.
 struct ThreadWaker {

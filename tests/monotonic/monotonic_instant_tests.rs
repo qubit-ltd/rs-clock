@@ -6,12 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimeError,
-};
 use std::time::Duration;
+
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::TimeError;
 
 #[test]
 fn test_monotonic_instant_checked_add_preserves_domain() {
