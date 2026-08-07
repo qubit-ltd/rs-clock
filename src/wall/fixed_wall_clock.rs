@@ -7,8 +7,9 @@
 // =============================================================================
 //! Defines an immutable fixed wall clock.
 
-use crate::WallClock;
 use std::time::SystemTime;
+
+use crate::WallClock;
 
 /// A wall clock that always returns one fixed time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

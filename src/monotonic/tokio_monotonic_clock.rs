@@ -7,17 +7,17 @@
 // =============================================================================
 //! Defines the Tokio monotonic clock implementation.
 
-use crate::{
-    ClockDomain,
-    MonotonicClock,
-    MonotonicInstant,
-    Timer,
-    TokioRuntimeError,
-    TokioTimer,
-};
 use std::sync::Arc;
+
 use tokio::runtime::Handle;
 use tokio::time::Instant;
+
+use crate::ClockDomain;
+use crate::MonotonicClock;
+use crate::MonotonicInstant;
+use crate::Timer;
+use crate::TokioRuntimeError;
+use crate::TokioTimer;
 
 /// Runs one synchronous operation in the target runtime context.
 ///

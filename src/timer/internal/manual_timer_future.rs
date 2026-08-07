@@ -7,18 +7,15 @@
 // =============================================================================
 //! Defines the cancellation-safe future used by manual timers.
 
-use crate::{
-    ManualMonotonicClock,
-    MonotonicInstant,
-    TimeError,
-};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-};
+use std::task::Context;
+use std::task::Poll;
+
+use crate::ManualMonotonicClock;
+use crate::MonotonicInstant;
+use crate::TimeError;
 
 /// A deadline future eagerly registered with one manual time domain.
 pub(crate) struct ManualTimerFuture {

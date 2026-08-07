@@ -9,37 +9,31 @@
 
 // qubit-style: allow coverage-cfg
 
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
+use std::sync::Arc;
+use std::sync::OnceLock;
+#[cfg(coverage)]
+use std::sync::atomic::AtomicBool;
+#[cfg(coverage)]
+use std::sync::atomic::Ordering;
+use std::time::Duration;
+
+use tokio::runtime::Handle;
+use tokio::time::Instant;
+use tokio::time::sleep_until;
+
+use crate::MonotonicClock;
+use crate::MonotonicInstant;
+use crate::TimeError;
+use crate::Timer;
+use crate::TimerFuture;
+use crate::TimerUnavailableError;
+use crate::TokioMonotonicClock;
+use crate::TokioRuntimeError;
 use crate::timer::internal::tokio_runtime_liveness::TokioRuntimeLiveness;
 use crate::timer::internal::tokio_runtime_liveness_registry::TokioRuntimeLivenessRegistry;
 use crate::timer::internal::tokio_timer_future::TokioTimerFuture;
-use crate::{
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-    TimerUnavailableError,
-    TokioMonotonicClock,
-    TokioRuntimeError,
-};
-#[cfg(coverage)]
-use std::sync::atomic::{
-    AtomicBool,
-    Ordering,
-};
-use std::{
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-    },
-    sync::{
-        Arc,
-        OnceLock,
-    },
-    time::Duration,
-};
-use tokio::runtime::Handle;
-use tokio::time::Instant;
 
 #[cfg(coverage)]
 static PANIC_NEXT_SLEEP_POLL: AtomicBool = AtomicBool::new(false);
@@ -248,12 +242,10 @@ impl TokioTimer {
         // cannot recover. Temporarily replacing the global hook would race
         // with application panic handling, so this library deliberately does
         // not attempt to suppress that observable side effect.
-        let sleep = catch_unwind(AssertUnwindSafe(|| {
-            tokio::time::sleep_until(deadline)
-        }))
-        .map_err(|_| TimeError::TimerUnavailable {
-            source: TimerUnavailableError::TimeDriverDisabled,
-        })?;
+        let sleep = catch_unwind(AssertUnwindSafe(|| sleep_until(deadline)))
+            .map_err(|_| TimeError::TimerUnavailable {
+                source: TimerUnavailableError::TimeDriverDisabled,
+            })?;
         // Criterion's `tokio_timer` benchmark showed that 10,240 legacy
         // per-deadline sentinels retained 10,240 tasks and made registration
         // more than 20% slower than native sleeps. One lazy sentinel per

@@ -7,16 +7,16 @@
 // =============================================================================
 //! Stores completion state for one standard timer registration.
 
-use super::std_timer_waiter_state::StdTimerWaiterState;
-#[cfg(all(loom, feature = "loom-model"))]
-use loom::sync::Mutex;
 #[cfg(not(all(loom, feature = "loom-model")))]
 use std::sync::Mutex;
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
+
+#[cfg(all(loom, feature = "loom-model"))]
+use loom::sync::Mutex;
+
+use super::std_timer_waiter_state::StdTimerWaiterState;
 
 /// Completion latch and task waker shared by a future and scheduler worker.
 pub(crate) struct StdTimerWaiter {

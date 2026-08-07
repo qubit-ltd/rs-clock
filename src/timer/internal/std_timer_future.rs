@@ -7,19 +7,16 @@
 // =============================================================================
 //! Defines a future registered with the standard timer scheduler.
 
-use super::std_timer_scheduler::StdTimerScheduler;
-use super::std_timer_waiter::StdTimerWaiter;
-use crate::{
-    TimeError,
-    TimerUnavailableError,
-};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-};
+use std::task::Context;
+use std::task::Poll;
+
+use super::std_timer_scheduler::StdTimerScheduler;
+use super::std_timer_waiter::StdTimerWaiter;
+use crate::TimeError;
+use crate::TimerUnavailableError;
 
 /// A cancellation-safe future backed by one shared standard scheduler.
 pub(crate) struct StdTimerFuture {

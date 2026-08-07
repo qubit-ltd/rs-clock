@@ -7,20 +7,17 @@
 // =============================================================================
 //! Defines a blocking adapter over the asynchronous Timer capability.
 
-use super::internal::ThreadWaker;
-use crate::{
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-};
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-    Waker,
-};
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
 use std::time::Duration;
+
+use super::internal::ThreadWaker;
+use crate::MonotonicInstant;
+use crate::TimeError;
+use crate::Timer;
+use crate::TimerFuture;
 
 /// Adapts any [`Timer`] into synchronous blocking sleep operations.
 ///

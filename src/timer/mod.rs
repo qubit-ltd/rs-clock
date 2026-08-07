@@ -26,10 +26,8 @@ pub use manual_timer::ManualTimer;
 pub use std_timer::StdTimer;
 pub use timer::Timer;
 pub use timer_future::TimerFuture;
-
 #[cfg(feature = "tokio")]
 pub use tokio_timer::TokioTimer;
-
 #[doc(hidden)]
 #[cfg(all(coverage, feature = "tokio"))]
 pub use tokio_timer::panic_next_tokio_timer_sleep_poll;

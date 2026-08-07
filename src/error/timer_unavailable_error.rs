@@ -7,10 +7,8 @@
 // =============================================================================
 //! Defines errors reported when a timer backend is unavailable.
 
-use std::{
-    error::Error as StdError,
-    io,
-};
+use std::error::Error as StdError;
+use std::io;
 
 use thiserror::Error;
 

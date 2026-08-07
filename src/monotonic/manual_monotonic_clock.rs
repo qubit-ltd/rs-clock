@@ -7,32 +7,25 @@
 // =============================================================================
 //! Defines an explicitly advanced monotonic clock for deterministic tests.
 
-use crate::internal::PanicFanout;
-use crate::monotonic::internal::{
-    AdvanceEffects,
-    ManualTimeDomain,
-    WaiterRegistrationGuard,
-};
-use crate::{
-    ClockDomain,
-    ManualDeadlineFuture,
-    ManualTimer,
-    ManualWaiterFuture,
-    ManualWallClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-};
 use std::sync::Arc;
-use std::task::{
-    Context,
-    Poll,
-};
-use std::time::{
-    Duration,
-    SystemTime,
-};
+use std::task::Context;
+use std::task::Poll;
+use std::time::Duration;
+use std::time::SystemTime;
+
+use crate::ClockDomain;
+use crate::ManualDeadlineFuture;
+use crate::ManualTimer;
+use crate::ManualWaiterFuture;
+use crate::ManualWallClock;
+use crate::MonotonicClock;
+use crate::MonotonicInstant;
+use crate::TimeError;
+use crate::Timer;
+use crate::internal::PanicFanout;
+use crate::monotonic::internal::AdvanceEffects;
+use crate::monotonic::internal::ManualTimeDomain;
+use crate::monotonic::internal::WaiterRegistrationGuard;
 
 /// A monotonic clock that advances only when explicitly instructed.
 ///

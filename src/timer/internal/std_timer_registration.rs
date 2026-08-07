@@ -7,9 +7,10 @@
 // =============================================================================
 //! Stores one active standard Timer registration.
 
-use super::std_timer_waiter::StdTimerWaiter;
 use std::sync::Arc;
 use std::time::Instant;
+
+use super::std_timer_waiter::StdTimerWaiter;
 
 /// Associates a native deadline with its completion waiter.
 pub(super) struct StdTimerRegistration {

@@ -7,23 +7,18 @@
 // =============================================================================
 //! Defines a Timer that deterministically injects configured failures.
 
+use std::io;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+
 use super::TimerFailurePoint;
-use crate::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-    TimerUnavailableError,
-};
-use std::{
-    io,
-    sync::atomic::{
-        AtomicUsize,
-        Ordering,
-    },
-};
+use crate::ManualMonotonicClock;
+use crate::MonotonicClock;
+use crate::MonotonicInstant;
+use crate::TimeError;
+use crate::Timer;
+use crate::TimerFuture;
+use crate::TimerUnavailableError;
 
 /// A deterministic Timer fixture that fails registration or completion.
 ///

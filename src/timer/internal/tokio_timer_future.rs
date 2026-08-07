@@ -9,32 +9,24 @@
 
 // qubit-style: allow coverage-cfg
 
+use std::future::Future;
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
+use std::panic::resume_unwind;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Context;
+use std::task::Poll;
+
+use pin_project_lite::pin_project;
+use tokio::sync::futures::OwnedNotified;
+use tokio::time::Sleep;
+
+use crate::TimeError;
+use crate::TimerUnavailableError;
 use crate::timer::internal::tokio_runtime_liveness::TokioRuntimeLiveness;
 #[cfg(coverage)]
 use crate::timer::tokio_timer::take_tokio_timer_sleep_poll_panic;
-use crate::{
-    TimeError,
-    TimerUnavailableError,
-};
-use pin_project_lite::pin_project;
-use std::{
-    future::Future,
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-        resume_unwind,
-    },
-    pin::Pin,
-    sync::Arc,
-    task::{
-        Context,
-        Poll,
-    },
-};
-use tokio::{
-    sync::futures::OwnedNotified,
-    time::Sleep,
-};
 
 pin_project! {
     /// Tokio sleep paired with shared retained-runtime liveness.

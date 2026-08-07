@@ -7,11 +7,13 @@
 // =============================================================================
 //! Maintains exact deadline and registration indexes for a standard Timer.
 
-use super::std_timer_registration::StdTimerRegistration;
-use super::std_timer_waiter::StdTimerWaiter;
-use qubit_collections::map::OrderedIndexMap;
 use std::sync::Arc;
 use std::time::Instant;
+
+use qubit_collections::map::OrderedIndexMap;
+
+use super::std_timer_registration::StdTimerRegistration;
+use super::std_timer_waiter::StdTimerWaiter;
 
 /// Mutable registrations protected by one scheduler lock.
 pub(super) struct StdTimerSchedulerState {

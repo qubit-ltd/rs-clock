@@ -8,16 +8,15 @@
 // qubit-style: allow source-test-pair
 //! Defines the one-bit notification state used while blocking on a Timer.
 
-#[cfg(all(loom, feature = "loom-model"))]
-use loom::sync::atomic::{
-    AtomicBool,
-    Ordering,
-};
 #[cfg(not(all(loom, feature = "loom-model")))]
-use std::sync::atomic::{
-    AtomicBool,
-    Ordering,
-};
+use std::sync::atomic::AtomicBool;
+#[cfg(not(all(loom, feature = "loom-model")))]
+use std::sync::atomic::Ordering;
+
+#[cfg(all(loom, feature = "loom-model"))]
+use loom::sync::atomic::AtomicBool;
+#[cfg(all(loom, feature = "loom-model"))]
+use loom::sync::atomic::Ordering;
 
 /// One-bit notification latch preventing wake-before-park loss.
 pub(crate) struct NotificationLatch {

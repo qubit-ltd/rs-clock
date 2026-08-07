@@ -7,8 +7,9 @@
 // =============================================================================
 //! Signals shutdown when Tokio drops the runtime-liveness sentinel.
 
-use crate::timer::internal::tokio_runtime_shutdown_state::TokioRuntimeShutdownState;
 use std::sync::Arc;
+
+use crate::timer::internal::tokio_runtime_shutdown_state::TokioRuntimeShutdownState;
 
 /// Sentinel-owned guard that publishes shutdown from [`Drop`].
 #[derive(Debug)]

@@ -7,9 +7,10 @@
 // =============================================================================
 //! Defines the notification latch used by a blocking sleeper.
 
-use super::notification_latch::NotificationLatch;
 use std::sync::Arc;
 use std::task::Wake;
+
+use super::notification_latch::NotificationLatch;
 
 /// Thread notification latch used as a future waker.
 pub(crate) struct ThreadWaker {
