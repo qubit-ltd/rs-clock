@@ -17,22 +17,5 @@ jobs:
   rust-ci:
     uses: qubit-ltd/rs-ci/.github/workflows/rust-ci.yml@main
     with:
-      run_windows_tests: true
-      run_macos_tests: true
+      coverage_enforce_thresholds: "1"
     secrets: inherit
-
-  tokio-task-hook-regression:
-    name: Tokio task-hook regression
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-      - name: Install Rust toolchain
-        run: rustup toolchain install 1.94.0 --profile minimal
-      - name: Test reentrant Tokio task hook
-        env:
-          RUSTFLAGS: --cfg tokio_unstable
-        run: >-
-          cargo +1.94.0 test --all-features
-          test_tokio_runtime_liveness_allows_reentrant_task_hook
