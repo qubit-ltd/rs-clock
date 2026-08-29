@@ -29,3 +29,16 @@ fn test_wall_clock_box_delegates_to_inner_object() {
     let clock: Box<dyn WallClock> = Box::new(FixedWallClock::new(UNIX_EPOCH));
     assert_eq!(UNIX_EPOCH, clock.now());
 }
+
+fn wall_time<C: WallClock>(clock: C) -> std::time::SystemTime {
+    clock.now()
+}
+
+#[test]
+fn test_wall_clock_reference_delegates_to_concrete_and_trait_object() {
+    let clock = FixedWallClock::new(UNIX_EPOCH);
+    let trait_object: &dyn WallClock = &clock;
+
+    assert_eq!(UNIX_EPOCH, wall_time(clock));
+    assert_eq!(UNIX_EPOCH, wall_time(trait_object));
+}

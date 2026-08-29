@@ -32,6 +32,21 @@ pub trait WallClock: Send + Sync {
     fn now(&self) -> SystemTime;
 }
 
+impl<T> WallClock for &T
+where
+    T: WallClock + ?Sized,
+{
+    /// Delegates to the borrowed wall clock object.
+    ///
+    /// # Returns
+    ///
+    /// The current wall time returned by the borrowed clock.
+    #[inline(always)]
+    fn now(&self) -> SystemTime {
+        <T as WallClock>::now(*self)
+    }
+}
+
 impl<T> WallClock for std::sync::Arc<T>
 where
     T: WallClock + ?Sized,

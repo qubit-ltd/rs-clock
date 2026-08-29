@@ -107,6 +107,57 @@ pub trait Timer: Send + Sync {
     }
 }
 
+impl<T> Timer for &T
+where
+    T: Timer + ?Sized,
+{
+    /// Delegates access to the borrowed timer's clock.
+    ///
+    /// # Returns
+    ///
+    /// The clock exposed by the borrowed timer.
+    #[inline(always)]
+    fn clock(&self) -> &dyn MonotonicClock {
+        <T as Timer>::clock(*self)
+    }
+
+    /// Delegates absolute deadline registration to the borrowed timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the borrowed timer's clock domain.
+    ///
+    /// # Returns
+    ///
+    /// The borrowed timer's cancellation-safe completion future.
+    ///
+    /// # Errors
+    ///
+    /// Returns any registration error reported by the borrowed timer.
+    #[inline(always)]
+    fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
+        <T as Timer>::at(*self, deadline)
+    }
+
+    /// Delegates relative deadline registration to the borrowed timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Duration from the borrowed timer's current instant.
+    ///
+    /// # Returns
+    ///
+    /// The borrowed timer's cancellation-safe completion future.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error reported by the borrowed timer.
+    #[inline(always)]
+    fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
+        <T as Timer>::after(*self, duration)
+    }
+}
+
 impl<T> Timer for std::sync::Arc<T>
 where
     T: Timer + ?Sized,
