@@ -95,10 +95,7 @@ impl MonotonicInstant {
     /// cannot represent the result.
     #[inline]
     pub fn checked_add(self, duration: Duration) -> Result<Self, TimeError> {
-        let elapsed = self
-            .elapsed
-            .checked_add(duration)
-            .ok_or(TimeError::InstantOverflow)?;
+        let elapsed = self.elapsed.checked_add(duration).ok_or(TimeError::InstantOverflow)?;
         Ok(Self::new(self.domain, elapsed))
     }
 
@@ -124,12 +121,12 @@ impl MonotonicInstant {
     #[inline]
     pub fn duration_since(self, earlier: Self) -> Result<Duration, TimeError> {
         earlier.validate_domain(self.domain)?;
-        self.elapsed.checked_sub(earlier.elapsed).ok_or(
-            TimeError::InvalidInstantOrder {
+        self.elapsed
+            .checked_sub(earlier.elapsed)
+            .ok_or(TimeError::InvalidInstantOrder {
                 current_elapsed: self.elapsed,
                 earlier_elapsed: earlier.elapsed,
-            },
-        )
+            })
     }
 
     /// Verifies that this instant belongs to `expected_domain`.
@@ -149,10 +146,7 @@ impl MonotonicInstant {
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] when the domains differ.
     #[inline]
-    pub fn validate_domain(
-        self,
-        expected_domain: ClockDomain,
-    ) -> Result<(), TimeError> {
+    pub fn validate_domain(self, expected_domain: ClockDomain) -> Result<(), TimeError> {
         if self.domain == expected_domain {
             Ok(())
         } else {

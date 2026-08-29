@@ -12,10 +12,7 @@
 pub(crate) mod internal;
 mod manual_timer;
 mod std_timer;
-#[allow(
-    clippy::module_inception,
-    reason = "the file name follows the public Timer type"
-)]
+#[allow(clippy::module_inception, reason = "the file name follows the public Timer type")]
 mod timer;
 mod timer_future;
 

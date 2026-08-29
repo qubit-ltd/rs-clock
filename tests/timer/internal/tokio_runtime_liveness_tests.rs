@@ -155,29 +155,17 @@ fn test_tokio_runtime_liveness_is_not_shared_across_runtimes() {
         .after(Duration::from_secs(60))
         .expect("second deadline should register");
 
-    assert_eq!(
-        first_initial_tasks + 1,
-        first_runtime.metrics().num_alive_tasks(),
-    );
-    assert_eq!(
-        second_initial_tasks + 1,
-        second_runtime.metrics().num_alive_tasks(),
-    );
+    assert_eq!(first_initial_tasks + 1, first_runtime.metrics().num_alive_tasks(),);
+    assert_eq!(second_initial_tasks + 1, second_runtime.metrics().num_alive_tasks(),);
 
     drop(first_future);
     drop(first_timer);
     first_runtime.block_on(tokio::task::yield_now());
-    assert_eq!(
-        first_initial_tasks,
-        first_runtime.metrics().num_alive_tasks(),
-    );
+    assert_eq!(first_initial_tasks, first_runtime.metrics().num_alive_tasks(),);
     drop(second_future);
     drop(second_timer);
     second_runtime.block_on(tokio::task::yield_now());
-    assert_eq!(
-        second_initial_tasks,
-        second_runtime.metrics().num_alive_tasks(),
-    );
+    assert_eq!(second_initial_tasks, second_runtime.metrics().num_alive_tasks(),);
 }
 
 /// Verifies that dropping one deadline leaves liveness retained by its timer.

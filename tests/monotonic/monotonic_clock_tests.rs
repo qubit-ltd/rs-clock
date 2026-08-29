@@ -31,10 +31,7 @@ impl MonotonicClock for ExternalMonotonicClock {
         MonotonicInstant::new(self.domain, self.elapsed)
     }
 
-    fn deadline_after(
-        &self,
-        _duration: Duration,
-    ) -> Result<MonotonicInstant, TimeError> {
+    fn deadline_after(&self, _duration: Duration) -> Result<MonotonicInstant, TimeError> {
         Ok(MonotonicInstant::new(self.domain, Duration::from_secs(11)))
     }
 
@@ -57,10 +54,7 @@ impl Timer for ExternalTimer {
         &self.clock
     }
 
-    fn at(
-        &self,
-        _deadline: MonotonicInstant,
-    ) -> Result<TimerFuture, TimeError> {
+    fn at(&self, _deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         Ok(Box::pin(std::future::ready(Ok(()))))
     }
 }
@@ -206,12 +200,6 @@ fn test_monotonic_clock_arc_and_box_delegate_overridden_deadline_after() {
         .deadline_after(Duration::from_secs(5))
         .expect("deadline should be supplied by the wrapped clock");
 
-    assert_eq!(
-        Duration::from_secs(11),
-        shared_deadline.elapsed_since_origin()
-    );
-    assert_eq!(
-        Duration::from_secs(11),
-        boxed_deadline.elapsed_since_origin()
-    );
+    assert_eq!(Duration::from_secs(11), shared_deadline.elapsed_since_origin());
+    assert_eq!(Duration::from_secs(11), boxed_deadline.elapsed_since_origin());
 }

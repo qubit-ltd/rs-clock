@@ -34,8 +34,7 @@ fn test_loom_manual_waiter_registry_advance_races_with_cancellation() {
         let mut registry = LoomManualWaiterRegistry::new();
         let waiter_id = registry.register_timer(Duration::from_secs(1));
         let context = Context::from_waker(Waker::noop());
-        let (poll, replaced_waker) =
-            registry.poll_timer(waiter_id, Duration::ZERO, &context);
+        let (poll, replaced_waker) = registry.poll_timer(waiter_id, Duration::ZERO, &context);
         assert_eq!(Poll::Pending, poll);
         assert!(replaced_waker.is_none());
         let registry = Arc::new(Mutex::new(registry));
@@ -58,10 +57,8 @@ fn test_loom_manual_waiter_registry_advance_races_with_cancellation() {
                 .is_some()
         });
 
-        let advance_owned_waker =
-            advance.join().expect("advance model thread should finish");
-        let cancel_owned_waker =
-            cancel.join().expect("cancel model thread should finish");
+        let advance_owned_waker = advance.join().expect("advance model thread should finish");
+        let cancel_owned_waker = cancel.join().expect("cancel model thread should finish");
         assert_eq!(1, advance_owned_waker + usize::from(cancel_owned_waker));
         assert_eq!(
             0,
@@ -76,17 +73,12 @@ fn test_loom_manual_waiter_registry_advance_races_with_cancellation() {
 /// Models deadline publication racing with cancellation of its observer.
 #[cfg(all(loom, feature = "loom-model"))]
 #[test]
-fn test_loom_manual_waiter_registry_publication_races_with_observer_cancellation()
- {
+fn test_loom_manual_waiter_registry_publication_races_with_observer_cancellation() {
     model(|| {
         let mut registry = LoomManualWaiterRegistry::new();
         let observer_id = registry.register_deadline_observer();
         let context = Context::from_waker(Waker::noop());
-        let (poll, replaced_waker) = registry.poll_deadline_observer(
-            observer_id,
-            Duration::ZERO,
-            &context,
-        );
+        let (poll, replaced_waker) = registry.poll_deadline_observer(observer_id, Duration::ZERO, &context);
         assert_eq!(Poll::Pending, poll);
         assert!(replaced_waker.is_none());
         let registry = Arc::new(Mutex::new(registry));
@@ -108,11 +100,8 @@ fn test_loom_manual_waiter_registry_publication_races_with_observer_cancellation
                 .is_some()
         });
 
-        let register_owned_waker = register
-            .join()
-            .expect("register model thread should finish");
-        let cancel_owned_waker =
-            cancel.join().expect("cancel model thread should finish");
+        let register_owned_waker = register.join().expect("register model thread should finish");
+        let cancel_owned_waker = cancel.join().expect("cancel model thread should finish");
         assert_eq!(1, register_owned_waker + usize::from(cancel_owned_waker));
         assert!(
             registry

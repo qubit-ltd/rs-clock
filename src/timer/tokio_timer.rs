@@ -116,9 +116,7 @@ impl TokioTimer {
     #[track_caller]
     #[inline]
     pub fn current() -> Self {
-        Self::try_current().unwrap_or_else(|error| {
-            panic!("cannot create Tokio timer: {error}")
-        })
+        Self::try_current().unwrap_or_else(|error| panic!("cannot create Tokio timer: {error}"))
     }
 
     /// Tries to create a timer by capturing the current Tokio runtime.
@@ -176,10 +174,7 @@ impl TokioTimer {
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline and
     /// [`TimeError::InstantOverflow`] when conversion overflows.
-    fn native_deadline(
-        &self,
-        deadline: MonotonicInstant,
-    ) -> Result<Instant, TimeError> {
+    fn native_deadline(&self, deadline: MonotonicInstant) -> Result<Instant, TimeError> {
         deadline.validate_domain(self.clock.domain())?;
         self.clock
             .origin()
@@ -202,11 +197,7 @@ impl TokioTimer {
         }
         let liveness = TokioRuntimeLivenessRegistry::current();
         let _ = self.liveness.set(liveness);
-        Arc::clone(
-            self.liveness
-                .get()
-                .expect("Tokio timer liveness should be initialized"),
-        )
+        Arc::clone(self.liveness.get().expect("Tokio timer liveness should be initialized"))
     }
 
     /// Creates the future for one native deadline while the target runtime is
@@ -228,11 +219,7 @@ impl TokioTimer {
     ///
     /// Returns [`TimerUnavailableError::TimeDriverDisabled`] when a future
     /// deadline cannot be registered because Tokio time is disabled.
-    fn schedule(
-        &self,
-        deadline: Instant,
-        now: Instant,
-    ) -> Result<TimerFuture, TimeError> {
+    fn schedule(&self, deadline: Instant, now: Instant) -> Result<TimerFuture, TimeError> {
         if deadline <= now {
             return Ok(Box::pin(std::future::ready(Ok(()))));
         }
@@ -242,8 +229,8 @@ impl TokioTimer {
         // cannot recover. Temporarily replacing the global hook would race
         // with application panic handling, so this library deliberately does
         // not attempt to suppress that observable side effect.
-        let sleep = catch_unwind(AssertUnwindSafe(|| sleep_until(deadline)))
-            .map_err(|_| TimeError::TimerUnavailable {
+        let sleep =
+            catch_unwind(AssertUnwindSafe(|| sleep_until(deadline))).map_err(|_| TimeError::TimerUnavailable {
                 source: TimerUnavailableError::TimeDriverDisabled,
             })?;
         // Criterion's `tokio_timer` benchmark showed that 10,240 legacy
@@ -291,8 +278,7 @@ impl Timer for TokioTimer {
     /// `panic = "abort"` builds Tokio aborts before conversion is possible.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let deadline = self.native_deadline(deadline)?;
-        self.clock
-            .with_runtime(|| self.schedule(deadline, Instant::now()))
+        self.clock.with_runtime(|| self.schedule(deadline, Instant::now()))
     }
 
     /// Registers a notification after a duration in the retained Tokio
@@ -320,9 +306,7 @@ impl Timer for TokioTimer {
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
         self.clock.with_runtime(|| {
             let now = Instant::now();
-            let deadline = now
-                .checked_add(duration)
-                .ok_or(TimeError::InstantOverflow)?;
+            let deadline = now.checked_add(duration).ok_or(TimeError::InstantOverflow)?;
             self.schedule(deadline, now)
         })
     }

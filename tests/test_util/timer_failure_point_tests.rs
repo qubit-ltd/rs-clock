@@ -15,18 +15,12 @@ fn test_timer_failure_point_has_value_semantics() {
     fn assert_copy_clone<T: Copy + Clone>() {}
 
     assert_copy_clone::<TimerFailurePoint>();
-    assert_ne!(
-        TimerFailurePoint::Registration,
-        TimerFailurePoint::Completion,
-    );
+    assert_ne!(TimerFailurePoint::Registration, TimerFailurePoint::Completion,);
 }
 
 /// Verifies that failure points produce useful diagnostic output.
 #[test]
 fn test_timer_failure_point_debug_identifies_stage() {
-    assert_eq!(
-        "Registration",
-        format!("{:?}", TimerFailurePoint::Registration)
-    );
+    assert_eq!("Registration", format!("{:?}", TimerFailurePoint::Registration));
     assert_eq!("Completion", format!("{:?}", TimerFailurePoint::Completion));
 }

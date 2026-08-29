@@ -101,8 +101,7 @@ impl Wake for WakeThreadRecorder {
         *self
             .wake_thread
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Some(std::thread::current().id());
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(std::thread::current().id());
         self.notified.store(true, Ordering::Release);
         self.polling_thread.unpark();
     }
@@ -175,10 +174,8 @@ fn test_std_timer_scheduler_shares_and_retains_process_worker() {
 
     let first_waiter = Arc::clone(&first_timer);
     let second_waiter = Arc::clone(&second_timer);
-    let first =
-        std::thread::spawn(move || observe_worker(first_waiter.as_ref()));
-    let second =
-        std::thread::spawn(move || observe_worker(second_waiter.as_ref()));
+    let first = std::thread::spawn(move || observe_worker(first_waiter.as_ref()));
+    let second = std::thread::spawn(move || observe_worker(second_waiter.as_ref()));
 
     let first_worker = first.join().expect("first waiter should finish");
     let second_worker = second.join().expect("second waiter should finish");

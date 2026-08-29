@@ -23,8 +23,7 @@ use qubit_clock::WallClock;
 fn test_manual_wall_clock_starts_at_wall_anchor() {
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
     let start = UNIX_EPOCH + Duration::from_secs(100);
-    let wall_clock =
-        ManualWallClock::from_clock(start, Arc::clone(&monotonic_clock));
+    let wall_clock = ManualWallClock::from_clock(start, Arc::clone(&monotonic_clock));
 
     assert_eq!(start, wall_clock.now());
 }
@@ -32,8 +31,7 @@ fn test_manual_wall_clock_starts_at_wall_anchor() {
 #[test]
 fn test_manual_wall_clock_follows_monotonic_advance() {
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
-    let wall_clock =
-        ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
+    let wall_clock = ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
 
     monotonic_clock
         .advance(Duration::from_secs(600))
@@ -45,8 +43,7 @@ fn test_manual_wall_clock_follows_monotonic_advance() {
 #[test]
 fn test_manual_wall_clock_reanchor_changes_only_wall_mapping() {
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
-    let wall_clock =
-        ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
+    let wall_clock = ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
     monotonic_clock
         .advance(Duration::from_secs(10))
         .expect("short advance should succeed");
@@ -67,8 +64,7 @@ fn test_manual_wall_clock_reanchor_changes_only_wall_mapping() {
 #[test]
 fn test_manual_wall_clock_now_panics_when_system_time_overflows() {
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
-    let wall_clock =
-        ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
+    let wall_clock = ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock));
     monotonic_clock
         .advance(Duration::MAX)
         .expect("maximum duration should fit the manual monotonic clock");
@@ -87,10 +83,7 @@ fn test_manual_wall_clock_concurrent_reanchor_never_mixes_snapshots() {
     const READERS: usize = 4;
     const WALL_STRIDE_SECONDS: u64 = 100;
     let monotonic_clock = Arc::new(ManualMonotonicClock::new());
-    let wall_clock = Arc::new(ManualWallClock::from_clock(
-        UNIX_EPOCH,
-        Arc::clone(&monotonic_clock),
-    ));
+    let wall_clock = Arc::new(ManualWallClock::from_clock(UNIX_EPOCH, Arc::clone(&monotonic_clock)));
     let barrier = Arc::new(Barrier::new(READERS + 1));
     let mixed_snapshot_observed = Arc::new(AtomicBool::new(false));
     let readers: Vec<_> = (0..READERS)
@@ -105,22 +98,11 @@ fn test_manual_wall_clock_concurrent_reanchor_never_mixes_snapshots() {
                     let old_mapping = if iteration == 0 {
                         UNIX_EPOCH
                     } else {
-                        UNIX_EPOCH
-                            + Duration::from_secs(
-                                iteration * WALL_STRIDE_SECONDS,
-                            )
-                            + Duration::from_nanos(1)
+                        UNIX_EPOCH + Duration::from_secs(iteration * WALL_STRIDE_SECONDS) + Duration::from_nanos(1)
                     };
-                    let new_mapping = UNIX_EPOCH
-                        + Duration::from_secs(
-                            (iteration + 1) * WALL_STRIDE_SECONDS,
-                        );
-                    let new_mapping_after_advance =
-                        new_mapping + Duration::from_nanos(1);
-                    if observed != old_mapping
-                        && observed != new_mapping
-                        && observed != new_mapping_after_advance
-                    {
+                    let new_mapping = UNIX_EPOCH + Duration::from_secs((iteration + 1) * WALL_STRIDE_SECONDS);
+                    let new_mapping_after_advance = new_mapping + Duration::from_nanos(1);
+                    if observed != old_mapping && observed != new_mapping && observed != new_mapping_after_advance {
                         mixed_snapshot_observed.store(true, Ordering::SeqCst);
                     }
                     barrier.wait();
@@ -131,10 +113,7 @@ fn test_manual_wall_clock_concurrent_reanchor_never_mixes_snapshots() {
 
     for iteration in 0..ITERATIONS {
         barrier.wait();
-        wall_clock.reanchor(
-            UNIX_EPOCH
-                + Duration::from_secs((iteration + 1) * WALL_STRIDE_SECONDS),
-        );
+        wall_clock.reanchor(UNIX_EPOCH + Duration::from_secs((iteration + 1) * WALL_STRIDE_SECONDS));
         monotonic_clock
             .advance(Duration::from_nanos(1))
             .expect("small concurrent advance should succeed");

@@ -79,8 +79,7 @@ impl Timer for ManualTimer {
     /// observer waker panics during registration notification.
     #[inline]
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
-        let future =
-            ManualTimerFuture::register(Arc::clone(&self.clock), deadline)?;
+        let future = ManualTimerFuture::register(Arc::clone(&self.clock), deadline)?;
         Ok(Box::pin(future))
     }
 }

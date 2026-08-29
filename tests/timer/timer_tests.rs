@@ -45,8 +45,7 @@ impl Timer for RecordingTimer {
     }
 
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
-        *self.deadline.lock().expect("deadline mutex is poisoned") =
-            Some(deadline);
+        *self.deadline.lock().expect("deadline mutex is poisoned") = Some(deadline);
         Ok(Box::pin(future::ready(Ok(()))))
     }
 }
@@ -90,18 +89,13 @@ impl MonotonicClock for DeadlineOverrideClock {
         MonotonicInstant::new(self.domain, Duration::ZERO)
     }
 
-    fn deadline_after(
-        &self,
-        _duration: Duration,
-    ) -> Result<MonotonicInstant, TimeError> {
+    fn deadline_after(&self, _duration: Duration) -> Result<MonotonicInstant, TimeError> {
         Ok(MonotonicInstant::new(self.domain, Duration::from_secs(9)))
     }
 
     fn new_timer(&self) -> Arc<dyn Timer> {
         Arc::new(RecordingDeadlineTimer {
-            clock: DeadlineOverrideClock {
-                domain: self.domain,
-            },
+            clock: DeadlineOverrideClock { domain: self.domain },
             deadline: Mutex::new(None),
         })
     }
@@ -124,8 +118,7 @@ impl Timer for RecordingDeadlineTimer {
     }
 
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
-        *self.deadline.lock().expect("deadline mutex is poisoned") =
-            Some(deadline);
+        *self.deadline.lock().expect("deadline mutex is poisoned") = Some(deadline);
         Ok(Box::pin(future::ready(Ok(()))))
     }
 }
@@ -135,10 +128,7 @@ impl Timer for FailingTimer {
         self.clock.as_ref()
     }
 
-    fn at(
-        &self,
-        _deadline: MonotonicInstant,
-    ) -> Result<TimerFuture, TimeError> {
+    fn at(&self, _deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         Err(TimeError::TimerUnavailable {
             source: TimerUnavailableError::BackendUnavailable {
                 backend: "test",
@@ -275,8 +265,7 @@ fn test_timer_arc_and_box_delegate_to_inner_timer() {
         .checked_add(Duration::from_secs(3))
         .expect("boxed timer deadline should be representable");
     let _direct_future =
-        <Box<RecordingTimer> as Timer>::at(&boxed, direct_deadline)
-            .expect("boxed timer registration should succeed");
+        <Box<RecordingTimer> as Timer>::at(&boxed, direct_deadline).expect("boxed timer registration should succeed");
 
     let _shared_future = shared
         .after(Duration::from_secs(2))
@@ -287,9 +276,7 @@ fn test_timer_arc_and_box_delegate_to_inner_timer() {
 
     assert_eq!(
         Some(Duration::from_secs(2)),
-        shared
-            .deadline()
-            .map(MonotonicInstant::elapsed_since_origin)
+        shared.deadline().map(MonotonicInstant::elapsed_since_origin)
     );
     assert_eq!(
         Some(Duration::from_secs(4)),

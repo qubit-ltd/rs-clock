@@ -19,11 +19,7 @@ fn test_std_monotonic_clock_progresses_with_real_time() {
     thread::sleep(Duration::from_millis(2));
     let end = clock.now();
 
-    assert!(
-        end.duration_since(start)
-            .expect("instants should share one domain")
-            >= Duration::from_millis(1),
-    );
+    assert!(end.duration_since(start).expect("instants should share one domain") >= Duration::from_millis(1),);
 }
 
 #[test]

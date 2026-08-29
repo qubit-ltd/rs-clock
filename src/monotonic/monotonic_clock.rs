@@ -128,10 +128,7 @@ pub trait MonotonicClock: Send + Sync {
     /// Returns [`TimeError::InstantOverflow`] when the resulting deadline
     /// cannot be represented by [`Duration`].
     #[inline]
-    fn deadline_after(
-        &self,
-        duration: Duration,
-    ) -> Result<MonotonicInstant, TimeError> {
+    fn deadline_after(&self, duration: Duration) -> Result<MonotonicInstant, TimeError> {
         self.now().checked_add(duration)
     }
 
@@ -187,10 +184,7 @@ where
     ///
     /// Returns any overflow error reported by the borrowed clock.
     #[inline(always)]
-    fn deadline_after(
-        &self,
-        duration: Duration,
-    ) -> Result<MonotonicInstant, TimeError> {
+    fn deadline_after(&self, duration: Duration) -> Result<MonotonicInstant, TimeError> {
         <T as MonotonicClock>::deadline_after(*self, duration)
     }
 
@@ -243,10 +237,7 @@ where
     ///
     /// Returns any overflow error reported by the wrapped clock.
     #[inline(always)]
-    fn deadline_after(
-        &self,
-        duration: Duration,
-    ) -> Result<MonotonicInstant, TimeError> {
+    fn deadline_after(&self, duration: Duration) -> Result<MonotonicInstant, TimeError> {
         self.as_ref().deadline_after(duration)
     }
 
@@ -299,10 +290,7 @@ where
     ///
     /// Returns any overflow error reported by the wrapped clock.
     #[inline(always)]
-    fn deadline_after(
-        &self,
-        duration: Duration,
-    ) -> Result<MonotonicInstant, TimeError> {
+    fn deadline_after(&self, duration: Duration) -> Result<MonotonicInstant, TimeError> {
         self.as_ref().deadline_after(duration)
     }
 

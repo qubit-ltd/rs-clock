@@ -190,9 +190,7 @@ fn test_manual_waiter_future_replacement_drops_waker_outside_clock_lock() {
     drop_observer
         .recv_timeout(Duration::from_secs(1))
         .expect("replaced observer waker should re-enter the unlocked clock");
-    let waiter = replacement
-        .join()
-        .expect("observer replacement poll should finish");
+    let waiter = replacement.join().expect("observer replacement poll should finish");
     drop(waiter);
 }
 
@@ -250,9 +248,7 @@ fn test_manual_waiter_future_cancellation_drops_waker_outside_clock_lock() {
     drop_observer
         .recv_timeout(Duration::from_secs(1))
         .expect("observer waker drop should re-enter the unlocked clock");
-    cancellation
-        .join()
-        .expect("observer cancellation should finish");
+    cancellation.join().expect("observer cancellation should finish");
 }
 
 #[test]
@@ -285,14 +281,8 @@ fn test_blocking_adapter_registration_cleans_up_after_observer_waker_panics() {
     let mut counting_context = Context::from_waker(&counting_waker);
     let mut panic_observer = Box::pin(clock.wait_for_waiters_async(1));
     let mut counting_observer = Box::pin(clock.wait_for_waiters_async(1));
-    assert_eq!(
-        Poll::Pending,
-        panic_observer.as_mut().poll(&mut panic_context),
-    );
-    assert_eq!(
-        Poll::Pending,
-        counting_observer.as_mut().poll(&mut counting_context),
-    );
+    assert_eq!(Poll::Pending, panic_observer.as_mut().poll(&mut panic_context),);
+    assert_eq!(Poll::Pending, counting_observer.as_mut().poll(&mut counting_context),);
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         sleeper.sleep_for(Duration::from_secs(1))
@@ -301,12 +291,6 @@ fn test_blocking_adapter_registration_cleans_up_after_observer_waker_panics() {
     assert!(result.is_err());
     assert_eq!(1, wake_counter.wakes.load(Ordering::SeqCst));
     assert_eq!(0, clock.pending_waiters());
-    assert_eq!(
-        Poll::Ready(()),
-        panic_observer.as_mut().poll(&mut panic_context),
-    );
-    assert_eq!(
-        Poll::Ready(()),
-        counting_observer.as_mut().poll(&mut counting_context),
-    );
+    assert_eq!(Poll::Ready(()), panic_observer.as_mut().poll(&mut panic_context),);
+    assert_eq!(Poll::Ready(()), counting_observer.as_mut().poll(&mut counting_context),);
 }

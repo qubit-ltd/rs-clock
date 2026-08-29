@@ -130,9 +130,7 @@ fn test_manual_monotonic_clock_debug_includes_domain() {
 fn test_manual_monotonic_clock_zero_advance_is_noop() {
     let clock = ManualMonotonicClock::new();
     let before = clock.now();
-    clock
-        .advance(Duration::ZERO)
-        .expect("zero advance should succeed");
+    clock.advance(Duration::ZERO).expect("zero advance should succeed");
     assert_eq!(before, clock.now());
 }
 
@@ -221,10 +219,7 @@ fn test_manual_monotonic_clock_tracks_many_deadlines() {
     );
 
     for future in &mut due {
-        assert!(matches!(
-            future.as_mut().poll(&mut context),
-            Poll::Ready(Ok(())),
-        ));
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Ready(Ok(())),));
     }
     assert_eq!(LATER_COUNT, clock.pending_waiters());
 
@@ -257,10 +252,7 @@ fn test_manual_monotonic_clock_completes_many_waiters_at_one_deadline() {
         .advance(Duration::from_secs(1))
         .expect("manual clock should reach shared deadline");
     for future in &mut futures {
-        assert!(matches!(
-            future.as_mut().poll(&mut context),
-            Poll::Ready(Ok(())),
-        ));
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Ready(Ok(())),));
     }
     assert_eq!(0, clock.pending_waiters());
 }
@@ -289,11 +281,8 @@ fn test_manual_monotonic_clock_waits_then_advances_after_waiter() {
     let driver_clock = Arc::clone(&clock);
     let (started_sender, started_receiver) = mpsc::channel();
     let driver = thread::spawn(move || {
-        started_sender
-            .send(())
-            .expect("driver start should be observable");
-        driver_clock
-            .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
+        started_sender.send(()).expect("driver start should be observable");
+        driver_clock.advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
     });
     started_receiver
         .recv()
@@ -344,10 +333,7 @@ fn test_manual_monotonic_clock_waiter_driver_ignores_cancelled_waiters() {
     let _first = timer
         .after(Duration::from_secs(5))
         .expect("first active deadline should register");
-    assert_eq!(
-        None,
-        clock.advance_to_next_deadline_after_waiters(2, Duration::ZERO),
-    );
+    assert_eq!(None, clock.advance_to_next_deadline_after_waiters(2, Duration::ZERO),);
     let _second = timer
         .after(Duration::from_secs(8))
         .expect("second active deadline should register");
@@ -363,10 +349,7 @@ fn test_manual_monotonic_clock_waiter_driver_ignores_cancelled_waiters() {
 fn test_manual_monotonic_clock_waiter_driver_times_out() {
     let clock = ManualMonotonicClock::new();
 
-    assert_eq!(
-        None,
-        clock.advance_to_next_deadline_after_waiters(1, Duration::ZERO),
-    );
+    assert_eq!(None, clock.advance_to_next_deadline_after_waiters(1, Duration::ZERO),);
     assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
 }
 
@@ -377,10 +360,7 @@ fn test_manual_monotonic_clock_waiter_driver_waits_for_guard_timeout() {
 
     assert_eq!(
         None,
-        clock.advance_to_next_deadline_after_waiters(
-            1,
-            Duration::from_millis(100),
-        ),
+        clock.advance_to_next_deadline_after_waiters(1, Duration::from_millis(100),),
     );
     assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
 }
@@ -390,10 +370,7 @@ fn test_manual_monotonic_clock_waiter_driver_waits_for_guard_timeout() {
 fn test_manual_monotonic_clock_waiter_driver_rejects_unrepresentable_guard() {
     let clock = ManualMonotonicClock::new();
 
-    assert_eq!(
-        None,
-        clock.advance_to_next_deadline_after_waiters(1, Duration::MAX),
-    );
+    assert_eq!(None, clock.advance_to_next_deadline_after_waiters(1, Duration::MAX),);
     assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
 }
 
@@ -401,10 +378,7 @@ fn test_manual_monotonic_clock_waiter_driver_rejects_unrepresentable_guard() {
 #[test]
 fn test_manual_monotonic_clock_zero_waiter_count_requires_deadline() {
     let clock = ManualMonotonicClock::new_shared();
-    assert_eq!(
-        None,
-        clock.advance_to_next_deadline_after_waiters(0, Duration::ZERO),
-    );
+    assert_eq!(None, clock.advance_to_next_deadline_after_waiters(0, Duration::ZERO),);
 
     let timer = clock.new_timer();
     let _pending = timer
@@ -418,13 +392,10 @@ fn test_manual_monotonic_clock_zero_waiter_count_requires_deadline() {
 }
 
 #[tokio::test]
-async fn test_manual_monotonic_clock_waits_and_advances_to_next_deadline_async()
-{
+async fn test_manual_monotonic_clock_waits_and_advances_to_next_deadline_async() {
     let clock = ManualMonotonicClock::new_shared();
     let driver_clock = Arc::clone(&clock);
-    let driver = tokio::spawn(async move {
-        driver_clock.advance_to_next_deadline_async().await
-    });
+    let driver = tokio::spawn(async move { driver_clock.advance_to_next_deadline_async().await });
     tokio::task::yield_now().await;
     assert!(!driver.is_finished());
 
@@ -439,8 +410,7 @@ async fn test_manual_monotonic_clock_waits_and_advances_to_next_deadline_async()
 }
 
 #[test]
-fn test_manual_monotonic_clock_async_driver_retries_after_deadline_cancellation()
- {
+fn test_manual_monotonic_clock_async_driver_retries_after_deadline_cancellation() {
     let clock = ManualMonotonicClock::new_shared();
     let timer = clock.new_timer();
     let mut driver = pin!(clock.advance_to_next_deadline_async());
@@ -460,20 +430,14 @@ fn test_manual_monotonic_clock_async_driver_retries_after_deadline_cancellation(
             .after(Duration::from_secs(5))
             .expect("active deadline should register")
     );
-    let expected = clock
-        .next_deadline()
-        .expect("active deadline should remain observable");
+    let expected = clock.next_deadline().expect("active deadline should remain observable");
     assert_eq!(Poll::Ready(expected), driver.as_mut().poll(&mut context),);
     assert_eq!(Duration::from_secs(5), clock.now().elapsed_since_origin());
-    assert!(matches!(
-        active.as_mut().poll(&mut context),
-        Poll::Ready(Ok(()))
-    ));
+    assert!(matches!(active.as_mut().poll(&mut context), Poll::Ready(Ok(()))));
 }
 
 #[test]
-fn test_manual_monotonic_clock_async_driver_selects_current_earliest_deadline()
-{
+fn test_manual_monotonic_clock_async_driver_selects_current_earliest_deadline() {
     let clock = ManualMonotonicClock::new_shared();
     let timer = clock.new_timer();
     let mut driver = pin!(clock.advance_to_next_deadline_async());
@@ -497,10 +461,7 @@ fn test_manual_monotonic_clock_async_driver_selects_current_earliest_deadline()
     };
     assert_eq!(Duration::from_secs(2), reached.elapsed_since_origin());
     assert!(later.as_mut().poll(&mut context).is_pending());
-    assert!(matches!(
-        earlier.as_mut().poll(&mut context),
-        Poll::Ready(Ok(()))
-    ));
+    assert!(matches!(earlier.as_mut().poll(&mut context), Poll::Ready(Ok(()))));
 }
 
 #[test]
@@ -515,9 +476,7 @@ fn test_manual_monotonic_clock_cancelled_async_driver_has_no_side_effects() {
     let pending_timer = timer
         .after(Duration::from_secs(4))
         .expect("timer deadline should register");
-    let expected_deadline = clock
-        .next_deadline()
-        .expect("timer deadline should remain observable");
+    let expected_deadline = clock.next_deadline().expect("timer deadline should remain observable");
     drop(driver);
 
     assert_eq!(Duration::ZERO, clock.now().elapsed_since_origin());
@@ -627,14 +586,9 @@ fn test_manual_monotonic_clock_wait_for_next_deadline_prefers_existing() {
     let pending_sleep = timer
         .after(Duration::from_secs(1))
         .expect("timer deadline should register");
-    let expected_deadline = clock
-        .next_deadline()
-        .expect("pending sleep should register a deadline");
+    let expected_deadline = clock.next_deadline().expect("pending sleep should register a deadline");
 
-    assert_eq!(
-        Some(expected_deadline),
-        clock.wait_for_next_deadline(Duration::MAX),
-    );
+    assert_eq!(Some(expected_deadline), clock.wait_for_next_deadline(Duration::MAX),);
 
     drop(pending_sleep);
 }

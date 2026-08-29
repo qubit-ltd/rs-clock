@@ -46,8 +46,7 @@ fn is_ready(future: &mut TimerFuture, context: &mut Context<'_>) -> bool {
 
 /// Benchmarks eager registration followed by cancellation through `Drop`.
 fn benchmark_registration_and_cancellation(criterion: &mut Criterion) {
-    let mut group =
-        criterion.benchmark_group("manual_timer/registration_and_cancellation");
+    let mut group = criterion.benchmark_group("manual_timer/registration_and_cancellation");
     for waiter_count in WAITER_COUNTS {
         let clock = ManualMonotonicClock::new_shared();
         let timer = clock.new_timer();
@@ -70,10 +69,7 @@ fn benchmark_registration_and_cancellation(criterion: &mut Criterion) {
                     }
                     drop(futures);
                 });
-                assert!(
-                    registration_succeeded.get(),
-                    "benchmark deadline should register"
-                );
+                assert!(registration_succeeded.get(), "benchmark deadline should register");
             },
         );
     }
@@ -82,8 +78,7 @@ fn benchmark_registration_and_cancellation(criterion: &mut Criterion) {
 
 /// Benchmarks waking and completing many waiters at one shared deadline.
 fn benchmark_batch_deadline_completion(criterion: &mut Criterion) {
-    let mut group =
-        criterion.benchmark_group("manual_timer/batch_deadline_completion");
+    let mut group = criterion.benchmark_group("manual_timer/batch_deadline_completion");
     for waiter_count in WAITER_COUNTS {
         group.throughput(Throughput::Elements(waiter_count as u64));
         group.bench_with_input(
@@ -96,11 +91,7 @@ fn benchmark_batch_deadline_completion(criterion: &mut Criterion) {
                         let clock = ManualMonotonicClock::new_shared();
                         let timer = clock.new_timer();
                         let futures = (0..waiter_count)
-                            .map(|_| {
-                                timer.after(BATCH_DEADLINE).expect(
-                                    "benchmark deadline should register",
-                                )
-                            })
+                            .map(|_| timer.after(BATCH_DEADLINE).expect("benchmark deadline should register"))
                             .collect::<Vec<_>>();
                         (clock, futures)
                     },
@@ -119,10 +110,7 @@ fn benchmark_batch_deadline_completion(criterion: &mut Criterion) {
                     },
                     BatchSize::SmallInput,
                 );
-                assert!(
-                    completion_succeeded.get(),
-                    "manual timer should complete after advance"
-                );
+                assert!(completion_succeeded.get(), "manual timer should complete after advance");
             },
         );
     }
@@ -131,8 +119,7 @@ fn benchmark_batch_deadline_completion(criterion: &mut Criterion) {
 
 /// Benchmarks delivering staggered deadlines through repeated small advances.
 fn benchmark_sequential_deadline_completion(criterion: &mut Criterion) {
-    let mut group = criterion
-        .benchmark_group("manual_timer/sequential_deadline_completion");
+    let mut group = criterion.benchmark_group("manual_timer/sequential_deadline_completion");
     for waiter_count in WAITER_COUNTS {
         group.throughput(Throughput::Elements(waiter_count as u64));
         group.bench_with_input(
@@ -148,9 +135,7 @@ fn benchmark_sequential_deadline_completion(criterion: &mut Criterion) {
                             .map(|step| {
                                 timer
                                     .after(Duration::from_nanos(step as u64))
-                                    .expect(
-                                        "benchmark deadline should register",
-                                    )
+                                    .expect("benchmark deadline should register")
                             })
                             .collect::<Vec<_>>();
                         (clock, futures)
@@ -159,9 +144,7 @@ fn benchmark_sequential_deadline_completion(criterion: &mut Criterion) {
                         let waker = Waker::noop();
                         let mut context = Context::from_waker(waker);
                         for future in &mut futures {
-                            if clock.advance(Duration::from_nanos(1)).is_err()
-                                || !is_ready(future, &mut context)
-                            {
+                            if clock.advance(Duration::from_nanos(1)).is_err() || !is_ready(future, &mut context) {
                                 completion_succeeded.set(false);
                             }
                         }

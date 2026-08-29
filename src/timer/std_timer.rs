@@ -83,10 +83,7 @@ impl StdTimer {
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline and
     /// [`TimeError::InstantOverflow`] when conversion overflows.
-    fn native_deadline(
-        &self,
-        deadline: MonotonicInstant,
-    ) -> Result<Instant, TimeError> {
+    fn native_deadline(&self, deadline: MonotonicInstant) -> Result<Instant, TimeError> {
         deadline.validate_domain(self.clock.domain())?;
         self.clock
             .origin()
@@ -115,17 +112,12 @@ impl StdTimer {
     /// Panics when scheduler registration identifiers or worker generations
     /// are exhausted, or an internal scheduler index invariant is violated.
     #[inline]
-    fn schedule(
-        &self,
-        deadline: Instant,
-        now: Instant,
-    ) -> Result<TimerFuture, TimeError> {
+    fn schedule(&self, deadline: Instant, now: Instant) -> Result<TimerFuture, TimeError> {
         if deadline <= now {
             return Ok(Box::pin(std::future::ready(Ok(()))));
         }
         let waiter = Arc::new(StdTimerWaiter::new());
-        let waiter_id =
-            self.scheduler.register(deadline, Arc::clone(&waiter))?;
+        let waiter_id = self.scheduler.register(deadline, Arc::clone(&waiter))?;
         Ok(Box::pin(StdTimerFuture::new(
             Arc::clone(&self.scheduler),
             waiter_id,
@@ -236,9 +228,7 @@ impl Timer for StdTimer {
     /// are exhausted, or an internal scheduler index invariant is violated.
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
         let now = Instant::now();
-        let deadline = now
-            .checked_add(duration)
-            .ok_or(TimeError::InstantOverflow)?;
+        let deadline = now.checked_add(duration).ok_or(TimeError::InstantOverflow)?;
         self.schedule(deadline, now)
     }
 }

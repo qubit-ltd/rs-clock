@@ -25,11 +25,7 @@ fn test_tokio_runtime_shutdown_state_notifies_all_pending_deadlines() {
             .expect("retained runtime should build");
         let timer = TokioTimer::from_handle(runtime.handle().clone());
         (0..DEADLINE_COUNT)
-            .map(|_| {
-                timer
-                    .after(Duration::from_secs(60))
-                    .expect("deadline should register")
-            })
+            .map(|_| timer.after(Duration::from_secs(60)).expect("deadline should register"))
             .collect::<Vec<_>>()
     };
     let polling_runtime = tokio::runtime::Builder::new_current_thread()

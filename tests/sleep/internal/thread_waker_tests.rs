@@ -38,10 +38,7 @@ impl Future for WakeBeforeParkFuture {
     /// # Returns
     ///
     /// Returns pending once and then completes successfully.
-    fn poll(
-        mut self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         if self.polled {
             Poll::Ready(Ok(()))
         } else {
@@ -75,10 +72,7 @@ impl Timer for WakeBeforeParkTimer {
     ///
     /// Returns a future that completes after the blocking sleeper observes the
     /// latched wake-up.
-    fn at(
-        &self,
-        _deadline: MonotonicInstant,
-    ) -> Result<TimerFuture, TimeError> {
+    fn at(&self, _deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         Ok(Box::pin(WakeBeforeParkFuture { polled: false }))
     }
 }

@@ -44,10 +44,7 @@ impl ManualWaiterFuture {
     ///
     /// Panics when the observer identifier space is exhausted.
     #[inline]
-    pub(crate) fn new(
-        clock: Arc<ManualMonotonicClock>,
-        expected_count: usize,
-    ) -> Self {
+    pub(crate) fn new(clock: Arc<ManualMonotonicClock>, expected_count: usize) -> Self {
         let observer_id = clock.register_waiter_observer(expected_count);
         Self { clock, observer_id }
     }
@@ -70,10 +67,7 @@ impl Future for ManualWaiterFuture {
     /// # Panics
     ///
     /// Panics if destroying a replaced custom task waker panics.
-    fn poll(
-        mut self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let Some(observer_id) = self.observer_id else {
             return Poll::Ready(());
         };

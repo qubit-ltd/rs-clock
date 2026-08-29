@@ -47,10 +47,7 @@ impl ManualTimerFuture {
     ///
     /// Panics when waiter identifiers are exhausted or a custom coordination
     /// waker panics during registration.
-    pub(crate) fn register(
-        clock: Arc<ManualMonotonicClock>,
-        deadline: MonotonicInstant,
-    ) -> Result<Self, TimeError> {
+    pub(crate) fn register(clock: Arc<ManualMonotonicClock>, deadline: MonotonicInstant) -> Result<Self, TimeError> {
         let waiter_id = clock.register_timer_waiter(deadline)?;
         Ok(Self { clock, waiter_id })
     }
@@ -69,10 +66,7 @@ impl Future for ManualTimerFuture {
     ///
     /// [`Poll::Ready`] once the registered deadline is reached, otherwise
     /// [`Poll::Pending`].
-    fn poll(
-        self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
         let Some(waiter_id) = this.waiter_id else {
             return Poll::Ready(Ok(()));

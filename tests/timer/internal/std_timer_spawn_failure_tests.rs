@@ -42,10 +42,7 @@ fn test_std_timer_worker_spawn_failure_rolls_back_and_preserves_source() {
             source: TimerUnavailableError::WorkerThreadSpawnFailed { source },
         } => {
             assert_eq!(source.kind(), std::io::ErrorKind::Other);
-            assert_eq!(
-                source.to_string(),
-                "injected standard Timer worker spawn failure",
-            );
+            assert_eq!(source.to_string(), "injected standard Timer worker spawn failure",);
         }
         other => panic!("expected worker spawn failure, got {other}"),
     }

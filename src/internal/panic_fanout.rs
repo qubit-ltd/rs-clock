@@ -70,9 +70,7 @@ impl PanicFanout {
         let Some(payload) = self.first_panic.take() else {
             return;
         };
-        if let Err(drop_panic) =
-            catch_unwind(AssertUnwindSafe(|| drop(payload)))
-        {
+        if let Err(drop_panic) = catch_unwind(AssertUnwindSafe(|| drop(payload))) {
             std::mem::forget(drop_panic);
         }
     }

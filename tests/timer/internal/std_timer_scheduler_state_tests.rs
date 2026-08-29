@@ -47,9 +47,7 @@ fn test_std_timer_scheduler_state_wakes_for_new_earlier_deadline() {
     drop(later);
 
     completion.expect("earlier deadline should complete before liveness guard");
-    waiter
-        .join()
-        .expect("earlier deadline waiter should finish");
+    waiter.join().expect("earlier deadline waiter should finish");
 }
 
 /// Verifies that the shared scheduler completes a batch of equal deadlines.

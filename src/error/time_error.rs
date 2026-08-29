@@ -56,9 +56,7 @@ use crate::ClockDomain;
 #[derive(Debug, Error)]
 pub enum TimeError {
     /// Two monotonic instants belong to different clock domains.
-    #[error(
-        "monotonic clock domain mismatch: expected {expected}, actual {actual}"
-    )]
+    #[error("monotonic clock domain mismatch: expected {expected}, actual {actual}")]
     ClockDomainMismatch {
         /// Domain required by the receiving clock or instant.
         expected: ClockDomain,

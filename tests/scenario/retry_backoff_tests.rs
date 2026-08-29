@@ -66,10 +66,7 @@ fn test_retry_exponential_backoff_uses_no_real_delay() {
 ///
 /// Panics if the expected deadline is not registered before the real-time
 /// coordination guard expires.
-fn wait_for_blocking_deadline(
-    clock: &ManualMonotonicClock,
-    expected_deadline: MonotonicInstant,
-) {
+fn wait_for_blocking_deadline(clock: &ManualMonotonicClock, expected_deadline: MonotonicInstant) {
     assert_eq!(
         Some(expected_deadline),
         clock.wait_for_next_deadline(Duration::from_secs(1)),

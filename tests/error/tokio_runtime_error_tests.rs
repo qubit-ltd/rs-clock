@@ -15,13 +15,10 @@ use tokio::runtime::TryCurrentError;
 /// Verifies that ambient runtime lookup failures retain Tokio's source.
 #[test]
 fn test_tokio_runtime_error_retains_runtime_lookup_source() {
-    let error = TokioMonotonicClock::try_current()
-        .expect_err("construction outside a runtime should fail");
+    let error = TokioMonotonicClock::try_current().expect_err("construction outside a runtime should fail");
 
     assert!(
-        error
-            .to_string()
-            .starts_with("no Tokio runtime is entered:"),
+        error.to_string().starts_with("no Tokio runtime is entered:"),
         "error should identify the missing ambient runtime"
     );
     let source = error
