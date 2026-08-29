@@ -51,6 +51,20 @@ impl Timer for RecordingTimer {
     }
 }
 
+fn timer_domain<T: Timer>(timer: T) -> ClockDomain {
+    timer.clock().domain()
+}
+
+#[test]
+fn test_timer_reference_delegates_to_concrete_and_trait_object() {
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = RecordingTimer::new(clock.clone());
+    let trait_object: &dyn Timer = &timer;
+
+    assert_eq!(clock.domain(), timer_domain(&timer));
+    assert_eq!(clock.domain(), timer_domain(trait_object));
+}
+
 struct FailingTimer {
     clock: Arc<ManualMonotonicClock>,
 }

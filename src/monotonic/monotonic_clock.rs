@@ -36,8 +36,9 @@ use crate::Timer;
 /// - `TokioMonotonicClock` — Tokio time-driver clock (requires the `tokio`
 ///   feature)
 ///
-/// `Arc<T>` and `Box<T>` implement this trait when `T: MonotonicClock +
-/// ?Sized`, so a shared or owned trait object needs no extra adapter.
+/// `&T`, `Arc<T>`, and `Box<T>` implement this trait when `T:
+/// MonotonicClock + ?Sized`, so borrowed, shared, and owned trait objects need
+/// no extra adapter.
 ///
 /// # Examples
 ///
@@ -146,6 +147,62 @@ pub trait MonotonicClock: Send + Sync {
     /// A shared timer whose [`Timer::clock`] reports this clock's domain.
     #[must_use = "the timer should be retained to register deadlines"]
     fn new_timer(&self) -> Arc<dyn Timer>;
+}
+
+impl<T> MonotonicClock for &T
+where
+    T: MonotonicClock + ?Sized,
+{
+    /// Delegates the stable domain identity to the borrowed clock.
+    ///
+    /// # Returns
+    ///
+    /// The domain returned by the borrowed clock.
+    #[inline(always)]
+    fn domain(&self) -> ClockDomain {
+        <T as MonotonicClock>::domain(*self)
+    }
+
+    /// Delegates the current instant to the borrowed clock.
+    ///
+    /// # Returns
+    ///
+    /// The current instant returned by the borrowed clock.
+    #[inline(always)]
+    fn now(&self) -> MonotonicInstant {
+        <T as MonotonicClock>::now(*self)
+    }
+
+    /// Delegates relative deadline calculation to the borrowed clock.
+    ///
+    /// # Parameters
+    ///
+    /// * `duration` - Duration from the borrowed clock's sampled current time.
+    ///
+    /// # Returns
+    ///
+    /// The deadline returned by the borrowed clock.
+    ///
+    /// # Errors
+    ///
+    /// Returns any overflow error reported by the borrowed clock.
+    #[inline(always)]
+    fn deadline_after(
+        &self,
+        duration: Duration,
+    ) -> Result<MonotonicInstant, TimeError> {
+        <T as MonotonicClock>::deadline_after(*self, duration)
+    }
+
+    /// Delegates timer creation without consuming the borrowed clock.
+    ///
+    /// # Returns
+    ///
+    /// A timer in the borrowed clock's exact monotonic domain.
+    #[inline(always)]
+    fn new_timer(&self) -> Arc<dyn Timer> {
+        <T as MonotonicClock>::new_timer(*self)
+    }
 }
 
 impl<T> MonotonicClock for std::sync::Arc<T>

@@ -122,6 +122,19 @@ fn test_monotonic_clock_supports_trait_object() {
     assert_eq!(first.domain(), second.domain());
 }
 
+fn monotonic_domain<C: MonotonicClock>(clock: C) -> ClockDomain {
+    clock.domain()
+}
+
+#[test]
+fn test_monotonic_clock_reference_delegates_to_concrete_and_trait_object() {
+    let clock = ManualMonotonicClock::new();
+    let trait_object: &dyn MonotonicClock = &clock;
+
+    assert_eq!(clock.domain(), monotonic_domain(&clock));
+    assert_eq!(clock.domain(), monotonic_domain(trait_object));
+}
+
 #[test]
 fn test_monotonic_clock_is_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
