@@ -23,8 +23,7 @@ fn test_monotonic_instant_checked_add_preserves_domain() {
     assert_eq!(start.domain(), end.domain());
     assert_eq!(
         Duration::from_millis(25),
-        end.duration_since(start)
-            .expect("instants should share one domain"),
+        end.duration_since(start).expect("instants should share one domain"),
     );
 }
 
@@ -72,9 +71,7 @@ fn test_monotonic_instant_rejects_foreign_domain() {
     let first = ManualMonotonicClock::new().now();
     let second = ManualMonotonicClock::new().now();
 
-    let Err(TimeError::ClockDomainMismatch { expected, actual }) =
-        first.duration_since(second)
-    else {
+    let Err(TimeError::ClockDomainMismatch { expected, actual }) = first.duration_since(second) else {
         panic!("cross-domain duration should report a domain mismatch");
     };
     assert_eq!(first.domain(), expected);

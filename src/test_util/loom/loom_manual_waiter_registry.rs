@@ -72,10 +72,7 @@ impl LoomManualWaiterRegistry {
     /// `Some` containing the optional detached Waker when the waiter existed,
     /// or `None` when it had already been removed.
     #[inline(always)]
-    pub fn unregister_timer(
-        &mut self,
-        waiter_id: u64,
-    ) -> Option<Option<Waker>> {
+    pub fn unregister_timer(&mut self, waiter_id: u64) -> Option<Option<Waker>> {
         self.inner.unregister_timer(waiter_id)
     }
 
@@ -153,8 +150,7 @@ impl LoomManualWaiterRegistry {
         elapsed: Duration,
         context: &Context<'_>,
     ) -> (Poll<Duration>, Option<Waker>) {
-        self.inner
-            .poll_deadline_observer(observer_id, elapsed, context)
+        self.inner.poll_deadline_observer(observer_id, elapsed, context)
     }
 
     /// Takes Wakers belonging to timer waiters due at `elapsed`.

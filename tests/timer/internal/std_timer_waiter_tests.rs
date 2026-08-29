@@ -58,8 +58,7 @@ fn test_loom_std_timer_waiter_poll_races_with_complete() {
             let context = Context::from_waker(waker);
             poll_waiter.poll(&context)
         });
-        let completer =
-            loom::thread::spawn(move || complete_waiter.complete().is_some());
+        let completer = loom::thread::spawn(move || complete_waiter.complete().is_some());
 
         let first_poll = poller.join().expect("poller should finish");
         let detached_waker = completer.join().expect("completer should finish");
@@ -96,8 +95,7 @@ fn test_loom_std_timer_waiter_poll_races_with_worker_failure() {
         let failure = loom::thread::spawn(move || fail_waiter.fail().is_some());
 
         let first_poll = poller.join().expect("poller should finish");
-        let detached_waker =
-            failure.join().expect("failure task should finish");
+        let detached_waker = failure.join().expect("failure task should finish");
         match first_poll {
             Poll::Pending => assert!(detached_waker),
             Poll::Ready(Err(())) => assert!(!detached_waker),

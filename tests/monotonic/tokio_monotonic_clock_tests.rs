@@ -47,8 +47,7 @@ fn test_tokio_monotonic_clock_current_panics_outside_runtime() {
 /// Verifies that fallible construction allocates an independent clock domain.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monotonic_clock_try_current_creates_clock() {
-    let clock = TokioMonotonicClock::try_current()
-        .expect("entered runtime should create a Tokio clock");
+    let clock = TokioMonotonicClock::try_current().expect("entered runtime should create a Tokio clock");
     let other = TokioMonotonicClock::current();
     assert_ne!(clock.now().domain(), other.now().domain());
 }
@@ -114,7 +113,6 @@ fn test_tokio_monotonic_clock_samples_target_time_inside_another_runtime() {
 
     assert_eq!(
         Duration::from_secs(7),
-        end.duration_since(start)
-            .expect("instants should share one domain"),
+        end.duration_since(start).expect("instants should share one domain"),
     );
 }

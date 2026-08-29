@@ -33,10 +33,7 @@ impl StdTimerRegistration {
     /// A registration ready to be inserted into scheduler state.
     #[must_use]
     #[inline(always)]
-    pub(super) const fn new(
-        deadline: Instant,
-        waiter: Arc<StdTimerWaiter>,
-    ) -> Self {
+    pub(super) const fn new(deadline: Instant, waiter: Arc<StdTimerWaiter>) -> Self {
         Self { deadline, waiter }
     }
 

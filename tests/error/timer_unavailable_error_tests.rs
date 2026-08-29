@@ -17,10 +17,7 @@ use qubit_clock::TimerUnavailableError;
 fn test_timer_unavailable_error_retains_worker_spawn_source() {
     let error = TimeError::TimerUnavailable {
         source: TimerUnavailableError::WorkerThreadSpawnFailed {
-            source: io::Error::new(
-                io::ErrorKind::OutOfMemory,
-                "scheduler capacity exhausted",
-            ),
+            source: io::Error::new(io::ErrorKind::OutOfMemory, "scheduler capacity exhausted"),
         },
     };
 
@@ -29,9 +26,7 @@ fn test_timer_unavailable_error_retains_worker_spawn_source() {
          not be spawned: scheduler capacity exhausted",
         error.to_string(),
     );
-    let timer_error = error
-        .source()
-        .expect("timer unavailability should be the outer source");
+    let timer_error = error.source().expect("timer unavailability should be the outer source");
     let io_error = timer_error
         .source()
         .and_then(|source| source.downcast_ref::<io::Error>())
@@ -43,10 +38,7 @@ fn test_timer_unavailable_error_retains_worker_spawn_source() {
 fn test_timer_unavailable_error_reports_worker_termination() {
     let error = TimerUnavailableError::SchedulerWorkerTerminated;
 
-    assert_eq!(
-        "the scheduler worker thread terminated unexpectedly",
-        error.to_string()
-    );
+    assert_eq!("the scheduler worker thread terminated unexpectedly", error.to_string());
     assert!(error.source().is_none());
 }
 
@@ -58,10 +50,7 @@ fn test_timer_unavailable_error_retains_custom_backend_source() {
         source: Box::new(io::Error::other("offline")),
     };
 
-    assert_eq!(
-        "timer backend 'test' is unavailable: offline",
-        error.to_string(),
-    );
+    assert_eq!("timer backend 'test' is unavailable: offline", error.to_string(),);
     let io_error = error
         .source()
         .and_then(|source| source.downcast_ref::<io::Error>())
@@ -82,10 +71,7 @@ fn test_timer_unavailable_error_implements_std_error() {
 fn test_timer_unavailable_error_reports_disabled_time_driver() {
     let error = TimerUnavailableError::TimeDriverDisabled;
 
-    assert_eq!(
-        "the asynchronous runtime time driver is disabled",
-        error.to_string(),
-    );
+    assert_eq!("the asynchronous runtime time driver is disabled", error.to_string(),);
     assert!(error.source().is_none());
 }
 

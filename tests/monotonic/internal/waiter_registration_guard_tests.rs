@@ -48,28 +48,14 @@ fn test_waiter_registration_guard_rolls_back_after_observer_waker_panics() {
     let mut counting_context = Context::from_waker(&counting_waker);
     let mut panic_observer = Box::pin(clock.wait_for_waiters_async(1));
     let mut counting_observer = Box::pin(clock.wait_for_waiters_async(1));
-    assert_eq!(
-        Poll::Pending,
-        panic_observer.as_mut().poll(&mut panic_context)
-    );
-    assert_eq!(
-        Poll::Pending,
-        counting_observer.as_mut().poll(&mut counting_context),
-    );
+    assert_eq!(Poll::Pending, panic_observer.as_mut().poll(&mut panic_context));
+    assert_eq!(Poll::Pending, counting_observer.as_mut().poll(&mut counting_context),);
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        timer.after(Duration::from_secs(1))
-    }));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| timer.after(Duration::from_secs(1))));
 
     assert!(result.is_err());
     assert_eq!(1, wake_counter.0.load(Ordering::Relaxed));
     assert_eq!(0, clock.pending_waiters());
-    assert_eq!(
-        Poll::Ready(()),
-        panic_observer.as_mut().poll(&mut panic_context)
-    );
-    assert_eq!(
-        Poll::Ready(()),
-        counting_observer.as_mut().poll(&mut counting_context),
-    );
+    assert_eq!(Poll::Ready(()), panic_observer.as_mut().poll(&mut panic_context));
+    assert_eq!(Poll::Ready(()), counting_observer.as_mut().poll(&mut counting_context),);
 }

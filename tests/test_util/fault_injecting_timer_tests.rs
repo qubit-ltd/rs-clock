@@ -48,12 +48,9 @@ fn poll_ready(mut future: TimerFuture) -> Result<(), TimeError> {
 /// Verifies a registration fault is returned by `Timer::at` itself.
 #[test]
 fn test_fault_injecting_timer_fails_registration() {
-    let timer =
-        FaultInjectingTimer::new(TimerFailurePoint::Registration, || {
-            TimeError::TimerUnavailable {
-                source: TimerUnavailableError::SchedulerWorkerTerminated,
-            }
-        });
+    let timer = FaultInjectingTimer::new(TimerFailurePoint::Registration, || TimeError::TimerUnavailable {
+        source: TimerUnavailableError::SchedulerWorkerTerminated,
+    });
 
     let Err(error) = timer.after(Duration::from_secs(1)) else {
         panic!("registration failure should be returned immediately");
@@ -72,10 +69,8 @@ fn test_fault_injecting_timer_fails_registration() {
 /// Verifies a completion fault is returned by the registered future.
 #[test]
 fn test_fault_injecting_timer_fails_completion() {
-    let timer = FaultInjectingTimer::new(TimerFailurePoint::Completion, || {
-        TimeError::TimerUnavailable {
-            source: TimerUnavailableError::SchedulerWorkerTerminated,
-        }
+    let timer = FaultInjectingTimer::new(TimerFailurePoint::Completion, || TimeError::TimerUnavailable {
+        source: TimerUnavailableError::SchedulerWorkerTerminated,
     });
     let future = timer
         .after(Duration::from_secs(1))
@@ -96,13 +91,12 @@ fn test_fault_injecting_timer_fails_completion() {
 fn test_fault_injecting_timer_rejects_foreign_domain_first() {
     let factory_calls = Arc::new(AtomicUsize::new(0));
     let observed_calls = Arc::clone(&factory_calls);
-    let timer =
-        FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
-            observed_calls.fetch_add(1, Ordering::Relaxed);
-            TimeError::TimerUnavailable {
-                source: TimerUnavailableError::SchedulerWorkerTerminated,
-            }
-        });
+    let timer = FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
+        observed_calls.fetch_add(1, Ordering::Relaxed);
+        TimeError::TimerUnavailable {
+            source: TimerUnavailableError::SchedulerWorkerTerminated,
+        }
+    });
     let foreign_deadline = ManualMonotonicClock::new().now();
 
     let Err(error) = timer.at(foreign_deadline) else {
@@ -119,13 +113,12 @@ fn test_fault_injecting_timer_rejects_foreign_domain_first() {
 fn test_fault_injecting_timer_completes_reached_deadline() {
     let factory_calls = Arc::new(AtomicUsize::new(0));
     let observed_calls = Arc::clone(&factory_calls);
-    let timer =
-        FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
-            observed_calls.fetch_add(1, Ordering::Relaxed);
-            TimeError::TimerUnavailable {
-                source: TimerUnavailableError::SchedulerWorkerTerminated,
-            }
-        });
+    let timer = FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
+        observed_calls.fetch_add(1, Ordering::Relaxed);
+        TimeError::TimerUnavailable {
+            source: TimerUnavailableError::SchedulerWorkerTerminated,
+        }
+    });
     let reached_deadline = timer.clock().now();
     let future = timer
         .at(reached_deadline)
@@ -141,13 +134,12 @@ fn test_fault_injecting_timer_completes_reached_deadline() {
 fn test_fault_injecting_timer_invokes_factory_per_registration() {
     let factory_calls = Arc::new(AtomicUsize::new(0));
     let observed_calls = Arc::clone(&factory_calls);
-    let timer =
-        FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
-            observed_calls.fetch_add(1, Ordering::Relaxed);
-            TimeError::TimerUnavailable {
-                source: TimerUnavailableError::SchedulerWorkerTerminated,
-            }
-        });
+    let timer = FaultInjectingTimer::new(TimerFailurePoint::Registration, move || {
+        observed_calls.fetch_add(1, Ordering::Relaxed);
+        TimeError::TimerUnavailable {
+            source: TimerUnavailableError::SchedulerWorkerTerminated,
+        }
+    });
 
     for _ in 0..2 {
         assert!(timer.after(Duration::from_secs(1)).is_err());
@@ -160,11 +152,7 @@ fn test_fault_injecting_timer_invokes_factory_per_registration() {
 /// Verifies the convenience constructor preserves backend error metadata.
 #[test]
 fn test_fault_injecting_timer_builds_backend_unavailable_error() {
-    let timer = FaultInjectingTimer::backend_unavailable(
-        TimerFailurePoint::Registration,
-        "example",
-        "backend offline",
-    );
+    let timer = FaultInjectingTimer::backend_unavailable(TimerFailurePoint::Registration, "example", "backend offline");
 
     let Err(error) = timer.after(Duration::from_secs(1)) else {
         panic!("backend-unavailable Timer should reject registration");

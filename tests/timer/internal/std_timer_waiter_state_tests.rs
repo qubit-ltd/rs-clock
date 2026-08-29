@@ -60,18 +60,13 @@ fn test_std_timer_waiter_state_replaces_registered_waker() {
         }
 
         let started = Instant::now();
-        while second_counter.0.load(Ordering::Relaxed) == 0
-            && started.elapsed() < REPLACEMENT_GUARD
-        {
+        while second_counter.0.load(Ordering::Relaxed) == 0 && started.elapsed() < REPLACEMENT_GUARD {
             std::thread::sleep(Duration::from_millis(1));
         }
 
         assert_eq!(0, first_counter.0.load(Ordering::Relaxed));
         assert_eq!(1, second_counter.0.load(Ordering::Relaxed));
-        assert!(matches!(
-            future.as_mut().poll(&mut second_context),
-            Poll::Ready(Ok(()))
-        ));
+        assert!(matches!(future.as_mut().poll(&mut second_context), Poll::Ready(Ok(()))));
         return;
     }
 

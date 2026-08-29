@@ -51,9 +51,7 @@ fn test_panic_fanout_attempts_every_due_waker_before_resuming_panic() {
     assert!(first.as_mut().poll(&mut first_context).is_pending());
     assert!(second.as_mut().poll(&mut second_context).is_pending());
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        clock.advance(Duration::from_secs(1))
-    }));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| clock.advance(Duration::from_secs(1))));
 
     assert!(result.is_err());
     assert_eq!(2, attempts.load(Ordering::Relaxed));

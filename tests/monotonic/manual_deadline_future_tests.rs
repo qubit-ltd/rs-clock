@@ -184,9 +184,7 @@ fn test_manual_deadline_future_replacement_drops_waker_outside_clock_lock() {
     drop_observer
         .recv_timeout(Duration::from_secs(1))
         .expect("replaced observer waker should re-enter the unlocked clock");
-    let observer = replacement
-        .join()
-        .expect("observer replacement poll should finish");
+    let observer = replacement.join().expect("observer replacement poll should finish");
     drop(observer);
 }
 

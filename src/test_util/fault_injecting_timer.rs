@@ -100,11 +100,7 @@ impl FaultInjectingTimer {
     ///
     /// Panics if process-wide clock-domain identifiers are exhausted.
     #[must_use]
-    pub fn backend_unavailable(
-        failure_point: TimerFailurePoint,
-        backend: &'static str,
-        message: &str,
-    ) -> Self {
+    pub fn backend_unavailable(failure_point: TimerFailurePoint, backend: &'static str, message: &str) -> Self {
         let message = message.to_owned();
         Self::new(failure_point, move || TimeError::TimerUnavailable {
             source: TimerUnavailableError::BackendUnavailable {
@@ -180,9 +176,7 @@ impl Timer for FaultInjectingTimer {
         let error = (self.error_factory)();
         match self.failure_point {
             TimerFailurePoint::Registration => Err(error),
-            TimerFailurePoint::Completion => {
-                Ok(Box::pin(std::future::ready(Err(error))))
-            }
+            TimerFailurePoint::Completion => Ok(Box::pin(std::future::ready(Err(error)))),
         }
     }
 }

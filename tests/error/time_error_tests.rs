@@ -29,10 +29,7 @@ fn test_time_error_clock_domain_mismatch_display() {
 
 #[test]
 fn test_time_error_other_variants_display() {
-    assert_eq!(
-        "monotonic instant overflow",
-        TimeError::InstantOverflow.to_string(),
-    );
+    assert_eq!("monotonic instant overflow", TimeError::InstantOverflow.to_string(),);
     assert_eq!(
         "manual monotonic time cannot move backward from 10s to 5s",
         TimeError::CannotMoveBackward {
@@ -70,8 +67,7 @@ fn test_time_error_implements_std_error() {
 
 #[test]
 fn test_timer_unavailable_error_converts_to_time_error() {
-    let error: TimeError =
-        TimerUnavailableError::SchedulerWorkerTerminated.into();
+    let error: TimeError = TimerUnavailableError::SchedulerWorkerTerminated.into();
 
     assert!(matches!(
         error,

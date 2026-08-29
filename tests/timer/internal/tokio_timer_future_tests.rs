@@ -24,9 +24,7 @@ fn test_tokio_timer_future_completes_at_deadline() {
         .build()
         .expect("runtime should build");
     let timer = TokioTimer::from_handle(runtime.handle().clone());
-    let future = timer
-        .after(Duration::from_secs(1))
-        .expect("deadline should register");
+    let future = timer.after(Duration::from_secs(1)).expect("deadline should register");
 
     runtime.block_on(async {
         tokio::time::advance(Duration::from_secs(1)).await;
@@ -48,9 +46,7 @@ fn test_tokio_timer_future_does_not_mask_unexpected_sleep_panic() {
         .expect("future deadline should register");
     panic_next_tokio_timer_sleep_poll();
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        runtime.block_on(future)
-    }));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| runtime.block_on(future)));
 
     assert!(result.is_err(), "unexpected Tokio sleep panic must resume");
 }

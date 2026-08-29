@@ -45,10 +45,7 @@ impl ManualWallClock {
     /// A wall clock anchored to the supplied wall and monotonic times.
     #[must_use]
     #[inline]
-    pub fn from_clock(
-        wall_time: SystemTime,
-        clock: Arc<ManualMonotonicClock>,
-    ) -> Self {
+    pub fn from_clock(wall_time: SystemTime, clock: Arc<ManualMonotonicClock>) -> Self {
         let monotonic_anchor = clock.now();
         Self {
             clock,
@@ -81,9 +78,7 @@ impl ManualWallClock {
     /// A guard granting mutable access to the anchor pair.
     #[inline]
     fn lock_anchor(&self) -> MutexGuard<'_, (SystemTime, MonotonicInstant)> {
-        self.anchor
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.anchor.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 }
 

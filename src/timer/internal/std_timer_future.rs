@@ -42,11 +42,7 @@ impl StdTimerFuture {
     /// A cancellation-safe pending future.
     #[must_use]
     #[inline]
-    pub(crate) const fn new(
-        scheduler: Arc<StdTimerScheduler>,
-        waiter_id: u64,
-        waiter: Arc<StdTimerWaiter>,
-    ) -> Self {
+    pub(crate) const fn new(scheduler: Arc<StdTimerScheduler>, waiter_id: u64, waiter: Arc<StdTimerWaiter>) -> Self {
         Self {
             scheduler,
             waiter_id: Some(waiter_id),
@@ -69,10 +65,7 @@ impl Future for StdTimerFuture {
     /// [`Poll::Ready(Ok)`] after the native deadline,
     /// [`Poll::Ready(Err)`] if the scheduler worker exits, otherwise
     /// [`Poll::Pending`].
-    fn poll(
-        self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
         match this.waiter.poll(context) {
             Poll::Pending => Poll::Pending,

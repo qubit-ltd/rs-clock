@@ -79,10 +79,7 @@ impl Future for ManualDeadlineFuture {
     ///
     /// Panics if the observer registration is unexpectedly missing or if
     /// destroying a replaced custom task waker panics.
-    fn poll(
-        mut self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let Some(observer_id) = self.observer_id else {
             panic!("manual deadline future polled after completion");
         };

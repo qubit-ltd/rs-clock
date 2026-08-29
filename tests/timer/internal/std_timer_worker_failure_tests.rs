@@ -79,10 +79,7 @@ impl Wake for ThreadUnparker {
 ///
 /// The Timer completion result.
 #[cfg(coverage)]
-fn poll_until_terminal(
-    mut future: TimerFuture,
-    mut pending_sender: Option<SyncSender<()>>,
-) -> Result<(), TimeError> {
+fn poll_until_terminal(mut future: TimerFuture, mut pending_sender: Option<SyncSender<()>>) -> Result<(), TimeError> {
     let thread_waker = Arc::new(ThreadUnparker {
         thread: std::thread::current(),
     });
@@ -129,9 +126,7 @@ fn test_std_timer_worker_failure_fails_waiter_and_recovers_next_generation() {
             source: TimerUnavailableError::SchedulerWorkerTerminated,
         })
     ));
-    failure_waiter
-        .join()
-        .expect("failure-observing thread should finish");
+    failure_waiter.join().expect("failure-observing thread should finish");
 
     let recovered_future = timer
         .after(Duration::from_millis(10))
@@ -145,7 +140,5 @@ fn test_std_timer_worker_failure_fails_waiter_and_recovers_next_generation() {
         .recv_timeout(RECOVERY_GUARD)
         .expect("new worker generation should make progress")
         .expect("recovered timer should complete successfully");
-    recovery_waiter
-        .join()
-        .expect("recovery-observing thread should finish");
+    recovery_waiter.join().expect("recovery-observing thread should finish");
 }

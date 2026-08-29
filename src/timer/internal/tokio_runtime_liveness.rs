@@ -52,8 +52,7 @@ impl TokioRuntimeLiveness {
     /// * `release_notification` - Receiver completed when the final liveness
     ///   consumer drops its sender.
     pub(crate) fn start(&self, release_notification: oneshot::Receiver<()>) {
-        let shutdown_guard =
-            TokioRuntimeShutdownGuard::new(Arc::clone(&self.shutdown));
+        let shutdown_guard = TokioRuntimeShutdownGuard::new(Arc::clone(&self.shutdown));
         spawn(async move {
             let _shutdown_guard = shutdown_guard;
             let _ = release_notification.await;

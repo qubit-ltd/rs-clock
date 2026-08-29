@@ -90,10 +90,7 @@ impl BlockingSleeper {
     ///
     /// Parks the calling thread while the composed timer is pending. The timer
     /// backend must be driven independently during that interval.
-    pub fn sleep_until(
-        &self,
-        deadline: MonotonicInstant,
-    ) -> Result<(), TimeError> {
+    pub fn sleep_until(&self, deadline: MonotonicInstant) -> Result<(), TimeError> {
         let future = self.timer.at(deadline)?;
         Self::block_on(future)
     }
@@ -180,8 +177,6 @@ impl std::fmt::Debug for BlockingSleeper {
     /// Returns [`std::fmt::Error`] when the destination rejects output.
     #[inline]
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("BlockingSleeper")
-            .finish_non_exhaustive()
+        formatter.debug_struct("BlockingSleeper").finish_non_exhaustive()
     }
 }

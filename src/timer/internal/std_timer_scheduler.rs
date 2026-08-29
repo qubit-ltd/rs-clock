@@ -135,11 +135,7 @@ impl StdTimerScheduler {
     ///
     /// Panics when registration identifiers or worker generations are
     /// exhausted, or an internal scheduler index invariant is violated.
-    pub(crate) fn register(
-        self: &Arc<Self>,
-        deadline: Instant,
-        waiter: Arc<StdTimerWaiter>,
-    ) -> Result<u64, TimeError> {
+    pub(crate) fn register(self: &Arc<Self>, deadline: Instant, waiter: Arc<StdTimerWaiter>) -> Result<u64, TimeError> {
         let mut state = self.lock_state();
         let previous_deadline = state.next_deadline();
         let waiter_id = state.register(deadline, waiter);
@@ -171,8 +167,7 @@ impl StdTimerScheduler {
         let mut state = self.lock_state();
         let previous_deadline = state.next_deadline();
         let waiter = state.cancel(waiter_id);
-        let next_deadline_changed =
-            waiter.is_some() && state.next_deadline() != previous_deadline;
+        let next_deadline_changed = waiter.is_some() && state.next_deadline() != previous_deadline;
         drop(state);
         drop(waiter);
         if next_deadline_changed {
@@ -193,11 +188,8 @@ impl StdTimerScheduler {
     /// * `worker_generation` - Exited worker generation, or zero for a disarmed
     ///   startup guard.
     pub(super) fn handle_worker_exit(&self, worker_generation: u64) {
-        let waiters = self
-            .lock_state()
-            .stop_worker_and_take_waiters(worker_generation);
-        let wakers =
-            waiters.iter().filter_map(|waiter| waiter.fail()).collect();
+        let waiters = self.lock_state().stop_worker_and_take_waiters(worker_generation);
+        let wakers = waiters.iter().filter_map(|waiter| waiter.fail()).collect();
         drop(waiters);
         let mut fanout = PanicFanout::new();
         fanout.wake_all(wakers);
@@ -244,8 +236,7 @@ impl StdTimerScheduler {
         worker_generation: u64,
     ) -> Result<u64, TimeError> {
         let scheduler = Arc::clone(self);
-        let spawn_result =
-            Self::spawn_native_worker(scheduler, worker_generation);
+        let spawn_result = Self::spawn_native_worker(scheduler, worker_generation);
         if let Err(source) = spawn_result {
             return Err(Self::rollback_failed_worker_start(
                 &mut state,
@@ -273,23 +264,15 @@ impl StdTimerScheduler {
     ///
     /// Returns the operating-system thread-spawn error. Coverage builds can
     /// also inject the same failure before invoking the operating system.
-    fn spawn_native_worker(
-        scheduler: Arc<Self>,
-        worker_generation: u64,
-    ) -> io::Result<std::thread::JoinHandle<()>> {
+    fn spawn_native_worker(scheduler: Arc<Self>, worker_generation: u64) -> io::Result<std::thread::JoinHandle<()>> {
         #[cfg(coverage)]
         if FAIL_NEXT_WORKER_SPAWN.swap(false, Ordering::AcqRel) {
-            return Err(io::Error::other(
-                "injected standard Timer worker spawn failure",
-            ));
+            return Err(io::Error::other("injected standard Timer worker spawn failure"));
         }
         std::thread::Builder::new()
             .name("qubit-clock-timer".to_owned())
             .spawn(move || {
-                let startup_guard = StdTimerWorkerGuard::new(
-                    scheduler.as_ref(),
-                    worker_generation,
-                );
+                let startup_guard = StdTimerWorkerGuard::new(scheduler.as_ref(), worker_generation);
                 let _worker_guard = startup_guard.handoff();
                 scheduler.run();
             })
@@ -344,9 +327,9 @@ impl StdTimerScheduler {
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
                 continue;
             }
-            let deadline = state.next_deadline().expect(
-                "active standard Timer registration must have a deadline",
-            );
+            let deadline = state
+                .next_deadline()
+                .expect("active standard Timer registration must have a deadline");
             let now = Instant::now();
             if deadline > now {
                 let duration = deadline.duration_since(now);
@@ -359,10 +342,7 @@ impl StdTimerScheduler {
             }
             let due_waiters = state.take_due(now);
             drop(state);
-            let wakers = due_waiters
-                .iter()
-                .filter_map(|waiter| waiter.complete())
-                .collect();
+            let wakers = due_waiters.iter().filter_map(|waiter| waiter.complete()).collect();
             drop(due_waiters);
             let mut fanout = PanicFanout::new();
             fanout.wake_all(wakers);
@@ -378,8 +358,6 @@ impl StdTimerScheduler {
     /// A guard granting mutable access to scheduler state.
     #[inline(always)]
     fn lock_state(&self) -> MutexGuard<'_, StdTimerSchedulerState> {
-        self.state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 }

@@ -39,9 +39,7 @@ fn test_manual_timer_future_registers_before_first_poll() {
     assert_eq!(1, clock.pending_waiters());
     assert_eq!(
         Some(Duration::from_secs(4)),
-        clock
-            .next_deadline()
-            .map(|value| value.elapsed_since_origin()),
+        clock.next_deadline().map(|value| value.elapsed_since_origin()),
     );
     drop(future);
     assert_eq!(0, clock.pending_waiters());
@@ -84,8 +82,5 @@ fn test_manual_timer_future_replaces_registered_waker() {
 
     assert_eq!(0, first_counter.0.load(Ordering::Relaxed));
     assert_eq!(1, second_counter.0.load(Ordering::Relaxed));
-    assert!(matches!(
-        future.as_mut().poll(&mut second_context),
-        Poll::Ready(Ok(()))
-    ));
+    assert!(matches!(future.as_mut().poll(&mut second_context), Poll::Ready(Ok(()))));
 }

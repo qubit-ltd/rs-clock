@@ -55,10 +55,7 @@ impl TokioTimerFuture {
     ///
     /// A single allocation containing both wait conditions.
     #[must_use]
-    pub(crate) fn new(
-        sleep: Sleep,
-        liveness: Arc<TokioRuntimeLiveness>,
-    ) -> Self {
+    pub(crate) fn new(sleep: Sleep, liveness: Arc<TokioRuntimeLiveness>) -> Self {
         let shutdown = liveness.shutdown_notification();
         Self {
             sleep,
@@ -72,14 +69,9 @@ impl Future for TokioTimerFuture {
     type Output = Result<(), TimeError>;
 
     /// Polls shutdown before the native sleep and preserves unexpected panics.
-    fn poll(
-        self: Pin<&mut Self>,
-        context: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
-        if this.liveness.is_shutdown()
-            || this.shutdown.as_mut().poll(context).is_ready()
-        {
+        if this.liveness.is_shutdown() || this.shutdown.as_mut().poll(context).is_ready() {
             return runtime_shutdown();
         }
         match catch_unwind(AssertUnwindSafe(|| {

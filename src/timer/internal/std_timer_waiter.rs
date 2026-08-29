@@ -58,21 +58,14 @@ impl StdTimerWaiter {
     /// before the deadline completed.
     pub(crate) fn poll(&self, context: &Context<'_>) -> Poll<Result<(), ()>> {
         let replaced_waker = {
-            let mut state = self
-                .state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             match &mut *state {
                 StdTimerWaiterState::Pending(waker)
-                    if waker.as_ref().is_some_and(|value| {
-                        value.will_wake(context.waker())
-                    }) =>
+                    if waker.as_ref().is_some_and(|value| value.will_wake(context.waker())) =>
                 {
                     None
                 }
-                StdTimerWaiterState::Pending(waker) => {
-                    waker.replace(context.waker().clone())
-                }
+                StdTimerWaiterState::Pending(waker) => waker.replace(context.waker().clone()),
                 StdTimerWaiterState::Ready => return Poll::Ready(Ok(())),
                 StdTimerWaiterState::WorkerFailed => {
                     return Poll::Ready(Err(()));
@@ -118,19 +111,14 @@ impl StdTimerWaiter {
     /// The previously registered Waker, or `None` when no Waker was registered
     /// or another terminal state had already latched.
     fn transition_to(&self, terminal: StdTimerWaiterState) -> Option<Waker> {
-        let mut state = self
-            .state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         match &mut *state {
             StdTimerWaiterState::Pending(waker) => {
                 let detached = waker.take();
                 *state = terminal;
                 detached
             }
-            StdTimerWaiterState::Ready | StdTimerWaiterState::WorkerFailed => {
-                None
-            }
+            StdTimerWaiterState::Ready | StdTimerWaiterState::WorkerFailed => None,
         }
     }
 }

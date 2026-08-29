@@ -124,9 +124,7 @@ fn block_on_timer_future(mut future: TimerFuture) -> bool {
 /// # Parameters
 ///
 /// * `group` - Criterion group receiving the throughput benchmark.
-fn benchmark_serial_registration_and_cancellation(
-    group: &mut BenchmarkGroup<'_, WallTime>,
-) {
+fn benchmark_serial_registration_and_cancellation(group: &mut BenchmarkGroup<'_, WallTime>) {
     let timer = StdMonotonicClock::new().new_timer();
     group.throughput(Throughput::Elements(REGISTRATIONS_PER_WORKER as u64));
     group.bench_function("serial_registration_and_cancellation", |bencher| {
@@ -144,10 +142,7 @@ fn benchmark_serial_registration_and_cancellation(
             }
             drop(futures);
         });
-        assert!(
-            registration_succeeded.get(),
-            "benchmark deadline should register"
-        );
+        assert!(registration_succeeded.get(), "benchmark deadline should register");
     });
 }
 
@@ -160,9 +155,7 @@ fn benchmark_serial_registration_and_cancellation(
 /// # Panics
 ///
 /// Panics when a deadline cannot be registered or a benchmark worker panics.
-fn benchmark_parallel_registration_and_cancellation(
-    group: &mut BenchmarkGroup<'_, WallTime>,
-) {
+fn benchmark_parallel_registration_and_cancellation(group: &mut BenchmarkGroup<'_, WallTime>) {
     for worker_count in CONCURRENT_WORKER_COUNTS {
         let timer = StdMonotonicClock::new().new_timer();
         let start = Arc::new(Barrier::new(worker_count + 1));
@@ -178,22 +171,19 @@ fn benchmark_parallel_registration_and_cancellation(
                 let registered = Arc::clone(&registered);
                 let finished = Arc::clone(&finished);
                 let stopping = Arc::clone(&stopping);
-                let registration_succeeded =
-                    Arc::clone(&registration_succeeded);
+                let registration_succeeded = Arc::clone(&registration_succeeded);
                 scope.spawn(move || {
                     loop {
                         start.wait();
                         if stopping.load(Ordering::Acquire) {
                             return;
                         }
-                        let mut futures =
-                            Vec::with_capacity(REGISTRATIONS_PER_WORKER);
+                        let mut futures = Vec::with_capacity(REGISTRATIONS_PER_WORKER);
                         for _ in 0..REGISTRATIONS_PER_WORKER {
                             match timer.after(CANCELLATION_DEADLINE) {
                                 Ok(future) => futures.push(future),
                                 Err(_) => {
-                                    registration_succeeded
-                                        .store(false, Ordering::Release);
+                                    registration_succeeded.store(false, Ordering::Release);
                                     break;
                                 }
                             }
@@ -208,10 +198,7 @@ fn benchmark_parallel_registration_and_cancellation(
             let elements = (worker_count * REGISTRATIONS_PER_WORKER) as u64;
             group.throughput(Throughput::Elements(elements));
             group.bench_with_input(
-                BenchmarkId::new(
-                    "lock_style_registration_and_cancellation",
-                    worker_count,
-                ),
+                BenchmarkId::new("lock_style_registration_and_cancellation", worker_count),
                 &worker_count,
                 |bencher, _worker_count| {
                     bencher.iter(|| {
@@ -240,9 +227,7 @@ fn benchmark_parallel_registration_and_cancellation(
 /// # Panics
 ///
 /// Panics when a deadline cannot be registered or a benchmark worker panics.
-fn benchmark_parallel_deadline_completion(
-    group: &mut BenchmarkGroup<'_, WallTime>,
-) {
+fn benchmark_parallel_deadline_completion(group: &mut BenchmarkGroup<'_, WallTime>) {
     for worker_count in CONCURRENT_WORKER_COUNTS {
         let timer = StdMonotonicClock::new().new_timer();
         let start = Arc::new(Barrier::new(worker_count + 1));
@@ -266,12 +251,10 @@ fn benchmark_parallel_deadline_completion(
                         match timer.after(COMPLETION_DEADLINE) {
                             Ok(future) => {
                                 if !block_on_timer_future(future) {
-                                    completion_succeeded
-                                        .store(false, Ordering::Release);
+                                    completion_succeeded.store(false, Ordering::Release);
                                 }
                             }
-                            Err(_) => completion_succeeded
-                                .store(false, Ordering::Release),
+                            Err(_) => completion_succeeded.store(false, Ordering::Release),
                         }
                         finished.wait();
                     }

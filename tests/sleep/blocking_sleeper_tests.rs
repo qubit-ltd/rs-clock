@@ -25,8 +25,7 @@ use qubit_clock::TimerUnavailableError;
 fn test_blocking_sleeper_uses_manual_timer_without_real_delay() {
     let clock = ManualMonotonicClock::new_shared();
     let sleeper = BlockingSleeper::new(clock.new_timer());
-    let worker =
-        thread::spawn(move || sleeper.sleep_for(Duration::from_secs(16)));
+    let worker = thread::spawn(move || sleeper.sleep_for(Duration::from_secs(16)));
 
     assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
     let _reached = clock
@@ -68,28 +67,20 @@ impl Timer for CompletionFailingTimer {
         &self.clock
     }
 
-    fn at(
-        &self,
-        _deadline: MonotonicInstant,
-    ) -> Result<TimerFuture, TimeError> {
-        Ok(Box::pin(std::future::ready(Err(
-            TimeError::TimerUnavailable {
-                source: TimerUnavailableError::BackendUnavailable {
-                    backend: "test",
-                    source: Box::new(io::Error::other(
-                        "test timer completion failed",
-                    )),
-                },
+    fn at(&self, _deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
+        Ok(Box::pin(std::future::ready(Err(TimeError::TimerUnavailable {
+            source: TimerUnavailableError::BackendUnavailable {
+                backend: "test",
+                source: Box::new(io::Error::other("test timer completion failed")),
             },
-        ))))
+        }))))
     }
 }
 
 #[test]
 fn test_blocking_sleeper_returns_completion_error() {
     let clock = ManualMonotonicClock::new();
-    let sleeper =
-        BlockingSleeper::new(Arc::new(CompletionFailingTimer { clock }));
+    let sleeper = BlockingSleeper::new(Arc::new(CompletionFailingTimer { clock }));
 
     let Err(TimeError::TimerUnavailable {
         source: TimerUnavailableError::BackendUnavailable { backend, source },
@@ -110,10 +101,7 @@ impl Timer for FailingTimer {
         &self.clock
     }
 
-    fn at(
-        &self,
-        _deadline: MonotonicInstant,
-    ) -> Result<TimerFuture, TimeError> {
+    fn at(&self, _deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         Err(TimeError::TimerUnavailable {
             source: TimerUnavailableError::BackendUnavailable {
                 backend: "test",
