@@ -7,8 +7,6 @@
 // =============================================================================
 //! Defines the inline Tokio timer future representation.
 
-// qubit-style: allow coverage-cfg
-
 use std::future::Future;
 use std::panic::AssertUnwindSafe;
 use std::panic::catch_unwind;

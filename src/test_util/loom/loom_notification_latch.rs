@@ -5,7 +5,6 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-// qubit-style: allow source-test-pair
 //! Exposes the production notification latch to external Loom models.
 
 use crate::sleep::internal::notification_latch::NotificationLatch;
