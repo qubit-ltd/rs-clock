@@ -1,0 +1,41 @@
+format = 1
+
+[[exceptions]]
+rule = "coverage-cfg"
+path = "src/lib.rs"
+reason = "Re-export isolated standard Timer worker failure hooks only for coverage integration tests."
+
+[[exceptions]]
+rule = "coverage-cfg"
+path = "src/timer/internal/std_timer_scheduler.rs"
+reason = "Inject worker spawn and run failures so rollback and abnormal-exit recovery can be tested deterministically in isolated processes."
+
+[[exceptions]]
+rule = "coverage-cfg"
+path = "src/timer/internal/tokio_timer_future.rs"
+reason = "Consume the reviewed Tokio sleep-poll failure hook inside the concrete future under test."
+
+[[exceptions]]
+rule = "coverage-cfg"
+path = "src/timer/mod.rs"
+reason = "Re-export the Tokio sleep-poll failure hook only for instrumented coverage tests."
+
+[[exceptions]]
+rule = "coverage-cfg"
+path = "src/timer/tokio_timer.rs"
+reason = "Inject an otherwise timing-dependent sleep-poll panic so defensive liveness handling is tested deterministically."
+
+[[exceptions]]
+rule = "coverage-cfg"
+path = "tests/timer/internal/std_timer_spawn_failure_tests.rs"
+reason = "Exercise the native thread-spawn failure hook only in instrumented coverage builds."
+
+[[exceptions]]
+rule = "coverage-cfg"
+path = "tests/timer/internal/std_timer_worker_failure_tests.rs"
+reason = "Exercise the standard Timer worker run-failure hook only in an instrumented isolated process."
+
+[[exceptions]]
+rule = "coverage-cfg"
+path = "tests/timer/internal/tokio_timer_future_tests.rs"
+reason = "Exercise the Tokio sleep-poll failure hook only in instrumented coverage builds."

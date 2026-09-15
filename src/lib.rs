@@ -72,7 +72,6 @@ pub use timer::Timer;
 pub use timer::TimerFuture;
 #[cfg(feature = "tokio")]
 pub use timer::TokioTimer;
-// qubit-style: allow coverage-cfg
 #[doc(hidden)]
 #[cfg(coverage)]
 pub use timer::internal::std_timer_scheduler::fail_next_std_timer_worker_spawn;

@@ -7,8 +7,6 @@
 // =============================================================================
 //! Defines a timer driven by Tokio's time driver.
 
-// qubit-style: allow coverage-cfg
-
 use std::panic::AssertUnwindSafe;
 use std::panic::catch_unwind;
 use std::sync::Arc;

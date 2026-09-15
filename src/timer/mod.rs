@@ -7,8 +7,6 @@
 // =============================================================================
 //! Timer capabilities for asynchronous deadline notification.
 
-// qubit-style: allow coverage-cfg
-
 pub(crate) mod internal;
 mod manual_timer;
 mod std_timer;

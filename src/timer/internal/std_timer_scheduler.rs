@@ -7,8 +7,6 @@
 // =============================================================================
 //! Schedules all standard Timer registrations on one process-wide worker.
 
-// qubit-style: allow coverage-cfg
-
 use std::io;
 use std::sync::Arc;
 use std::sync::Condvar;

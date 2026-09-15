@@ -5,7 +5,6 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-// qubit-style: allow source-test-pair
 //! Exposes the production manual waiter registry to external Loom models.
 
 use std::task::Context;
