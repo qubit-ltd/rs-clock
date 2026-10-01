@@ -5,6 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+// qubit-style: allow coverage-cfg
 #![cfg_attr(docsrs, feature(doc_cfg))]
 //! Injectable wall clocks, monotonic clocks, and deterministic timers.
 //!

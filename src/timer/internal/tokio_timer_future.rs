@@ -5,6 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+// qubit-style: allow coverage-cfg
 //! Defines the inline Tokio timer future representation.
 
 use std::future::Future;
