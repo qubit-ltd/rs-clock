@@ -5,6 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+// qubit-style: allow coverage-cfg
 //! Defines a timer driven by Tokio's time driver.
 
 use std::panic::AssertUnwindSafe;

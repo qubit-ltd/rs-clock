@@ -5,6 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+// qubit-style: allow coverage-cfg
 //! Timer capabilities for asynchronous deadline notification.
 
 pub(crate) mod internal;
