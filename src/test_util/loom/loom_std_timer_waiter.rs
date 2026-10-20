@@ -42,7 +42,7 @@ impl LoomStdTimerWaiter {
     /// # Returns
     ///
     /// The production waiter's current pending, ready, or failed state.
-    #[inline(always)]
+    #[inline]
     pub fn poll(&self, context: &Context<'_>) -> Poll<Result<(), ()>> {
         self.inner.poll(context)
     }
@@ -54,7 +54,7 @@ impl LoomStdTimerWaiter {
     /// The detached Waker, or `None` when no Waker was registered or the
     /// waiter was already terminal.
     #[must_use = "the detached Waker must be invoked or safely discarded"]
-    #[inline(always)]
+    #[inline]
     pub fn complete(&self) -> Option<Waker> {
         self.inner.complete()
     }
@@ -66,7 +66,7 @@ impl LoomStdTimerWaiter {
     /// The detached Waker, or `None` when no Waker was registered or the
     /// waiter was already terminal.
     #[must_use = "the detached Waker must be invoked or safely discarded"]
-    #[inline(always)]
+    #[inline]
     pub fn fail(&self) -> Option<Waker> {
         self.inner.fail()
     }

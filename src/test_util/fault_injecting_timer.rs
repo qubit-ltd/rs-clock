@@ -129,7 +129,7 @@ impl FaultInjectingTimer {
     /// The current registration count. Concurrent observations are intended
     /// for test diagnostics and use relaxed ordering.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn registration_count(&self) -> usize {
         self.registration_count.load(Ordering::Relaxed)
     }
@@ -141,7 +141,7 @@ impl Timer for FaultInjectingTimer {
     /// # Returns
     ///
     /// The clock defining valid deadlines for this Timer.
-    #[inline(always)]
+    #[inline]
     fn clock(&self) -> &dyn MonotonicClock {
         &self.clock
     }

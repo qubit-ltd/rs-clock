@@ -34,6 +34,21 @@ use crate::TimerFuture;
 /// alive and be driven independently. Blocking the sole driver thread of a
 /// current-thread Tokio runtime while waiting on that same runtime's timer
 /// prevents the deadline from completing.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::BlockingSleeper;
+/// use qubit_clock::MonotonicClock;
+/// use qubit_clock::StdMonotonicClock;
+/// use std::time::Duration;
+///
+/// let timer = StdMonotonicClock::new().new_timer();
+/// let sleeper = BlockingSleeper::new(timer);
+/// sleeper
+///     .sleep_for(Duration::ZERO)
+///     .expect("zero-duration sleep should complete");
+/// ```
 #[derive(Clone)]
 pub struct BlockingSleeper {
     /// Timer providing eager deadline registration and completion futures.
@@ -52,6 +67,7 @@ impl BlockingSleeper {
     ///
     /// A cloneable blocking sleeper composing `timer`.
     #[must_use]
+    #[inline]
     pub const fn new(timer: Arc<dyn Timer>) -> Self {
         Self { timer }
     }
@@ -62,6 +78,7 @@ impl BlockingSleeper {
     ///
     /// The timer used to register blocking sleeps.
     #[must_use]
+    #[inline]
     pub fn timer(&self) -> &dyn Timer {
         self.timer.as_ref()
     }

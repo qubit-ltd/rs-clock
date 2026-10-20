@@ -26,7 +26,7 @@ impl StdTimerWaiterState {
     ///
     /// Initial state for a newly allocated waiter.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(super) const fn new() -> Self {
         Self::Pending(None)
     }

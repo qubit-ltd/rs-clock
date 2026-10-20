@@ -30,7 +30,7 @@ impl NotificationLatch {
     ///
     /// A notification latch in its cleared state.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn new() -> Self {
         Self {
             notified: AtomicBool::new(false),
@@ -38,13 +38,13 @@ impl NotificationLatch {
     }
 
     /// Clears a stale notification before another future poll.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn clear_notification(&self) {
         self.notified.store(false, Ordering::Release);
     }
 
     /// Latches a notification for a current or future observer.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn notify(&self) {
         self.notified.fetch_or(true, Ordering::Release);
     }
@@ -55,7 +55,7 @@ impl NotificationLatch {
     ///
     /// `true` when a notification was pending.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn take_notification(&self) -> bool {
         self.notified.swap(false, Ordering::AcqRel)
     }

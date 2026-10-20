@@ -32,7 +32,7 @@ impl StdTimerRegistration {
     ///
     /// A registration ready to be inserted into scheduler state.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(super) const fn new(deadline: Instant, waiter: Arc<StdTimerWaiter>) -> Self {
         Self { deadline, waiter }
     }
@@ -43,7 +43,7 @@ impl StdTimerRegistration {
     ///
     /// The registration's standard-library deadline.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(super) const fn deadline(&self) -> Instant {
         self.deadline
     }
@@ -54,7 +54,7 @@ impl StdTimerRegistration {
     ///
     /// The waiter formerly owned by this active registration.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(super) fn into_waiter(self) -> Arc<StdTimerWaiter> {
         self.waiter
     }

@@ -67,6 +67,21 @@ pub(crate) fn take_tokio_timer_sleep_poll_panic() -> bool {
 /// Logical deadlines preserve the full [`Duration`], but Tokio drives pending
 /// sleeps with millisecond-level scheduling granularity. This timer is not for
 /// high-resolution timing, and platform scheduling may add further delay.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{MonotonicClock, Timer, TokioTimer};
+///
+/// let runtime = tokio::runtime::Builder::new_current_thread()
+///     .enable_time()
+///     .build()?;
+/// let timer = TokioTimer::from_handle(runtime.handle().clone());
+/// let deadline = timer.clock().now();
+/// let notification = timer.at(deadline)?;
+/// runtime.block_on(notification)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioTimer {
@@ -248,7 +263,7 @@ impl Timer for TokioTimer {
     /// # Returns
     ///
     /// The monotonic clock driving this timer.
-    #[inline(always)]
+    #[inline]
     fn clock(&self) -> &dyn MonotonicClock {
         &self.clock
     }

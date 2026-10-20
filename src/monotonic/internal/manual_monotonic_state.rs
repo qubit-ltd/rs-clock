@@ -40,7 +40,7 @@ impl ManualMonotonicState {
     ///
     /// The total number of registered deadline waiters.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn waiter_count(&self) -> usize {
         self.waiters.count()
     }

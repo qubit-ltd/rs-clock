@@ -7,6 +7,7 @@
 // =============================================================================
 //! Defines the asynchronous timer capability.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::MonotonicClock;
@@ -35,6 +36,19 @@ use crate::TimerFuture;
 /// registration, such as an unavailable scheduler worker or a Tokio runtime
 /// that shut down. Custom implementations may document additional lifecycle
 /// preconditions and panic conditions.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{MonotonicClock, StdMonotonicClock, Timer};
+///
+/// let clock = StdMonotonicClock::new();
+/// let timer = clock.new_timer();
+/// let deadline = timer.clock().now();
+/// let notification = timer.at(deadline)?;
+/// # let _ = notification;
+/// # Ok::<(), qubit_clock::TimeError>(())
+/// ```
 pub trait Timer: Send + Sync {
     /// Returns the monotonic clock whose domain this timer uses.
     ///
@@ -116,7 +130,7 @@ where
     /// # Returns
     ///
     /// The clock exposed by the borrowed timer.
-    #[inline(always)]
+    #[inline]
     fn clock(&self) -> &dyn MonotonicClock {
         <T as Timer>::clock(*self)
     }
@@ -134,7 +148,7 @@ where
     /// # Errors
     ///
     /// Returns any registration error reported by the borrowed timer.
-    #[inline(always)]
+    #[inline]
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         <T as Timer>::at(*self, deadline)
     }
@@ -152,13 +166,13 @@ where
     /// # Errors
     ///
     /// Returns any error reported by the borrowed timer.
-    #[inline(always)]
+    #[inline]
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
         <T as Timer>::after(*self, duration)
     }
 }
 
-impl<T> Timer for std::sync::Arc<T>
+impl<T> Timer for Arc<T>
 where
     T: Timer + ?Sized,
 {
@@ -167,7 +181,7 @@ where
     /// # Returns
     ///
     /// The clock exposed by the wrapped timer.
-    #[inline(always)]
+    #[inline]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
@@ -185,7 +199,7 @@ where
     /// # Errors
     ///
     /// Returns any registration error reported by the wrapped timer.
-    #[inline(always)]
+    #[inline]
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         self.as_ref().at(deadline)
     }
@@ -203,7 +217,7 @@ where
     /// # Errors
     ///
     /// Returns any registration error reported by the wrapped timer.
-    #[inline(always)]
+    #[inline]
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
         self.as_ref().after(duration)
     }
@@ -218,7 +232,7 @@ where
     /// # Returns
     ///
     /// The clock exposed by the wrapped timer.
-    #[inline(always)]
+    #[inline]
     fn clock(&self) -> &dyn MonotonicClock {
         self.as_ref().clock()
     }
@@ -236,7 +250,7 @@ where
     /// # Errors
     ///
     /// Returns any registration error reported by the wrapped timer.
-    #[inline(always)]
+    #[inline]
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         self.as_ref().at(deadline)
     }
@@ -254,7 +268,7 @@ where
     /// # Errors
     ///
     /// Returns any registration error reported by the wrapped timer.
-    #[inline(always)]
+    #[inline]
     fn after(&self, duration: Duration) -> Result<TimerFuture, TimeError> {
         self.as_ref().after(duration)
     }

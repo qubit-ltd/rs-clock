@@ -19,7 +19,17 @@ use thiserror::Error;
 /// [`BackendUnavailable`](Self::BackendUnavailable) to retain their own error
 /// rather than reducing it to display text. The enum is non-exhaustive; callers
 /// must retain a fallback arm when matching it.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::TimerUnavailableError;
+///
+/// let error = TimerUnavailableError::SchedulerWorkerTerminated;
+/// assert_eq!("the scheduler worker thread terminated unexpectedly", error.to_string());
+/// ```
 #[non_exhaustive]
+#[must_use]
 #[derive(Debug, Error)]
 pub enum TimerUnavailableError {
     /// The standard timer could not spawn its shared scheduler worker.

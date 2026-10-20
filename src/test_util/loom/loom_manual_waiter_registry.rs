@@ -40,7 +40,7 @@ impl LoomManualWaiterRegistry {
     ///
     /// The production registry's current timer-waiter count.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn count(&self) -> usize {
         self.inner.count()
     }
@@ -55,7 +55,7 @@ impl LoomManualWaiterRegistry {
     ///
     /// The allocated waiter identifier.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn register_timer(&mut self, deadline: Duration) -> u64 {
         self.inner.register_timer(deadline)
     }
@@ -70,7 +70,7 @@ impl LoomManualWaiterRegistry {
     ///
     /// `Some` containing the optional detached Waker when the waiter existed,
     /// or `None` when it had already been removed.
-    #[inline(always)]
+    #[inline]
     pub fn unregister_timer(&mut self, waiter_id: u64) -> Option<Option<Waker>> {
         self.inner.unregister_timer(waiter_id)
     }
@@ -81,7 +81,7 @@ impl LoomManualWaiterRegistry {
     ///
     /// The allocated observer identifier.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn register_deadline_observer(&mut self) -> u64 {
         self.inner.register_deadline_observer()
     }
@@ -95,7 +95,7 @@ impl LoomManualWaiterRegistry {
     /// # Returns
     ///
     /// The detached Waker when one was registered, or `None` otherwise.
-    #[inline(always)]
+    #[inline]
     pub fn unregister_observer(&mut self, observer_id: u64) -> Option<Waker> {
         self.inner.unregister_observer(observer_id)
     }
@@ -116,7 +116,7 @@ impl LoomManualWaiterRegistry {
     ///
     /// Panics when `waiter_id` is not registered.
     #[must_use = "the poll state and detached waker must both be handled"]
-    #[inline(always)]
+    #[inline]
     pub fn poll_timer(
         &mut self,
         waiter_id: u64,
@@ -142,7 +142,7 @@ impl LoomManualWaiterRegistry {
     ///
     /// Panics when `observer_id` is not registered.
     #[must_use = "the poll state and detached waker must both be handled"]
-    #[inline(always)]
+    #[inline]
     pub fn poll_deadline_observer(
         &mut self,
         observer_id: u64,
@@ -161,7 +161,7 @@ impl LoomManualWaiterRegistry {
     /// # Returns
     ///
     /// Wakers detached from all due timer waiters.
-    #[inline(always)]
+    #[inline]
     pub fn take_due_timer_wakers(&mut self, elapsed: Duration) -> Vec<Waker> {
         self.inner.take_due_timer_wakers(elapsed)
     }

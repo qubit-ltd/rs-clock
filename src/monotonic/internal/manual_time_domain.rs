@@ -424,7 +424,7 @@ impl ManualTimeDomain {
     }
 
     /// Notifies all native coordination waiters after registration changes.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn notify_waiters_changed(&self) {
         self.waiters_changed.notify_all();
     }

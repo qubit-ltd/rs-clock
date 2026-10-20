@@ -56,6 +56,23 @@ fn within_runtime<R>(runtime: &Handle, operation: impl FnOnce() -> R) -> R {
 /// The type intentionally does not implement [`Clone`]; shared identity uses
 /// `Arc<TokioMonotonicClock>`. Derived timers retain an independent handle with
 /// the same clock domain and Tokio origin.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{MonotonicClock, TokioMonotonicClock};
+/// use tokio::runtime::Builder;
+///
+/// let runtime = Builder::new_current_thread()
+///     .enable_time()
+///     .build()
+///     .expect("Tokio runtime should build");
+/// let clock = TokioMonotonicClock::from_handle(runtime.handle().clone());
+/// let first = clock.now();
+/// let second = clock.now();
+/// assert_eq!(first.domain(), second.domain());
+/// assert!(second.elapsed_since_origin() >= first.elapsed_since_origin());
+/// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug)]
 pub struct TokioMonotonicClock {
@@ -155,7 +172,7 @@ impl TokioMonotonicClock {
     ///
     /// The Tokio instant mapped to elapsed duration zero.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn origin(&self) -> Instant {
         self.origin
     }
@@ -165,7 +182,7 @@ impl TokioMonotonicClock {
     /// # Returns
     ///
     /// This clock's process-unique domain.
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn domain(&self) -> ClockDomain {
         self.domain
     }

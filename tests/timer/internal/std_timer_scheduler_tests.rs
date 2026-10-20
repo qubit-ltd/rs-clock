@@ -61,7 +61,7 @@ impl WakeThreadRecorder {
     }
 
     /// Clears an earlier notification immediately before polling.
-    #[inline(always)]
+    #[inline]
     fn prepare_to_poll(&self) {
         self.notified.store(false, Ordering::Release);
     }
@@ -90,13 +90,13 @@ impl WakeThreadRecorder {
 
 impl Wake for WakeThreadRecorder {
     /// Records the current worker and unparks the polling thread.
-    #[inline(always)]
+    #[inline]
     fn wake(self: Arc<Self>) {
         self.wake_by_ref();
     }
 
     /// Records the current worker and unparks the polling thread.
-    #[inline(always)]
+    #[inline]
     fn wake_by_ref(self: &Arc<Self>) {
         *self
             .wake_thread

@@ -114,7 +114,7 @@ impl ManualWaiterRegistry {
     ///
     /// `None` when the waiter was absent, `Some(None)` for an unpolled waiter,
     /// or `Some(Some(waker))` for a waiter with a registered task waker.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn unregister_timer(&mut self, waiter_id: u64) -> Option<Option<Waker>> {
         self.timer_waiters.remove(&waiter_id).map(|entry| entry.into_value())
     }
@@ -313,7 +313,7 @@ impl ManualWaiterRegistry {
     ///
     /// `true` when the observer remains registered.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn contains_observer(&self, observer_id: u64) -> bool {
         self.count_observers.contains_key(&observer_id)
     }
@@ -409,7 +409,7 @@ impl ManualWaiterRegistry {
     ///
     /// The number of timer waiter registrations.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn count(&self) -> usize {
         self.timer_waiters.len()
     }

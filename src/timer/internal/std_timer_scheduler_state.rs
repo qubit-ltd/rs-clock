@@ -119,7 +119,7 @@ impl StdTimerSchedulerState {
     ///
     /// The earliest deadline, or `None` when there are no active registrations.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(super) fn next_deadline(&self) -> Option<Instant> {
         self.registrations.first().map(|entry| *entry.order())
     }
@@ -134,7 +134,7 @@ impl StdTimerSchedulerState {
     ///
     /// Panics in debug builds when an active registration has been unindexed.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(super) fn is_empty(&self) -> bool {
         debug_assert_eq!(self.registrations.len(), self.registrations.attached_len());
         self.registrations.is_empty()
@@ -146,7 +146,7 @@ impl StdTimerSchedulerState {
     ///
     /// The current worker-running state.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(super) const fn worker_running(&self) -> bool {
         self.worker_running
     }

@@ -14,6 +14,17 @@ use std::time::SystemTime;
 /// Unlike monotonic time, wall time may move backward after a system clock
 /// adjustment and must not be used to measure elapsed durations.
 ///
+/// # Examples
+///
+/// ```
+/// use std::time::SystemTime;
+/// use qubit_clock::{StdWallClock, WallClock};
+///
+/// let clock = StdWallClock::new();
+/// let now = clock.now();
+/// assert!(now.duration_since(SystemTime::UNIX_EPOCH).is_ok());
+/// ```
+///
 /// Discarding a sampled wall time is rejected when `unused_must_use` is denied:
 ///
 /// ```compile_fail
@@ -41,7 +52,7 @@ where
     /// # Returns
     ///
     /// The current wall time returned by the borrowed clock.
-    #[inline(always)]
+    #[inline]
     fn now(&self) -> SystemTime {
         <T as WallClock>::now(*self)
     }
@@ -56,7 +67,7 @@ where
     /// # Returns
     ///
     /// The current wall time returned by the wrapped clock.
-    #[inline(always)]
+    #[inline]
     fn now(&self) -> SystemTime {
         self.as_ref().now()
     }
@@ -71,7 +82,7 @@ where
     /// # Returns
     ///
     /// The current wall time returned by the wrapped clock.
-    #[inline(always)]
+    #[inline]
     fn now(&self) -> SystemTime {
         self.as_ref().now()
     }

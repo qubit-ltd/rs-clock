@@ -21,6 +21,15 @@ use crate::TimeError;
 /// recoverable backend failure that occurs after successful registration.
 /// Built-in timers report backend shutdown through [`TimeError`].
 ///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{TimeError, TimerFuture};
+///
+/// let future: TimerFuture = Box::pin(async { Ok::<(), TimeError>(()) });
+/// drop(future);
+/// ```
+///
 /// # Panics
 ///
 /// A custom Timer implementation may document additional panic conditions.

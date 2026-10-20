@@ -28,6 +28,38 @@ use crate::MonotonicInstant;
 /// The ready value is a point-in-time observation. Prefer
 /// [`ManualMonotonicClock::advance_to_next_deadline`] when the next operation
 /// must select and advance to the current earliest deadline atomically.
+///
+/// # Examples
+///
+/// Observe a registered manual timer deadline before advancing the clock:
+///
+/// ```
+/// use qubit_clock::{ManualDeadlineFuture, ManualMonotonicClock, MonotonicClock, Timer};
+/// use std::time::Duration;
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let clock = ManualMonotonicClock::new_shared();
+/// let timer = clock.new_timer();
+/// let task = tokio::spawn(async move {
+///     timer
+///         .after(Duration::from_secs(5))
+///         .expect("timer deadline should register")
+///         .await
+///         .expect("timer should complete");
+/// });
+///
+/// let deadline: ManualDeadlineFuture = clock.wait_for_next_deadline_async();
+/// let observed = deadline.await;
+/// assert_eq!(Duration::from_secs(5), observed.elapsed_since_origin());
+/// let reached = clock
+///     .advance_to_next_deadline()
+///     .expect("the observed waiter should remain active");
+/// assert_eq!(observed, reached);
+/// task.await?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct ManualDeadlineFuture {
     /// Manual clock whose deadline registrations are observed.

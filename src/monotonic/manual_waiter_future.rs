@@ -20,6 +20,37 @@ use crate::ManualMonotonicClock;
 /// This is a deterministic synchronization primitive for tests. Its observer
 /// is registered when the future is created, before its first poll. Dropping
 /// an incomplete future unregisters the observer from the clock.
+///
+/// # Examples
+///
+/// Wait for the manual clock to observe a requested number of timer waiters:
+///
+/// ```
+/// use qubit_clock::{ManualMonotonicClock, ManualWaiterFuture, MonotonicClock, Timer};
+/// use std::time::Duration;
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let clock = ManualMonotonicClock::new_shared();
+/// let waiter_count = clock.wait_for_waiters_async(1);
+/// let waiter: ManualWaiterFuture = waiter_count;
+/// let timer = clock.new_timer();
+/// let task = tokio::spawn(async move {
+///     timer
+///         .after(Duration::from_secs(1))
+///         .expect("timer deadline should register")
+///         .await
+///         .expect("timer should complete");
+/// });
+///
+/// waiter.await;
+/// clock
+///     .advance(Duration::from_secs(1))
+///     .expect("one second should fit in the manual clock");
+/// task.await?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct ManualWaiterFuture {
     /// The reference to the manual clock.

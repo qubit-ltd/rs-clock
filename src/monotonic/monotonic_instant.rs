@@ -27,6 +27,19 @@ use crate::TimeError;
 ///
 /// ManualMonotonicClock::new().now();
 /// ```
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{ClockDomain, MonotonicInstant};
+/// use std::time::Duration;
+///
+/// let domain = ClockDomain::new();
+/// let earlier = MonotonicInstant::new(domain, Duration::from_secs(2));
+/// let later = MonotonicInstant::new(domain, Duration::from_secs(5));
+///
+/// assert_eq!(later.duration_since(earlier).unwrap(), Duration::from_secs(3));
+/// ```
 #[must_use = "monotonic instants should be used to measure or compare time"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MonotonicInstant {
@@ -47,7 +60,7 @@ impl MonotonicInstant {
     /// # Returns
     ///
     /// An instant scoped to `domain` at `elapsed`.
-    #[inline(always)]
+    #[inline]
     pub const fn new(domain: ClockDomain, elapsed: Duration) -> Self {
         Self { domain, elapsed }
     }
@@ -57,7 +70,7 @@ impl MonotonicInstant {
     /// # Returns
     ///
     /// The domain carried by this instant.
-    #[inline(always)]
+    #[inline]
     pub const fn domain(self) -> ClockDomain {
         self.domain
     }
@@ -71,7 +84,7 @@ impl MonotonicInstant {
     ///
     /// The duration from the originating clock's private origin.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn elapsed_since_origin(self) -> Duration {
         self.elapsed
     }

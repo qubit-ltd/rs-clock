@@ -16,7 +16,22 @@ use tokio::runtime::TryCurrentError;
 /// Tokio clock or timer uses its retained runtime handle and does not depend on
 /// the caller's ambient runtime context. The enum is non-exhaustive; callers
 /// must retain a fallback arm when matching it.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{TokioRuntimeError, TokioTimer};
+///
+/// match TokioTimer::try_current() {
+///     Err(TokioRuntimeError::NotEntered { source }) => {
+///         eprintln!("Tokio runtime is unavailable: {source}");
+///     }
+///     Err(error) => eprintln!("could not capture Tokio runtime: {error}"),
+///     Ok(_timer) => {}
+/// }
+/// ```
 #[non_exhaustive]
+#[must_use]
 #[derive(Debug, Error)]
 pub enum TokioRuntimeError {
     /// No Tokio runtime is entered on the current thread.

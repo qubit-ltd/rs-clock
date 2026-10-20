@@ -27,7 +27,10 @@ fn test_blocking_sleeper_uses_manual_timer_without_real_delay() {
     let sleeper = BlockingSleeper::new(clock.new_timer());
     let worker = thread::spawn(move || sleeper.sleep_for(Duration::from_secs(16)));
 
-    assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
+    assert!(
+        clock.wait_for_waiters(1, Duration::from_secs(1)),
+        "blocking sleeper should register its deadline",
+    );
     let _reached = clock
         .advance_to_next_deadline()
         .expect("blocking deadline should exist");
@@ -55,7 +58,10 @@ fn test_blocking_sleeper_exposes_composed_timer() {
 
     assert_eq!(clock.now().domain(), sleeper.timer().clock().now().domain(),);
     assert_eq!(clock.now().domain(), cloned.timer().clock().now().domain(),);
-    assert!(format!("{sleeper:?}").starts_with("BlockingSleeper"));
+    assert!(
+        format!("{sleeper:?}").starts_with("BlockingSleeper"),
+        "debug output should identify the blocking sleeper",
+    );
 }
 
 struct CompletionFailingTimer {

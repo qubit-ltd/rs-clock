@@ -20,6 +20,16 @@ use crate::Timer;
 ///
 /// The type intentionally does not implement [`Clone`]. Shared identity is
 /// expressed explicitly with `Arc<StdMonotonicClock>`.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{MonotonicClock, StdMonotonicClock};
+///
+/// let clock = StdMonotonicClock::new();
+/// let instant = clock.now();
+/// assert_eq!(instant.domain(), clock.domain());
+/// ```
 #[derive(Debug)]
 pub struct StdMonotonicClock {
     /// Domain carried by instants sampled from this clock.
@@ -67,7 +77,7 @@ impl StdMonotonicClock {
     ///
     /// The standard-library instant mapped to elapsed duration zero.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn origin(&self) -> Instant {
         self.origin
     }
@@ -77,7 +87,7 @@ impl StdMonotonicClock {
     /// # Returns
     ///
     /// This clock's process-unique domain.
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn domain(&self) -> ClockDomain {
         self.domain
     }
@@ -93,7 +103,7 @@ impl Default for StdMonotonicClock {
     /// # Panics
     ///
     /// Panics if all process-wide clock-domain identifiers are exhausted.
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -105,7 +115,7 @@ impl MonotonicClock for StdMonotonicClock {
     /// # Returns
     ///
     /// This clock's process-unique domain.
-    #[inline(always)]
+    #[inline]
     fn domain(&self) -> ClockDomain {
         self.domain
     }

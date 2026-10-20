@@ -45,7 +45,7 @@ impl ThreadWaker {
     }
 
     /// Clears an earlier notification immediately before polling.
-    #[inline(always)]
+    #[inline]
     fn prepare_to_poll(&self) {
         self.notified.store(false, Ordering::Release);
     }
@@ -60,13 +60,13 @@ impl ThreadWaker {
 
 impl Wake for ThreadWaker {
     /// Latches a notification before unparking the polling thread.
-    #[inline(always)]
+    #[inline]
     fn wake(self: Arc<Self>) {
         self.wake_by_ref();
     }
 
     /// Latches a notification before unparking the polling thread.
-    #[inline(always)]
+    #[inline]
     fn wake_by_ref(self: &Arc<Self>) {
         self.notified.store(true, Ordering::Release);
         self.thread.unpark();

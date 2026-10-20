@@ -31,6 +31,19 @@ use crate::timer::internal::std_timer_waiter::StdTimerWaiter;
 /// [`TimerUnavailableError::SchedulerWorkerTerminated`](crate::TimerUnavailableError::SchedulerWorkerTerminated)
 /// instead of remaining pending or reporting false deadline completion. A
 /// later registration starts a replacement worker generation.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{StdTimer, Timer};
+///
+/// # fn main() -> Result<(), qubit_clock::TimeError> {
+/// let timer = StdTimer::new();
+/// let deadline = timer.clock().now();
+/// let _ready = timer.at(deadline)?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct StdTimer {
     /// Private clock handle retaining the source domain and native origin.
     clock: StdMonotonicClock,
@@ -170,7 +183,7 @@ impl Timer for StdTimer {
     /// # Returns
     ///
     /// The monotonic clock driving this timer.
-    #[inline(always)]
+    #[inline]
     fn clock(&self) -> &dyn MonotonicClock {
         &self.clock
     }

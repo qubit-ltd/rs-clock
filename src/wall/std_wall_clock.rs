@@ -12,6 +12,16 @@ use std::time::SystemTime;
 use crate::WallClock;
 
 /// A zero-sized wall clock backed by [`SystemTime::now`].
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{StdWallClock, WallClock};
+///
+/// let clock = StdWallClock::new();
+/// let now = clock.now();
+/// assert!(now.duration_since(std::time::SystemTime::UNIX_EPOCH).is_ok());
+/// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct StdWallClock;
 
@@ -21,6 +31,7 @@ impl StdWallClock {
     /// # Returns
     ///
     /// A zero-sized wall clock backed by [`SystemTime::now`].
+    #[inline]
     #[must_use]
     pub const fn new() -> Self {
         Self

@@ -6,6 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -51,7 +53,7 @@ fn test_panic_fanout_attempts_every_due_waker_before_resuming_panic() {
     assert!(first.as_mut().poll(&mut first_context).is_pending());
     assert!(second.as_mut().poll(&mut second_context).is_pending());
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| clock.advance(Duration::from_secs(1))));
+    let result = catch_unwind(AssertUnwindSafe(|| clock.advance(Duration::from_secs(1))));
 
     assert!(result.is_err());
     assert_eq!(2, attempts.load(Ordering::Relaxed));

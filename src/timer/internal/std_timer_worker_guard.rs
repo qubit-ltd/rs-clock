@@ -30,7 +30,7 @@ impl<'a> StdTimerWorkerGuard<'a> {
     /// # Returns
     ///
     /// A guard that restores scheduler state when the worker exits.
-    #[inline(always)]
+    #[inline]
     pub(super) const fn new(scheduler: &'a StdTimerScheduler, worker_generation: u64) -> Self {
         Self {
             scheduler,
@@ -63,7 +63,7 @@ impl Drop for StdTimerWorkerGuard<'_> {
     /// only a no-op generation check. An active guard atomically detaches the
     /// exited generation before failing and waking its waiters outside the
     /// scheduler state mutex.
-    #[inline(always)]
+    #[inline]
     fn drop(&mut self) {
         self.scheduler.handle_worker_exit(self.worker_generation);
     }

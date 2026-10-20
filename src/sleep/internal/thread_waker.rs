@@ -5,7 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Defines the notification latch used by a blocking sleeper.
+//! Wakes the thread blocked while polling a timer future.
 
 use std::sync::Arc;
 use std::task::Wake;
@@ -31,7 +31,7 @@ impl ThreadWaker {
     ///
     /// A latch with no pending notification.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn new(thread: std::thread::Thread) -> Self {
         Self {
             thread,
@@ -40,7 +40,7 @@ impl ThreadWaker {
     }
 
     /// Clears a stale notification before polling the future again.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn clear_notification(&self) {
         self.notification.clear_notification();
     }
@@ -51,7 +51,7 @@ impl ThreadWaker {
     ///
     /// `true` when a wake occurred since the previous clear or take.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn take_notification(&self) -> bool {
         self.notification.take_notification()
     }
@@ -59,13 +59,13 @@ impl ThreadWaker {
 
 impl Wake for ThreadWaker {
     /// Latches a notification before unparking the blocked thread.
-    #[inline(always)]
+    #[inline]
     fn wake(self: Arc<Self>) {
         self.wake_by_ref();
     }
 
     /// Latches a notification before unparking the blocked thread.
-    #[inline(always)]
+    #[inline]
     fn wake_by_ref(self: &Arc<Self>) {
         self.notification.notify();
         self.thread.unpark();

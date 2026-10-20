@@ -29,7 +29,7 @@ static NEXT_CLOCK_DOMAIN: AtomicU64 = AtomicU64::new(1);
 /// # Returns
 ///
 /// The next allocator state, or `None` when `identifier` is already zero.
-#[inline(always)]
+#[inline]
 pub(crate) fn next_identifier_state(identifier: u64) -> Option<u64> {
     NonZeroU64::new(identifier).map(|identifier| identifier.get().wrapping_add(1))
 }
@@ -69,6 +69,15 @@ fn allocate_clock_domain_identifier(next: &AtomicU64) -> u64 {
 ///
 /// let domain = ClockDomain::default();
 /// ```
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::ClockDomain;
+///
+/// let domain = ClockDomain::new();
+/// assert_ne!(domain.to_string(), "0");
+/// ```
 #[must_use = "clock domains should be retained to identify monotonic timelines"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClockDomain(
@@ -91,7 +100,7 @@ impl ClockDomain {
     /// Panics if all representable nonzero domain identifiers have been
     /// allocated rather than wrapping and reusing a prior identity.
     #[allow(clippy::new_without_default)]
-    #[inline(always)]
+    #[inline]
     pub fn new() -> Self {
         Self(allocate_clock_domain_identifier(&NEXT_CLOCK_DOMAIN))
     }
@@ -111,7 +120,7 @@ impl Display for ClockDomain {
     /// # Errors
     ///
     /// Returns [`std::fmt::Error`] when the formatter rejects the output.
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         let Self(identifier) = self;
         identifier.fmt(formatter)

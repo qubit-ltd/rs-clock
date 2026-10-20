@@ -30,13 +30,13 @@ impl LoomNotificationLatch {
     }
 
     /// Clears a stale notification before another modeled poll.
-    #[inline(always)]
+    #[inline]
     pub fn clear_notification(&self) {
         self.inner.clear_notification();
     }
 
     /// Latches a notification for a current or future modeled observer.
-    #[inline(always)]
+    #[inline]
     pub fn notify(&self) {
         self.inner.notify();
     }
@@ -47,7 +47,7 @@ impl LoomNotificationLatch {
     ///
     /// `true` when a notification was pending.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn take_notification(&self) -> bool {
         self.inner.take_notification()
     }

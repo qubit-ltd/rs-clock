@@ -29,7 +29,7 @@ impl<'a> WaiterRegistrationGuard<'a> {
     /// # Returns
     ///
     /// A guard that unregisters the waiter unless ownership is transferred.
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn new(clock: &'a ManualMonotonicClock, waiter_id: u64) -> Self {
         Self {
             clock,

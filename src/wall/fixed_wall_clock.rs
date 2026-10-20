@@ -12,6 +12,17 @@ use std::time::SystemTime;
 use crate::WallClock;
 
 /// A wall clock that always returns one fixed time.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::{FixedWallClock, WallClock};
+/// use std::time::SystemTime;
+///
+/// let fixed_time = SystemTime::UNIX_EPOCH;
+/// let clock = FixedWallClock::new(fixed_time);
+/// assert_eq!(clock.now(), fixed_time);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedWallClock {
     /// Immutable wall-clock value returned by every sample.

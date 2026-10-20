@@ -107,7 +107,7 @@ impl From<TimerUnavailableError> for TimeError {
     /// # Returns
     ///
     /// A monotonic time error retaining `source`.
-    #[inline(always)]
+    #[inline]
     fn from(source: TimerUnavailableError) -> Self {
         Self::TimerUnavailable { source }
     }

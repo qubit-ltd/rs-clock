@@ -31,6 +31,20 @@ use crate::monotonic::internal::WaiterRegistrationGuard;
 ///
 /// The type intentionally does not implement [`Clone`]. Components that must
 /// observe one shared manual clock use `Arc<ManualMonotonicClock>` explicitly.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::ManualMonotonicClock;
+/// use qubit_clock::MonotonicClock;
+/// use std::time::Duration;
+///
+/// let clock = ManualMonotonicClock::new();
+/// clock
+///     .advance(Duration::from_secs(1))
+///     .expect("one second should fit in the manual clock");
+/// assert_eq!(Duration::from_secs(1), clock.now().elapsed_since_origin());
+/// ```
 pub struct ManualMonotonicClock {
     /// The identifier of the originating monotonic clock domain.
     domain: ClockDomain,
@@ -196,7 +210,6 @@ impl ManualMonotonicClock {
     ///
     /// The earliest future deadline, or `None` when every registration is due
     /// or no waiter is registered.
-    #[must_use]
     #[inline]
     pub fn next_deadline(&self) -> Option<MonotonicInstant> {
         self.time_domain
@@ -223,8 +236,7 @@ impl ManualMonotonicClock {
     /// The earliest registered future deadline. Returns `None` when no such
     /// deadline exists and the real-time guard expires or cannot be
     /// represented.
-    #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn wait_for_next_deadline(&self, real_timeout: Duration) -> Option<MonotonicInstant> {
         self.time_domain
             .wait_for_next_deadline(real_timeout)
@@ -414,7 +426,7 @@ impl ManualMonotonicClock {
     ///
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn wait_for_waiters_async(self: &Arc<Self>, expected_count: usize) -> ManualWaiterFuture {
         ManualWaiterFuture::new(Arc::clone(self), expected_count)
     }
@@ -446,7 +458,7 @@ impl ManualMonotonicClock {
     ///
     /// Panics if the waiter-observer identifier space is exhausted.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn wait_for_waiters(&self, expected_count: usize, real_timeout: Duration) -> bool {
         self.time_domain.wait_for_waiters(expected_count, real_timeout)
     }
@@ -676,7 +688,7 @@ impl Default for ManualMonotonicClock {
     /// # Panics
     ///
     /// Panics if all process-wide clock-domain identifiers are exhausted.
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -688,7 +700,7 @@ impl MonotonicClock for ManualMonotonicClock {
     /// # Returns
     ///
     /// This clock's process-unique domain.
-    #[inline(always)]
+    #[inline]
     fn domain(&self) -> ClockDomain {
         self.domain
     }

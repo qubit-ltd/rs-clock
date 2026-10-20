@@ -31,7 +31,7 @@ pin_project! {
     /// Tokio sleep paired with shared retained-runtime liveness.
     #[derive(Debug)]
     pub(crate) struct TokioTimerFuture {
-        // Native Tokio deadline future.
+        // Native Tokio deadline future polled after checking shutdown.
         #[pin]
         sleep: Sleep,
         // Shutdown notification owned by this deadline.
@@ -68,6 +68,18 @@ impl Future for TokioTimerFuture {
     type Output = Result<(), TimeError>;
 
     /// Polls shutdown before the native sleep and preserves unexpected panics.
+    ///
+    /// # Parameters
+    ///
+    /// * `self` - Pinned timer future whose shutdown and deadline are observed.
+    /// * `context` - Task context used to register wakeups for either wait
+    ///   condition.
+    ///
+    /// # Returns
+    ///
+    /// `Pending` while both conditions remain unresolved, `Ready(Ok(()))` when
+    /// the deadline expires, or a runtime-shutdown error when its runtime
+    /// closes.
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
         if this.liveness.is_shutdown() || this.shutdown.as_mut().poll(context).is_ready() {

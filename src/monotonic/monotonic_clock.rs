@@ -155,7 +155,7 @@ where
     /// # Returns
     ///
     /// The domain returned by the borrowed clock.
-    #[inline(always)]
+    #[inline]
     fn domain(&self) -> ClockDomain {
         <T as MonotonicClock>::domain(*self)
     }
@@ -165,7 +165,7 @@ where
     /// # Returns
     ///
     /// The current instant returned by the borrowed clock.
-    #[inline(always)]
+    #[inline]
     fn now(&self) -> MonotonicInstant {
         <T as MonotonicClock>::now(*self)
     }
@@ -183,7 +183,7 @@ where
     /// # Errors
     ///
     /// Returns any overflow error reported by the borrowed clock.
-    #[inline(always)]
+    #[inline]
     fn deadline_after(&self, duration: Duration) -> Result<MonotonicInstant, TimeError> {
         <T as MonotonicClock>::deadline_after(*self, duration)
     }
@@ -193,7 +193,7 @@ where
     /// # Returns
     ///
     /// A timer in the borrowed clock's exact monotonic domain.
-    #[inline(always)]
+    #[inline]
     fn new_timer(&self) -> Arc<dyn Timer> {
         <T as MonotonicClock>::new_timer(*self)
     }
@@ -208,7 +208,7 @@ where
     /// # Returns
     ///
     /// The domain returned by the wrapped clock.
-    #[inline(always)]
+    #[inline]
     fn domain(&self) -> ClockDomain {
         self.as_ref().domain()
     }
@@ -218,7 +218,7 @@ where
     /// # Returns
     ///
     /// The current instant returned by the wrapped clock.
-    #[inline(always)]
+    #[inline]
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()
     }
@@ -236,7 +236,7 @@ where
     /// # Errors
     ///
     /// Returns any overflow error reported by the wrapped clock.
-    #[inline(always)]
+    #[inline]
     fn deadline_after(&self, duration: Duration) -> Result<MonotonicInstant, TimeError> {
         self.as_ref().deadline_after(duration)
     }
@@ -246,7 +246,7 @@ where
     /// # Returns
     ///
     /// A timer in the wrapped clock's exact monotonic domain.
-    #[inline(always)]
+    #[inline]
     fn new_timer(&self) -> Arc<dyn Timer> {
         self.as_ref().new_timer()
     }
@@ -261,7 +261,7 @@ where
     /// # Returns
     ///
     /// The domain returned by the wrapped clock.
-    #[inline(always)]
+    #[inline]
     fn domain(&self) -> ClockDomain {
         self.as_ref().domain()
     }
@@ -271,7 +271,7 @@ where
     /// # Returns
     ///
     /// The current instant returned by the wrapped clock.
-    #[inline(always)]
+    #[inline]
     fn now(&self) -> MonotonicInstant {
         self.as_ref().now()
     }
@@ -289,7 +289,7 @@ where
     /// # Errors
     ///
     /// Returns any overflow error reported by the wrapped clock.
-    #[inline(always)]
+    #[inline]
     fn deadline_after(&self, duration: Duration) -> Result<MonotonicInstant, TimeError> {
         self.as_ref().deadline_after(duration)
     }
@@ -299,7 +299,7 @@ where
     /// # Returns
     ///
     /// A timer in the wrapped clock's exact monotonic domain.
-    #[inline(always)]
+    #[inline]
     fn new_timer(&self) -> Arc<dyn Timer> {
         self.as_ref().new_timer()
     }

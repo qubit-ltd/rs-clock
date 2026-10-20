@@ -1,6 +1,6 @@
 [package]
 name = "qubit-clock"
-version = "0.13.0"
+version = "0.13.1"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -64,9 +64,9 @@ tokio = ["dep:pin-project-lite", "dep:tokio"]
 
 [dependencies]
 loom = { version = "^0.7", optional = true }
-pin-project-lite = { version = "^0.2", optional = true }
 thiserror = "^2.0"
 tokio = { version = "^1.53", optional = true, features = ["rt", "sync", "time"] }
+pin-project-lite = { version = "^0.2", optional = true }
 qubit-collections = { version = "0.2" }
 
 [dev-dependencies]

@@ -23,6 +23,19 @@ use crate::timer::internal::manual_timer_future::ManualTimerFuture;
 /// before this timer returns their futures. The timer and its futures retain a
 /// private same-domain clock handle, so they remain valid if the source clock
 /// value is dropped.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::ManualMonotonicClock;
+/// use qubit_clock::ManualTimer;
+/// use qubit_clock::MonotonicClock;
+/// use qubit_clock::Timer;
+///
+/// let clock = ManualMonotonicClock::new();
+/// let timer = ManualTimer::from_clock(&clock);
+/// assert_eq!(timer.clock().domain(), clock.domain());
+/// ```
 #[derive(Debug)]
 pub struct ManualTimer {
     /// Private handle retaining the manual clock domain and mutable timeline.
@@ -54,7 +67,7 @@ impl Timer for ManualTimer {
     /// # Returns
     ///
     /// The monotonic clock driving this timer.
-    #[inline(always)]
+    #[inline]
     fn clock(&self) -> &dyn MonotonicClock {
         self.clock.as_ref()
     }

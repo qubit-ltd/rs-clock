@@ -22,6 +22,21 @@ use crate::WallClock;
 /// Advancing the monotonic clock advances this wall clock by the same
 /// duration. Calling [`reanchor()`](Self::reanchor) changes only the wall-time
 /// mapping and never changes the underlying monotonic clock.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_clock::ManualMonotonicClock;
+/// use qubit_clock::ManualWallClock;
+/// use qubit_clock::WallClock;
+/// use std::sync::Arc;
+/// use std::time::SystemTime;
+///
+/// let wall_time = SystemTime::UNIX_EPOCH;
+/// let monotonic_clock = ManualMonotonicClock::new_shared();
+/// let wall_clock = ManualWallClock::from_clock(wall_time, Arc::clone(&monotonic_clock));
+/// assert_eq!(wall_clock.now(), wall_time);
+/// ```
 #[derive(Debug)]
 pub struct ManualWallClock {
     /// Shared monotonic timeline used to project elapsed wall time.
