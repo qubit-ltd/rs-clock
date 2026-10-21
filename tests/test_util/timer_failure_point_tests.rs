@@ -11,7 +11,6 @@ use qubit_clock::test_util::TimerFailurePoint;
 /// Verifies that failure points retain value semantics for test assertions.
 #[test]
 fn test_timer_failure_point_has_value_semantics() {
-    /// Requires a type to support copied and cloned test values.
     fn assert_copy_clone<T: Copy + Clone>() {}
 
     assert_copy_clone::<TimerFailurePoint>();

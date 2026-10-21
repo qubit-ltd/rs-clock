@@ -14,6 +14,7 @@ mod std_timer_registration_tests;
 mod std_timer_scheduler_state_tests;
 mod std_timer_waiter_state_tests;
 mod std_timer_waiter_tests;
+mod std_timer_worker_failure_tests;
 mod std_timer_worker_guard_tests;
 
 #[cfg(feature = "tokio")]

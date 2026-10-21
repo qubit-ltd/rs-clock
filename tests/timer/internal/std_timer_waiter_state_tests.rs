@@ -64,8 +64,16 @@ fn test_std_timer_waiter_state_replaces_registered_waker() {
             std::thread::sleep(Duration::from_millis(1));
         }
 
-        assert_eq!(0, first_counter.0.load(Ordering::Relaxed));
-        assert_eq!(1, second_counter.0.load(Ordering::Relaxed));
+        assert_eq!(
+            0,
+            first_counter.0.load(Ordering::Relaxed),
+            "the replaced Waker must not be invoked",
+        );
+        assert_eq!(
+            1,
+            second_counter.0.load(Ordering::Relaxed),
+            "the latest registered Waker must be invoked exactly once",
+        );
         assert!(matches!(future.as_mut().poll(&mut second_context), Poll::Ready(Ok(()))));
         return;
     }
