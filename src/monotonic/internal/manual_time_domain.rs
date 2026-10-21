@@ -240,6 +240,7 @@ impl ManualTimeDomain {
     /// # Panics
     ///
     /// Panics when observer identifiers are exhausted.
+    #[must_use]
     pub(crate) fn wait_for_waiters(&self, expected_count: usize, real_timeout: Duration) -> bool {
         let mut state = self.lock_state();
         let count = state.waiter_count();

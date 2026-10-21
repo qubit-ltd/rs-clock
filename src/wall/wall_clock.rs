@@ -7,6 +7,7 @@
 // =============================================================================
 //! Defines the wall-clock capability.
 
+use std::sync::Arc;
 use std::time::SystemTime;
 
 /// Provides the current civil time as a [`SystemTime`].
@@ -58,7 +59,7 @@ where
     }
 }
 
-impl<T> WallClock for std::sync::Arc<T>
+impl<T> WallClock for Arc<T>
 where
     T: WallClock + ?Sized,
 {

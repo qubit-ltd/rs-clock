@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 use std::task::Wake;
+use std::thread::Thread;
 
 use super::notification_latch::NotificationLatch;
 
@@ -32,7 +33,7 @@ impl ThreadWaker {
     /// A latch with no pending notification.
     #[must_use]
     #[inline]
-    pub(crate) fn new(thread: std::thread::Thread) -> Self {
+    pub(crate) fn new(thread: Thread) -> Self {
         Self {
             thread,
             notification: NotificationLatch::new(),

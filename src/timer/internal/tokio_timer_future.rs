@@ -110,6 +110,7 @@ impl Future for TokioTimerFuture {
 /// # Returns
 ///
 /// A ready timer-unavailable result reporting runtime shutdown.
+#[inline]
 fn runtime_shutdown() -> Poll<Result<(), TimeError>> {
     Poll::Ready(Err(TimeError::TimerUnavailable {
         source: TimerUnavailableError::RuntimeShuttingDown,

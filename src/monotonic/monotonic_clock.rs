@@ -199,7 +199,7 @@ where
     }
 }
 
-impl<T> MonotonicClock for std::sync::Arc<T>
+impl<T> MonotonicClock for Arc<T>
 where
     T: MonotonicClock + ?Sized,
 {

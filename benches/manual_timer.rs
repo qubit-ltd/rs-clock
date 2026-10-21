@@ -39,6 +39,7 @@ const BATCH_DEADLINE: Duration = Duration::from_secs(1);
 /// # Returns
 ///
 /// `true` when the future is ready with a successful result.
+#[must_use]
 #[inline]
 fn is_ready(future: &mut TimerFuture, context: &mut Context<'_>) -> bool {
     matches!(future.as_mut().poll(context), Poll::Ready(Ok(())))
