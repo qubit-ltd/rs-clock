@@ -43,18 +43,24 @@ impl TokioRuntimeLivenessRegistry {
         REGISTRY.get_or_create(Handle::current().id())
     }
 
-    /// Returns live state for one runtime identifier.
+    /// Returns shared liveness state for one runtime identifier.
     ///
-    /// Closed state is never reused because Tokio may recycle identifiers after
-    /// a runtime completes.
+    /// Closed state is replaced because Tokio may recycle identifiers after a
+    /// runtime completes. The registry lock ensures concurrent callers reuse
+    /// the same live state.
     ///
     /// # Parameters
     ///
-    /// * `runtime_id` - Identifier of the currently entered runtime.
+    /// * `runtime_id` - Tokio identifier of the runtime associated with this
+    ///   liveness state.
     ///
     /// # Returns
     ///
     /// Shared live state for `runtime_id`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the registry mutex is poisoned.
     fn get_or_create(&self, runtime_id: Id) -> Arc<TokioRuntimeLiveness> {
         let (liveness, release_notification) = {
             let mut entries = self
