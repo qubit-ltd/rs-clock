@@ -96,6 +96,7 @@ impl StdTimer {
     ///
     /// Returns [`TimeError::ClockDomainMismatch`] for a foreign deadline and
     /// [`TimeError::InstantOverflow`] when conversion overflows.
+    #[inline]
     fn native_deadline(&self, deadline: MonotonicInstant) -> Result<Instant, TimeError> {
         deadline.validate_domain(self.clock.domain())?;
         self.clock

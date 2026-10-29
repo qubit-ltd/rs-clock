@@ -40,7 +40,6 @@ impl StdTimerFuture {
     /// # Returns
     ///
     /// A cancellation-safe pending future.
-    #[must_use]
     #[inline]
     pub(crate) const fn new(scheduler: Arc<StdTimerScheduler>, waiter_id: u64, waiter: Arc<StdTimerWaiter>) -> Self {
         Self {

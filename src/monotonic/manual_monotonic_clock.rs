@@ -200,6 +200,7 @@ impl ManualMonotonicClock {
     ///
     /// The total number of waiter registrations awaiting cleanup or completion.
     #[must_use]
+    #[inline]
     pub fn pending_waiters(&self) -> usize {
         self.time_domain.waiter_count()
     }
@@ -210,6 +211,7 @@ impl ManualMonotonicClock {
     ///
     /// The earliest future deadline, or `None` when every registration is due
     /// or no waiter is registered.
+    #[must_use]
     #[inline]
     pub fn next_deadline(&self) -> Option<MonotonicInstant> {
         self.time_domain
@@ -236,6 +238,7 @@ impl ManualMonotonicClock {
     /// The earliest registered future deadline. Returns `None` when no such
     /// deadline exists and the real-time guard expires or cannot be
     /// represented.
+    #[must_use]
     #[inline]
     pub fn wait_for_next_deadline(&self, real_timeout: Duration) -> Option<MonotonicInstant> {
         self.time_domain
@@ -320,6 +323,7 @@ impl ManualMonotonicClock {
     /// this advance is attempted before the first panic is resumed. The
     /// logical-time update is already committed and is not rolled back during
     /// unwinding.
+    #[must_use]
     pub fn advance_to_next_deadline(&self) -> Option<MonotonicInstant> {
         let (target_elapsed, effects) = self.time_domain.advance_to_next_deadline()?;
         let target = MonotonicInstant::new(self.domain, target_elapsed);
@@ -358,6 +362,7 @@ impl ManualMonotonicClock {
     /// this advance is attempted before the first panic is resumed. The
     /// logical-time update is already committed and is not rolled back during
     /// unwinding.
+    #[must_use]
     #[inline]
     pub fn advance_to_next_deadline_after_waiters(
         &self,
@@ -517,6 +522,7 @@ impl ManualMonotonicClock {
     /// # Panics
     ///
     /// Panics when the observer identifier space is exhausted.
+    #[must_use]
     #[inline]
     pub(crate) fn register_waiter_observer(&self, expected_count: usize) -> Option<u64> {
         self.time_domain.register_waiter_observer(expected_count)
@@ -614,6 +620,7 @@ impl ManualMonotonicClock {
     ///
     /// Panics if `waiter_id` no longer identifies a registered timer waiter or
     /// if destroying a replaced custom task waker panics after unlocking.
+    #[inline]
     pub(crate) fn poll_timer_waiter(&self, waiter_id: u64, context: &Context<'_>) -> Poll<()> {
         let (poll_result, replaced_waker) = self.time_domain.poll_timer_waiter(waiter_id, context);
         drop(replaced_waker);

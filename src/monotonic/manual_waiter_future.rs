@@ -56,6 +56,9 @@ pub struct ManualWaiterFuture {
     /// The reference to the manual clock.
     clock: Arc<ManualMonotonicClock>,
     /// The identifier of the observer.
+    ///
+    /// This is `None` after the waiter count is reached, preventing `Drop`
+    /// from unregistering an observer that has already completed.
     observer_id: Option<u64>,
 }
 

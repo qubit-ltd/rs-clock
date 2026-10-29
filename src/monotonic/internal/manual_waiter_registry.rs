@@ -74,6 +74,48 @@ impl ManualWaiterRegistry {
         }
     }
 
+    /// Returns the earliest deadline strictly after elapsed.
+    ///
+    /// # Parameters
+    ///
+    /// * `elapsed` - Current elapsed duration used to exclude reached waiters.
+    ///
+    /// # Returns
+    ///
+    /// The earliest future deadline, or `None` when none is registered.
+    #[inline]
+    pub(crate) fn next_future_deadline(&self, elapsed: Duration) -> Option<Duration> {
+        let deadline = self.timer_waiters.first().map(|entry| *entry.order());
+        debug_assert!(deadline.is_none_or(|deadline| deadline > elapsed));
+        deadline
+    }
+
+    /// Returns whether an observer is still waiting for its target count.
+    ///
+    /// # Parameters
+    ///
+    /// * `observer_id` - Identifier of the observer to inspect.
+    ///
+    /// # Returns
+    ///
+    /// `true` when the observer remains registered.
+    #[must_use]
+    #[inline]
+    pub(crate) fn contains_observer(&self, observer_id: u64) -> bool {
+        self.count_observers.contains_key(&observer_id)
+    }
+
+    /// Returns the number of registered deadline waiters.
+    ///
+    /// # Returns
+    ///
+    /// The number of timer waiter registrations.
+    #[must_use]
+    #[inline]
+    pub(crate) fn count(&self) -> usize {
+        self.timer_waiters.len()
+    }
+
     /// Registers a timer deadline and returns its registration identifier.
     ///
     /// Panics when the registry cannot allocate another identifier.
@@ -117,21 +159,6 @@ impl ManualWaiterRegistry {
     #[inline]
     pub(crate) fn unregister_timer(&mut self, waiter_id: u64) -> Option<Option<Waker>> {
         self.timer_waiters.remove(&waiter_id).map(|entry| entry.into_value())
-    }
-
-    /// Returns the earliest deadline strictly after elapsed.
-    ///
-    /// # Parameters
-    ///
-    /// * `elapsed` - Current elapsed duration used to exclude reached waiters.
-    ///
-    /// # Returns
-    ///
-    /// The earliest future deadline, or `None` when none is registered.
-    pub(crate) fn next_future_deadline(&self, elapsed: Duration) -> Option<Duration> {
-        let deadline = self.timer_waiters.first().map(|entry| *entry.order());
-        debug_assert!(deadline.is_none_or(|deadline| deadline > elapsed));
-        deadline
     }
 
     /// Takes task wakers for timer deadlines reached by elapsed.
@@ -303,21 +330,6 @@ impl ManualWaiterRegistry {
         self.deadline_observers.remove(&observer_id).flatten()
     }
 
-    /// Returns whether an observer is still waiting for its target count.
-    ///
-    /// # Parameters
-    ///
-    /// * `observer_id` - Identifier of the observer to inspect.
-    ///
-    /// # Returns
-    ///
-    /// `true` when the observer remains registered.
-    #[must_use]
-    #[inline]
-    pub(crate) fn contains_observer(&self, observer_id: u64) -> bool {
-        self.count_observers.contains_key(&observer_id)
-    }
-
     /// Updates the timer waiter waker or reports that its deadline is due.
     ///
     /// The returned ready state removes the waiter registration.
@@ -401,16 +413,5 @@ impl ManualWaiterRegistry {
             });
         }
         wakers
-    }
-
-    /// Returns the number of registered deadline waiters.
-    ///
-    /// # Returns
-    ///
-    /// The number of timer waiter registrations.
-    #[must_use]
-    #[inline]
-    pub(crate) fn count(&self) -> usize {
-        self.timer_waiters.len()
     }
 }

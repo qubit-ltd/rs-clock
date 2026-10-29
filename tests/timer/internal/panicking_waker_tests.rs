@@ -7,6 +7,7 @@
 // =============================================================================
 //! Defines a task waker that panics whenever a notification is delivered.
 
+use std::panic::panic_any;
 use std::sync::Arc;
 use std::task::Wake;
 
@@ -62,6 +63,6 @@ impl Wake for DestructorPanickingWaker {
     ///
     /// Always panics with [`DestructorPanickingPayload`].
     fn wake_by_ref(self: &Arc<Self>) {
-        std::panic::panic_any(DestructorPanickingPayload);
+        panic_any(DestructorPanickingPayload);
     }
 }

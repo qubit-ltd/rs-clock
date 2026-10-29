@@ -68,8 +68,9 @@ impl LoomManualWaiterRegistry {
     ///
     /// # Returns
     ///
-    /// `Some` containing the optional detached Waker when the waiter existed,
-    /// or `None` when it had already been removed.
+    /// `None` when the waiter was absent, `Some(None)` when it existed without
+    /// a registered Waker, or `Some(Some(waker))` when it had a registered
+    /// Waker.
     #[inline]
     pub fn unregister_timer(&mut self, waiter_id: u64) -> Option<Option<Waker>> {
         self.inner.unregister_timer(waiter_id)
@@ -110,7 +111,9 @@ impl LoomManualWaiterRegistry {
     ///
     /// # Returns
     ///
-    /// The waiter state and any replaced or removed Waker.
+    /// `Poll::Pending` while the deadline is in the future or `Poll::Ready(())`
+    /// when it is reached, paired with `Some(waker)` if polling replaced or
+    /// removed a registered Waker, or `None` otherwise.
     ///
     /// # Panics
     ///
@@ -136,7 +139,10 @@ impl LoomManualWaiterRegistry {
     ///
     /// # Returns
     ///
-    /// The observer state and any replaced or removed Waker.
+    /// `Poll::Pending` while no future deadline is available or
+    /// `Poll::Ready(deadline)` when one is available, paired with
+    /// `Some(waker)` if polling replaced or removed a registered Waker, or
+    /// `None` otherwise.
     ///
     /// # Panics
     ///
@@ -161,6 +167,7 @@ impl LoomManualWaiterRegistry {
     /// # Returns
     ///
     /// Wakers detached from all due timer waiters.
+    #[must_use = "due wakers should be invoked after unlocking"]
     #[inline]
     pub fn take_due_timer_wakers(&mut self, elapsed: Duration) -> Vec<Waker> {
         self.inner.take_due_timer_wakers(elapsed)
@@ -175,6 +182,7 @@ impl LoomManualWaiterRegistry {
     /// # Returns
     ///
     /// Wakers detached from all satisfied observers.
+    #[must_use = "reached observer wakers should be invoked after unlocking"]
     #[inline(always)]
     pub fn reached_observer_wakers(&mut self, elapsed: Duration) -> Vec<Waker> {
         self.inner.reached_observer_wakers(elapsed)

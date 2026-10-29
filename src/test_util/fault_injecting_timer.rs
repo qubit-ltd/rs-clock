@@ -116,6 +116,7 @@ impl FaultInjectingTimer {
     ///
     /// Registration or completion according to fixture construction.
     #[must_use]
+    #[inline]
     pub fn failure_point(&self) -> TimerFailurePoint {
         self.failure_point
     }

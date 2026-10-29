@@ -53,6 +53,7 @@ impl TokioRuntimeShutdownState {
     /// # Returns
     ///
     /// A future that becomes ready when shutdown is published.
+    #[inline]
     pub(crate) fn notification(&self) -> OwnedNotified {
         Arc::clone(&self.notification).notified_owned()
     }

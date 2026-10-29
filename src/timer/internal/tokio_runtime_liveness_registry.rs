@@ -5,7 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Shares Tokio runtime liveness across independent timers.
+//! Stores shared liveness state for Tokio runtimes.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -61,6 +61,7 @@ impl TokioRuntimeLivenessRegistry {
     /// # Panics
     ///
     /// Panics if the registry mutex is poisoned.
+    #[must_use]
     fn get_or_create(&self, runtime_id: Id) -> Arc<TokioRuntimeLiveness> {
         let (liveness, release_notification) = {
             let mut entries = self

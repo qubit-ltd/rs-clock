@@ -83,6 +83,7 @@ impl StdTimerSchedulerState {
     /// # Panics
     ///
     /// Panics when the indexed collection invariants are violated.
+    #[must_use = "the removed waiter indicates whether the registration was active"]
     pub(super) fn cancel(&mut self, waiter_id: u64) -> Option<Arc<StdTimerWaiter>> {
         let entry = self.registrations.remove(&waiter_id)?;
         debug_assert_eq!(*entry.order(), entry.value().deadline());
@@ -103,6 +104,7 @@ impl StdTimerSchedulerState {
     /// # Panics
     ///
     /// Panics when the indexed collection invariants are violated.
+    #[must_use = "the due waiters must be completed after releasing the scheduler lock"]
     pub(super) fn take_due(&mut self, now: Instant) -> Vec<Arc<StdTimerWaiter>> {
         self.registrations
             .extract_range(..=now)

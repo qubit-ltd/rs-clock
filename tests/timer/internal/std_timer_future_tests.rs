@@ -6,6 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use std::thread;
 use std::time::Duration;
 
 use qubit_clock::StdMonotonicClock;
@@ -37,7 +38,7 @@ fn test_std_timer_future_latches_completion_before_first_poll() {
         .after(Duration::from_millis(2))
         .expect("short deadline should register");
 
-    std::thread::sleep(Duration::from_millis(10));
+    thread::sleep(Duration::from_millis(10));
     block_on_timer_future(future);
 }
 
@@ -49,6 +50,6 @@ fn test_std_timer_future_drop_after_scheduler_completion_is_harmless() {
         .after(Duration::from_millis(2))
         .expect("short deadline should register");
 
-    std::thread::sleep(Duration::from_millis(10));
+    thread::sleep(Duration::from_millis(10));
     drop(future);
 }

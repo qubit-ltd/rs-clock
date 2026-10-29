@@ -51,7 +51,9 @@ fn test_waiter_registration_guard_rolls_back_after_observer_waker_panics() {
     assert_eq!(Poll::Pending, panic_observer.as_mut().poll(&mut panic_context));
     assert_eq!(Poll::Pending, counting_observer.as_mut().poll(&mut counting_context),);
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| timer.after(Duration::from_secs(1))));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        assert!(timer.after(Duration::from_secs(1)).is_ok());
+    }));
 
     assert!(result.is_err());
     assert_eq!(1, wake_counter.0.load(Ordering::Relaxed));

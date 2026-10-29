@@ -82,7 +82,6 @@ impl StdTimerWaiter {
     ///
     /// The detached Waker that must be invoked outside scheduler locks, or
     /// `None` when no Waker was registered or the waiter was already terminal.
-    #[must_use = "the detached Waker must be invoked or safely discarded"]
     #[inline]
     pub(crate) fn complete(&self) -> Option<Waker> {
         self.transition_to(StdTimerWaiterState::Ready)
@@ -94,7 +93,6 @@ impl StdTimerWaiter {
     ///
     /// The detached Waker that must be invoked outside scheduler locks, or
     /// `None` when no Waker was registered or the waiter was already terminal.
-    #[must_use = "the detached Waker must be invoked or safely discarded"]
     #[inline]
     pub(crate) fn fail(&self) -> Option<Waker> {
         self.transition_to(StdTimerWaiterState::WorkerFailed)

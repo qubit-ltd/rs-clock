@@ -44,6 +44,7 @@ impl WallClock for StdWallClock {
     /// # Returns
     ///
     /// The value produced by [`SystemTime::now`].
+    #[inline]
     fn now(&self) -> SystemTime {
         SystemTime::now()
     }

@@ -106,6 +106,7 @@ impl Wake for ThreadWaker {
 /// # Returns
 ///
 /// `true` when the future completes without a timer error.
+#[must_use]
 fn block_on_timer_future(mut future: TimerFuture) -> bool {
     let thread_waker = Arc::new(ThreadWaker::new(std::thread::current()));
     let waker = Waker::from(Arc::clone(&thread_waker));

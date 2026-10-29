@@ -7,6 +7,7 @@
 // =============================================================================
 
 use std::sync::Arc;
+use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use qubit_clock::FixedWallClock;
@@ -30,7 +31,7 @@ fn test_wall_clock_box_delegates_to_inner_object() {
     assert_eq!(UNIX_EPOCH, clock.now());
 }
 
-fn wall_time<C: WallClock>(clock: C) -> std::time::SystemTime {
+fn wall_time<C: WallClock>(clock: C) -> SystemTime {
     clock.now()
 }
 

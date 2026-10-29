@@ -87,7 +87,7 @@ fn test_std_timer_continues_after_registered_waker_panics() {
         sender.send(()).expect("receiver should remain available");
     });
 
-    assert_eq!(Ok(()), receiver.recv_timeout(Duration::from_secs(1)),);
+    assert_eq!(Ok(()), receiver.recv_timeout(Duration::from_secs(1)));
 }
 
 #[test]
@@ -110,7 +110,7 @@ fn test_std_timer_survives_panicking_waker_payload_destructor() {
         sender.send(()).expect("receiver should remain available");
     });
 
-    assert_eq!(Ok(()), receiver.recv_timeout(Duration::from_secs(1)),);
+    assert_eq!(Ok(()), receiver.recv_timeout(Duration::from_secs(1)));
 }
 
 #[test]

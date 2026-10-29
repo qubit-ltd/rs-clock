@@ -42,6 +42,11 @@ impl LoomStdTimerWaiter {
     /// # Returns
     ///
     /// The production waiter's current pending, ready, or failed state.
+    ///
+    /// # Errors
+    ///
+    /// The unit error indicates that the scheduler worker exited before the
+    /// deadline completed.
     #[inline]
     pub fn poll(&self, context: &Context<'_>) -> Poll<Result<(), ()>> {
         self.inner.poll(context)
@@ -51,8 +56,9 @@ impl LoomStdTimerWaiter {
     ///
     /// # Returns
     ///
-    /// The detached Waker, or `None` when no Waker was registered or the
-    /// waiter was already terminal.
+    /// The detached Waker, which must be invoked outside scheduler locks or
+    /// safely discarded, or `None` when no Waker was registered or the waiter
+    /// was already terminal.
     #[must_use = "the detached Waker must be invoked or safely discarded"]
     #[inline]
     pub fn complete(&self) -> Option<Waker> {
@@ -63,8 +69,9 @@ impl LoomStdTimerWaiter {
     ///
     /// # Returns
     ///
-    /// The detached Waker, or `None` when no Waker was registered or the
-    /// waiter was already terminal.
+    /// The detached Waker, which must be invoked outside scheduler locks or
+    /// safely discarded, or `None` when no Waker was registered or the waiter
+    /// was already terminal.
     #[must_use = "the detached Waker must be invoked or safely discarded"]
     #[inline]
     pub fn fail(&self) -> Option<Waker> {

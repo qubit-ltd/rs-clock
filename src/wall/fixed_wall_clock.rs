@@ -23,6 +23,7 @@ use crate::WallClock;
 /// let clock = FixedWallClock::new(fixed_time);
 /// assert_eq!(clock.now(), fixed_time);
 /// ```
+#[must_use = "the fixed wall clock must be used to sample its configured time"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedWallClock {
     /// Immutable wall-clock value returned by every sample.
@@ -39,7 +40,6 @@ impl FixedWallClock {
     /// # Returns
     ///
     /// A wall clock fixed at `fixed_time`.
-    #[must_use]
     pub const fn new(fixed_time: SystemTime) -> Self {
         Self { fixed_time }
     }
@@ -61,6 +61,7 @@ impl WallClock for FixedWallClock {
     /// # Returns
     ///
     /// The same fixed value for every call.
+    #[inline]
     fn now(&self) -> SystemTime {
         self.fixed_time
     }

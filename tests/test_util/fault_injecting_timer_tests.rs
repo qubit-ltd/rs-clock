@@ -45,7 +45,7 @@ fn poll_ready(mut future: TimerFuture) -> Result<(), TimeError> {
     }
 }
 
-/// Verifies a registration fault is returned by `Timer::at` itself.
+/// Verifies a registration fault is returned by `Timer::after` itself.
 #[test]
 fn test_fault_injecting_timer_fails_registration() {
     let timer = FaultInjectingTimer::new(TimerFailurePoint::Registration, || TimeError::TimerUnavailable {

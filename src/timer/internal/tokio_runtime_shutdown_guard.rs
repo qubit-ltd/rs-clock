@@ -29,6 +29,7 @@ impl TokioRuntimeShutdownGuard {
     ///
     /// A guard retaining the supplied state.
     #[must_use]
+    #[inline]
     pub(crate) fn new(shutdown: Arc<TokioRuntimeShutdownState>) -> Self {
         Self { shutdown }
     }

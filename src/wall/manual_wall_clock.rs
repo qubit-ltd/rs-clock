@@ -10,6 +10,7 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
+use std::sync::PoisonError;
 use std::time::SystemTime;
 
 use crate::ManualMonotonicClock;
@@ -93,7 +94,7 @@ impl ManualWallClock {
     /// A guard granting mutable access to the anchor pair.
     #[inline]
     fn lock_anchor(&self) -> MutexGuard<'_, (SystemTime, MonotonicInstant)> {
-        self.anchor.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.anchor.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 

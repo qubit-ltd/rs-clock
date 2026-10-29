@@ -28,7 +28,11 @@ fn test_tokio_runtime_liveness_registry_reuses_one_sentinel() {
         .after(Duration::from_secs(60))
         .expect("second deadline should register");
 
-    assert_eq!(initial_tasks + 1, runtime.metrics().num_alive_tasks());
+    assert_eq!(
+        initial_tasks + 1,
+        runtime.metrics().num_alive_tasks(),
+        "independent timers should share one runtime-liveness task",
+    );
 
     drop(first_future);
     drop(second_future);

@@ -60,6 +60,19 @@ impl WakeThreadRecorder {
         }
     }
 
+    /// Returns the thread identifier recorded by the Timer wake, if any.
+    ///
+    /// # Returns
+    ///
+    /// The unique identifier of the thread that delivered the wake, or `None`
+    /// when the future completed before registering its Waker.
+    fn wake_thread(&self) -> Option<ThreadId> {
+        *self
+            .wake_thread
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     /// Clears an earlier notification immediately before polling.
     #[inline]
     fn prepare_to_poll(&self) {
@@ -71,20 +84,6 @@ impl WakeThreadRecorder {
         while !self.notified.swap(false, Ordering::AcqRel) {
             std::thread::park();
         }
-    }
-
-    /// Returns the thread identifier recorded by the Timer wake, if any.
-    ///
-    /// # Returns
-    ///
-    /// The unique identifier of the thread that delivered the wake, or `None`
-    /// when the future completed before registering its Waker.
-    #[must_use]
-    fn wake_thread(&self) -> Option<ThreadId> {
-        *self
-            .wake_thread
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 }
 
@@ -145,6 +144,7 @@ fn block_on_with_wake_thread(mut future: TimerFuture) -> Option<ThreadId> {
 ///
 /// Panics when deadline registration fails or every bounded attempt completes
 /// before its first poll.
+#[must_use]
 fn observe_worker(timer: &dyn Timer) -> ThreadId {
     for _ in 0..4 {
         let future = timer

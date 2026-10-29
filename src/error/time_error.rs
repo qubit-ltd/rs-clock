@@ -53,6 +53,7 @@ use crate::ClockDomain;
 /// }
 /// ```
 #[non_exhaustive]
+#[must_use]
 #[derive(Debug, Error)]
 pub enum TimeError {
     /// Two monotonic instants belong to different clock domains.

@@ -52,8 +52,8 @@ impl TokioTimerFuture {
     ///
     /// # Returns
     ///
-    /// A single allocation containing both wait conditions.
-    #[must_use]
+    /// A future that waits for the deadline or runtime shutdown.
+    #[inline]
     pub(crate) fn new(sleep: Sleep, liveness: Arc<TokioRuntimeLiveness>) -> Self {
         let shutdown = liveness.shutdown_notification();
         Self {
