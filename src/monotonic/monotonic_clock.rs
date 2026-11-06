@@ -94,7 +94,6 @@ pub trait MonotonicClock: Send + Sync {
     /// # Returns
     ///
     /// The domain carried by every instant sampled from this clock.
-    #[must_use = "the clock domain should be used to validate monotonic instants"]
     fn domain(&self) -> ClockDomain;
 
     /// Returns the current instant in this clock's domain.

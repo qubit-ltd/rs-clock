@@ -75,6 +75,7 @@ impl TokioRuntimeLiveness {
     /// # Returns
     ///
     /// A future that becomes ready after the sentinel guard publishes shutdown.
+    #[inline]
     pub(crate) fn shutdown_notification(&self) -> OwnedNotified {
         self.shutdown.notification()
     }

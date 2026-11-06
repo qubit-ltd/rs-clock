@@ -94,6 +94,7 @@ impl ManualDeadlineFuture {
 }
 
 impl Future for ManualDeadlineFuture {
+    /// The earliest active future deadline observed when this future completes.
     type Output = MonotonicInstant;
 
     /// Polls for the earliest currently active future deadline.

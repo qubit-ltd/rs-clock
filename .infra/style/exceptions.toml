@@ -37,5 +37,5 @@ reason = "Exercise the standard Timer worker run-failure hook only in an instrum
 
 [[exceptions]]
 rule = "coverage-cfg"
-path = "tests/timer/internal/tokio_timer_future_tests.rs"
+path = "tests/timer_tests/timer/internal/tokio_timer_future_tests.rs"
 reason = "Exercise the Tokio sleep-poll failure hook only in instrumented coverage builds."

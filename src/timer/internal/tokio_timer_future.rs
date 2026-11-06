@@ -65,6 +65,8 @@ impl TokioTimerFuture {
 }
 
 impl Future for TokioTimerFuture {
+    /// Result of the native sleep, or a runtime-shutdown error if its
+    /// retained runtime closes before the deadline.
     type Output = Result<(), TimeError>;
 
     /// Polls shutdown before the native sleep and preserves unexpected panics.

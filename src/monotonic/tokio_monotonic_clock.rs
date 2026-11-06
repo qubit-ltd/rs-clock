@@ -30,6 +30,10 @@ use crate::TokioTimer;
 /// * `runtime` - Runtime context required by `operation`.
 /// * `operation` - Synchronous operation to execute.
 ///
+/// # Type Parameters
+///
+/// * `R` - Type of the value returned by `operation`.
+///
 /// # Returns
 ///
 /// The value returned by `operation`.
@@ -195,6 +199,10 @@ impl TokioMonotonicClock {
     /// # Parameters
     ///
     /// * `operation` - Synchronous operation requiring Tokio runtime context.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Type of the value returned by `operation`.
     ///
     /// # Returns
     ///

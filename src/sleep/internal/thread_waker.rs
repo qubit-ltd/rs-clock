@@ -40,12 +40,6 @@ impl ThreadWaker {
         }
     }
 
-    /// Clears a stale notification before polling the future again.
-    #[inline]
-    pub(crate) fn clear_notification(&self) {
-        self.notification.clear_notification();
-    }
-
     /// Takes and clears the currently latched notification.
     ///
     /// # Returns
@@ -55,6 +49,12 @@ impl ThreadWaker {
     #[inline]
     pub(crate) fn take_notification(&self) -> bool {
         self.notification.take_notification()
+    }
+
+    /// Clears a stale notification before polling the future again.
+    #[inline]
+    pub(crate) fn clear_notification(&self) {
+        self.notification.clear_notification();
     }
 }
 

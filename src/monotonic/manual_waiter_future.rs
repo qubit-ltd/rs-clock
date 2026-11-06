@@ -85,6 +85,7 @@ impl ManualWaiterFuture {
 }
 
 impl Future for ManualWaiterFuture {
+    /// Completes with `()` when the requested waiter count has been reached.
     type Output = ();
 
     /// Polls whether the requested waiter count has been reached.

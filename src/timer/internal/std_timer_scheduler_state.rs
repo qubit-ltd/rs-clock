@@ -44,6 +44,43 @@ impl StdTimerSchedulerState {
         }
     }
 
+    /// Returns the earliest active deadline.
+    ///
+    /// # Returns
+    ///
+    /// The earliest deadline, or `None` when there are no active registrations.
+    #[inline]
+    pub(super) fn next_deadline(&self) -> Option<Instant> {
+        self.registrations.first().map(|entry| *entry.order())
+    }
+
+    /// Reports whether no active registrations remain.
+    ///
+    /// # Returns
+    ///
+    /// `true` when no active registration remains.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug builds when an active registration has been unindexed.
+    #[must_use]
+    #[inline]
+    pub(super) fn is_empty(&self) -> bool {
+        debug_assert_eq!(self.registrations.len(), self.registrations.attached_len());
+        self.registrations.is_empty()
+    }
+
+    /// Reports whether a scheduler worker is running.
+    ///
+    /// # Returns
+    ///
+    /// The current worker-running state.
+    #[must_use]
+    #[inline]
+    pub(super) const fn worker_running(&self) -> bool {
+        self.worker_running
+    }
+
     /// Registers `waiter` at `deadline` in the indexed collection.
     ///
     /// # Parameters
@@ -83,7 +120,6 @@ impl StdTimerSchedulerState {
     /// # Panics
     ///
     /// Panics when the indexed collection invariants are violated.
-    #[must_use = "the removed waiter indicates whether the registration was active"]
     pub(super) fn cancel(&mut self, waiter_id: u64) -> Option<Arc<StdTimerWaiter>> {
         let entry = self.registrations.remove(&waiter_id)?;
         debug_assert_eq!(*entry.order(), entry.value().deadline());
@@ -113,44 +149,6 @@ impl StdTimerSchedulerState {
                 entry.into_value().into_waiter()
             })
             .collect()
-    }
-
-    /// Returns the earliest active deadline.
-    ///
-    /// # Returns
-    ///
-    /// The earliest deadline, or `None` when there are no active registrations.
-    #[must_use]
-    #[inline]
-    pub(super) fn next_deadline(&self) -> Option<Instant> {
-        self.registrations.first().map(|entry| *entry.order())
-    }
-
-    /// Reports whether no active registrations remain.
-    ///
-    /// # Returns
-    ///
-    /// `true` when no active registration remains.
-    ///
-    /// # Panics
-    ///
-    /// Panics in debug builds when an active registration has been unindexed.
-    #[must_use]
-    #[inline]
-    pub(super) fn is_empty(&self) -> bool {
-        debug_assert_eq!(self.registrations.len(), self.registrations.attached_len());
-        self.registrations.is_empty()
-    }
-
-    /// Reports whether a scheduler worker is running.
-    ///
-    /// # Returns
-    ///
-    /// The current worker-running state.
-    #[must_use]
-    #[inline]
-    pub(super) const fn worker_running(&self) -> bool {
-        self.worker_running
     }
 
     /// Marks a new scheduler worker as running.

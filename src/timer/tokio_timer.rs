@@ -205,6 +205,7 @@ impl TokioTimer {
     /// # Returns
     ///
     /// Liveness shared by timers retaining the same Tokio runtime.
+    #[must_use]
     fn runtime_liveness(&self) -> Arc<TokioRuntimeLiveness> {
         if let Some(liveness) = self.liveness.get() {
             return Arc::clone(liveness);

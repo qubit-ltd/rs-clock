@@ -44,6 +44,7 @@ use crate::timer::internal::std_timer_waiter::StdTimerWaiter;
 /// # Ok(())
 /// # }
 /// ```
+#[must_use = "the timer must be retained to register deadlines"]
 pub struct StdTimer {
     /// Private clock handle retaining the source domain and native origin.
     clock: StdMonotonicClock,
@@ -57,7 +58,6 @@ impl StdTimer {
     /// # Returns
     ///
     /// A timer with a fresh clock domain and the process-wide scheduler.
-    #[must_use]
     #[inline]
     pub fn new() -> Self {
         let clock = StdMonotonicClock::new();
@@ -73,7 +73,6 @@ impl StdTimer {
     /// # Returns
     ///
     /// A timer retaining the process-wide lazy scheduler.
-    #[must_use]
     #[inline]
     pub fn from_clock(clock: &StdMonotonicClock) -> Self {
         Self {

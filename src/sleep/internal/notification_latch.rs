@@ -37,12 +37,6 @@ impl NotificationLatch {
         }
     }
 
-    /// Clears a stale notification before another future poll.
-    #[inline]
-    pub(crate) fn clear_notification(&self) {
-        self.notified.store(false, Ordering::Release);
-    }
-
     /// Latches a notification for a current or future observer.
     #[inline]
     pub(crate) fn notify(&self) {
@@ -58,5 +52,11 @@ impl NotificationLatch {
     #[inline]
     pub(crate) fn take_notification(&self) -> bool {
         self.notified.swap(false, Ordering::AcqRel)
+    }
+
+    /// Clears a stale notification before another future poll.
+    #[inline]
+    pub(crate) fn clear_notification(&self) {
+        self.notified.store(false, Ordering::Release);
     }
 }

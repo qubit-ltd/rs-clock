@@ -54,6 +54,7 @@ impl ManualTimerFuture {
 }
 
 impl Future for ManualTimerFuture {
+    /// Reports timer completion or a clock-domain error.
     type Output = Result<(), TimeError>;
 
     /// Checks manual time and records the current task waker while pending.

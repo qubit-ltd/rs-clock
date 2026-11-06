@@ -51,6 +51,8 @@ impl StdTimerFuture {
 }
 
 impl Future for StdTimerFuture {
+    /// Resolves successfully when the registered deadline expires, or reports
+    /// that the shared scheduler worker terminated before completion.
     type Output = Result<(), TimeError>;
 
     /// Polls the worker-owned completion latch.

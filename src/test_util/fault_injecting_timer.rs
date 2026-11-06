@@ -57,6 +57,11 @@ pub struct FaultInjectingTimer {
 impl FaultInjectingTimer {
     /// Creates a Timer that invokes `error_factory` at `failure_point`.
     ///
+    /// # Type Parameters
+    ///
+    /// * `F` - Thread-safe, static closure that creates a fresh [`TimeError`]
+    ///   for each failed future-deadline registration.
+    ///
     /// # Parameters
     ///
     /// * `failure_point` - Registration or completion stage to fail.

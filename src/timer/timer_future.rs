@@ -24,10 +24,22 @@ use crate::TimeError;
 /// # Examples
 ///
 /// ```
-/// use qubit_clock::{TimeError, TimerFuture};
+/// use qubit_clock::{ManualMonotonicClock, ManualTimer, Timer, TimerFuture};
+/// use std::future::Future;
+/// use std::task::Context;
+/// use std::task::Poll;
+/// use std::task::Waker;
 ///
-/// let future: TimerFuture = Box::pin(async { Ok::<(), TimeError>(()) });
-/// drop(future);
+/// let clock = ManualMonotonicClock::new();
+/// let timer = ManualTimer::from_clock(&clock);
+/// let mut notification: TimerFuture = timer.at(timer.clock().now())?;
+/// let mut context = Context::from_waker(Waker::noop());
+///
+/// let Poll::Ready(result) = notification.as_mut().poll(&mut context) else {
+///     panic!("a notification for the current instant should be ready");
+/// };
+/// result.expect("the manual timer should complete successfully");
+/// # Ok::<(), qubit_clock::TimeError>(())
 /// ```
 ///
 /// # Panics

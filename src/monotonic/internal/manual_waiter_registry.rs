@@ -36,7 +36,7 @@ use crate::monotonic::clock_domain::next_identifier_state;
 /// Panics with `exhausted_message` when the allocator is already exhausted.
 #[must_use = "the allocated identifier must be retained by its registration"]
 #[inline]
-pub(crate) fn allocate_identifier(next_identifier: &mut u64, exhausted_message: &str) -> u64 {
+fn allocate_identifier(next_identifier: &mut u64, exhausted_message: &str) -> u64 {
     let identifier = *next_identifier;
     *next_identifier = next_identifier_state(identifier).expect(exhausted_message);
     identifier

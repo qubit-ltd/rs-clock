@@ -50,6 +50,7 @@ impl FixedWallClock {
     ///
     /// The configured fixed wall-clock value.
     #[must_use]
+    #[inline]
     pub const fn fixed_time(&self) -> SystemTime {
         self.fixed_time
     }

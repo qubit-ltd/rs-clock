@@ -19,6 +19,8 @@ use crate::ClockDomain;
 /// Callers must include a wildcard arm when matching this enum so future
 /// versions can add errors without breaking downstream code:
 ///
+/// # Examples
+///
 /// ```
 /// use qubit_clock::TimeError;
 ///

@@ -12,7 +12,10 @@ use std::task::Waker;
 /// Mutable terminal state for one standard Timer waiter.
 pub(super) enum StdTimerWaiterState {
     /// Deadline is pending, optionally with the most recently registered Waker.
-    Pending(Option<Waker>),
+    Pending(
+        /// Most recently registered task Waker, or `None` before polling.
+        Option<Waker>,
+    ),
     /// Deadline completion has latched.
     Ready,
     /// The owning scheduler worker exited before deadline completion.
