@@ -155,16 +155,18 @@ executor-neutral and do not require this feature.
 Every monotonic clock creates a same-domain timer without consuming the clock:
 
 ```rust
-use qubit_clock::{MonotonicClock, StdMonotonicClock, Timer};
-use std::time::Duration;
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), qubit_clock::TimeError> {
+    use qubit_clock::{MonotonicClock, StdMonotonicClock, Timer};
+    use std::time::Duration;
 
-# async fn example() -> Result<(), qubit_clock::TimeError> {
-let clock = StdMonotonicClock::new();
-let timer = clock.new_timer();
-timer.after(Duration::from_millis(10))?.await?;
-let _still_usable = clock.now();
-# Ok(())
-# }
+    let clock = StdMonotonicClock::new();
+    let timer = clock.new_timer();
+    timer.after(Duration::from_millis(10))?.await?;
+    let sampled = clock.now();
+    assert!(clock.now() >= sampled);
+    Ok(())
+}
 ```
 
 `Timer::after` samples the clock and fixes its absolute deadline during the
@@ -188,20 +190,23 @@ capture the ambient handle during construction; `try_current()` returns
 `from_handle(handle)` at dependency-injection boundaries:
 
 ```rust
-use qubit_clock::{Timer, TokioTimer};
-use std::time::Duration;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use qubit_clock::{Timer, TokioTimer};
+    use std::time::Duration;
 
-let runtime = tokio::runtime::Builder::new_current_thread()
-    .enable_time()
-    .build()
-    .expect("Tokio runtime should build");
-let timer = TokioTimer::from_handle(runtime.handle().clone());
-let deadline = timer
-    .after(Duration::from_millis(1))
-    .expect("deadline should register on the retained runtime");
-runtime
-    .block_on(deadline)
-    .expect("deadline should complete");
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("Tokio runtime should build");
+    let timer = TokioTimer::from_handle(runtime.handle().clone());
+    let deadline = timer
+        .after(Duration::from_millis(1))
+        .expect("deadline should register on the retained runtime");
+    runtime
+        .block_on(deadline)
+        .expect("deadline should complete");
+    Ok(())
+}
 ```
 
 Clock samples and `Sleep` creation briefly enter the retained handle, regardless
@@ -247,7 +252,7 @@ as a direct development dependency:
 
 ```toml
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt"] }
+tokio = { version = "1", features = ["macros", "rt", "time"] }
 ```
 
 Deterministic manual time controls logical time, deadline selection, and
@@ -255,23 +260,23 @@ deadline completion. It does not define the wake order of waiters sharing one
 deadline or the order in which an executor polls ready tasks.
 
 ```rust
-use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
-use std::time::Duration;
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
+    use std::time::Duration;
 
-# #[tokio::main(flavor = "current_thread")]
-# async fn main() -> Result<(), Box<dyn std::error::Error>> {
-let clock = ManualMonotonicClock::new_shared();
-let timer = clock.new_timer();
-let task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(8))?.await?;
-    Ok::<_, qubit_clock::TimeError>(())
-});
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let task = tokio::spawn(async move {
+        timer.after(Duration::from_secs(8))?.await?;
+        Ok::<_, qubit_clock::TimeError>(())
+    });
 
-let reached = clock.advance_to_next_deadline_async().await;
-assert_eq!(Duration::from_secs(8), reached.elapsed_since_origin());
-task.await??;
-# Ok(())
-# }
+    let reached = clock.advance_to_next_deadline_async().await;
+    assert_eq!(Duration::from_secs(8), reached.elapsed_since_origin());
+    task.await??;
+    Ok(())
+}
 ```
 
 Manual timer registration is eager: `pending_waiters`, `next_deadline`, and
@@ -302,29 +307,30 @@ against the manual-time driver. This avoids guessing how many stages the task
 will execute and avoids waiting for another deadline after it has completed:
 
 ```rust
-# use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
-# use std::time::Duration;
-# #[tokio::main(flavor = "current_thread")]
-# async fn main() -> Result<(), Box<dyn std::error::Error>> {
-let clock = ManualMonotonicClock::new_shared();
-let timer = clock.new_timer();
-let mut task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(1))?.await?;
-    timer.after(Duration::from_secs(2))?.await?;
-    Ok::<_, qubit_clock::TimeError>(())
-});
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
+    use std::time::Duration;
 
-loop {
-    tokio::select! {
-        result = &mut task => {
-            result??;
-            break;
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let mut task = tokio::spawn(async move {
+        timer.after(Duration::from_secs(1))?.await?;
+        timer.after(Duration::from_secs(2))?.await?;
+        Ok::<_, qubit_clock::TimeError>(())
+    });
+
+    loop {
+        tokio::select! {
+            result = &mut task => {
+                result??;
+                break;
+            }
+            _ = clock.advance_to_next_deadline_async() => {}
         }
-        _ = clock.advance_to_next_deadline_async() => {}
     }
+    Ok(())
 }
-# Ok(())
-# }
 ```
 
 ### Runtime ownership and cancellation
@@ -343,17 +349,19 @@ polling runtime. The retained target runtime must remain alive and driven.
 A manual wall clock projects wall-clock time from the shared monotonic timeline:
 
 ```rust
-use qubit_clock::{ManualMonotonicClock, WallClock};
-use std::time::{Duration, UNIX_EPOCH};
+fn main() -> Result<(), qubit_clock::TimeError> {
+    use qubit_clock::{ManualMonotonicClock, WallClock};
+    use std::time::{Duration, UNIX_EPOCH};
 
-let clock = ManualMonotonicClock::new_shared();
-let wall_clock = clock.new_wall_clock(UNIX_EPOCH);
-clock.advance(Duration::from_secs(5))?;
-assert_eq!(UNIX_EPOCH + Duration::from_secs(5), wall_clock.now());
+    let clock = ManualMonotonicClock::new_shared();
+    let wall_clock = clock.new_wall_clock(UNIX_EPOCH);
+    clock.advance(Duration::from_secs(5))?;
+    assert_eq!(UNIX_EPOCH + Duration::from_secs(5), wall_clock.now());
 
-wall_clock.reanchor(UNIX_EPOCH + Duration::from_secs(100));
-assert_eq!(UNIX_EPOCH + Duration::from_secs(100), wall_clock.now());
-# Ok::<_, qubit_clock::TimeError>(())
+    wall_clock.reanchor(UNIX_EPOCH + Duration::from_secs(100));
+    assert_eq!(UNIX_EPOCH + Duration::from_secs(100), wall_clock.now());
+    Ok(())
+}
 ```
 
 `reanchor` changes only the wall-time mapping. It does not move the monotonic
@@ -364,13 +372,15 @@ timeline or alter deadlines and timer registrations.
 `BlockingSleeper` is a concrete adapter, not another scheduling abstraction:
 
 ```rust
-use qubit_clock::{BlockingSleeper, MonotonicClock, StdMonotonicClock};
-use std::time::Duration;
+fn main() -> Result<(), qubit_clock::TimeError> {
+    use qubit_clock::{BlockingSleeper, MonotonicClock, StdMonotonicClock};
+    use std::time::Duration;
 
-let clock = StdMonotonicClock::new();
-let sleeper = BlockingSleeper::new(clock.new_timer());
-sleeper.sleep_for(Duration::from_millis(10))?;
-# Ok::<_, qubit_clock::TimeError>(())
+    let clock = StdMonotonicClock::new();
+    let sleeper = BlockingSleeper::new(clock.new_timer());
+    sleeper.sleep_for(Duration::from_millis(10))?;
+    Ok(())
+}
 ```
 
 The adapter polls the timer future and parks only the calling thread. Once that

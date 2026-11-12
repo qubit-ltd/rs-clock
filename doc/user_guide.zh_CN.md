@@ -135,16 +135,18 @@ qubit-clock = { version = "0.13", features = ["tokio"] }
 每种单调时钟都能直接创建同域定时器，而且创建定时器后仍可继续使用原时钟：
 
 ```rust
-use qubit_clock::{MonotonicClock, StdMonotonicClock, Timer};
-use std::time::Duration;
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), qubit_clock::TimeError> {
+    use qubit_clock::{MonotonicClock, StdMonotonicClock, Timer};
+    use std::time::Duration;
 
-# async fn example() -> Result<(), qubit_clock::TimeError> {
-let clock = StdMonotonicClock::new();
-let timer = clock.new_timer();
-timer.after(Duration::from_millis(10))?.await?;
-let _still_usable = clock.now();
-# Ok(())
-# }
+    let clock = StdMonotonicClock::new();
+    let timer = clock.new_timer();
+    timer.after(Duration::from_millis(10))?.await?;
+    let sampled = clock.now();
+    assert!(clock.now() >= sampled);
+    Ok(())
+}
 ```
 
 `Timer::after` 在调用期间采样时钟并固定绝对截止时间；`Timer::at` 接受绝对
@@ -165,20 +167,23 @@ let _still_usable = clock.now();
 `from_handle(handle)`：
 
 ```rust
-use qubit_clock::{Timer, TokioTimer};
-use std::time::Duration;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use qubit_clock::{Timer, TokioTimer};
+    use std::time::Duration;
 
-let runtime = tokio::runtime::Builder::new_current_thread()
-    .enable_time()
-    .build()
-    .expect("Tokio runtime should build");
-let timer = TokioTimer::from_handle(runtime.handle().clone());
-let deadline = timer
-    .after(Duration::from_millis(1))
-    .expect("deadline should register on the retained runtime");
-runtime
-    .block_on(deadline)
-    .expect("deadline should complete");
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("Tokio runtime should build");
+    let timer = TokioTimer::from_handle(runtime.handle().clone());
+    let deadline = timer
+        .after(Duration::from_millis(1))
+        .expect("deadline should register on the retained runtime");
+    runtime
+        .block_on(deadline)
+        .expect("deadline should complete");
+    Ok(())
+}
 ```
 
 采样时钟和创建 `Sleep` 时会短暂进入保存的 Handle，不依赖调用方当前所在的运行时。
@@ -214,30 +219,30 @@ feature。本节只使用 Tokio 运行、派生和选择任务；在测试中运
 
 ```toml
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt"] }
+tokio = { version = "1", features = ["macros", "rt", "time"] }
 ```
 
 确定性手动时间可以控制逻辑时间、截止时间的选择和到达，但不规定同一截止时间上多个
 等待者的唤醒顺序，也不规定执行器轮询就绪任务的顺序。
 
 ```rust
-use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
-use std::time::Duration;
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
+    use std::time::Duration;
 
-# #[tokio::main(flavor = "current_thread")]
-# async fn main() -> Result<(), Box<dyn std::error::Error>> {
-let clock = ManualMonotonicClock::new_shared();
-let timer = clock.new_timer();
-let task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(8))?.await?;
-    Ok::<_, qubit_clock::TimeError>(())
-});
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let task = tokio::spawn(async move {
+        timer.after(Duration::from_secs(8))?.await?;
+        Ok::<_, qubit_clock::TimeError>(())
+    });
 
-let reached = clock.advance_to_next_deadline_async().await;
-assert_eq!(Duration::from_secs(8), reached.elapsed_since_origin());
-task.await??;
-# Ok(())
-# }
+    let reached = clock.advance_to_next_deadline_async().await;
+    assert_eq!(Duration::from_secs(8), reached.elapsed_since_origin());
+    task.await??;
+    Ok(())
+}
 ```
 
 手动定时器会立即登记等待：即使定时器 Future 尚未首次被轮询，
@@ -263,29 +268,30 @@ task.await??;
 竞争。这样无需猜测任务会执行多少阶段，也不会在任务完成后继续等待不存在的截止点：
 
 ```rust
-# use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
-# use std::time::Duration;
-# #[tokio::main(flavor = "current_thread")]
-# async fn main() -> Result<(), Box<dyn std::error::Error>> {
-let clock = ManualMonotonicClock::new_shared();
-let timer = clock.new_timer();
-let mut task = tokio::spawn(async move {
-    timer.after(Duration::from_secs(1))?.await?;
-    timer.after(Duration::from_secs(2))?.await?;
-    Ok::<_, qubit_clock::TimeError>(())
-});
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use qubit_clock::{ManualMonotonicClock, MonotonicClock, Timer};
+    use std::time::Duration;
 
-loop {
-    tokio::select! {
-        result = &mut task => {
-            result??;
-            break;
+    let clock = ManualMonotonicClock::new_shared();
+    let timer = clock.new_timer();
+    let mut task = tokio::spawn(async move {
+        timer.after(Duration::from_secs(1))?.await?;
+        timer.after(Duration::from_secs(2))?.await?;
+        Ok::<_, qubit_clock::TimeError>(())
+    });
+
+    loop {
+        tokio::select! {
+            result = &mut task => {
+                result??;
+                break;
+            }
+            _ = clock.advance_to_next_deadline_async() => {}
         }
-        _ = clock.advance_to_next_deadline_async() => {}
     }
+    Ok(())
 }
-# Ok(())
-# }
 ```
 
 ### 运行时所有权与取消
@@ -302,17 +308,19 @@ loop {
 `ManualWallClock` 从共享的单调时间线投影现实世界时间：
 
 ```rust
-use qubit_clock::{ManualMonotonicClock, WallClock};
-use std::time::{Duration, UNIX_EPOCH};
+fn main() -> Result<(), qubit_clock::TimeError> {
+    use qubit_clock::{ManualMonotonicClock, WallClock};
+    use std::time::{Duration, UNIX_EPOCH};
 
-let clock = ManualMonotonicClock::new_shared();
-let wall_clock = clock.new_wall_clock(UNIX_EPOCH);
-clock.advance(Duration::from_secs(5))?;
-assert_eq!(UNIX_EPOCH + Duration::from_secs(5), wall_clock.now());
+    let clock = ManualMonotonicClock::new_shared();
+    let wall_clock = clock.new_wall_clock(UNIX_EPOCH);
+    clock.advance(Duration::from_secs(5))?;
+    assert_eq!(UNIX_EPOCH + Duration::from_secs(5), wall_clock.now());
 
-wall_clock.reanchor(UNIX_EPOCH + Duration::from_secs(100));
-assert_eq!(UNIX_EPOCH + Duration::from_secs(100), wall_clock.now());
-# Ok::<_, qubit_clock::TimeError>(())
+    wall_clock.reanchor(UNIX_EPOCH + Duration::from_secs(100));
+    assert_eq!(UNIX_EPOCH + Duration::from_secs(100), wall_clock.now());
+    Ok(())
+}
 ```
 
 `reanchor` 只改变 `WallClock` 映射，不会移动单调时间线，也不会改变截止时间或
@@ -323,13 +331,15 @@ assert_eq!(UNIX_EPOCH + Duration::from_secs(100), wall_clock.now());
 `BlockingSleeper` 是具体适配器，不是另一套调度抽象：
 
 ```rust
-use qubit_clock::{BlockingSleeper, MonotonicClock, StdMonotonicClock};
-use std::time::Duration;
+fn main() -> Result<(), qubit_clock::TimeError> {
+    use qubit_clock::{BlockingSleeper, MonotonicClock, StdMonotonicClock};
+    use std::time::Duration;
 
-let clock = StdMonotonicClock::new();
-let sleeper = BlockingSleeper::new(clock.new_timer());
-sleeper.sleep_for(Duration::from_millis(10))?;
-# Ok::<_, qubit_clock::TimeError>(())
+    let clock = StdMonotonicClock::new();
+    let sleeper = BlockingSleeper::new(clock.new_timer());
+    sleeper.sleep_for(Duration::from_millis(10))?;
+    Ok(())
+}
 ```
 
 适配器轮询定时器 Future，并且只停驻当前调用线程；线程停驻后，定时器后端仍须能够
