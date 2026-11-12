@@ -209,9 +209,7 @@ fn test_clone_panic_leaves_manual_and_standard_timer_waiters_usable() {
         .build()
         .expect("test runtime should build");
     runtime
-        .block_on(async {
-            tokio::time::timeout(Duration::from_secs(10), standard).await
-        })
+        .block_on(async { tokio::time::timeout(Duration::from_secs(10), standard).await })
         .expect("standard timer should complete within the test guard")
         .expect("standard timer should remain usable after clone panic");
 }
