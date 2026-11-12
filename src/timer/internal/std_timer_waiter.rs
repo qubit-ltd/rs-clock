@@ -57,6 +57,7 @@ impl StdTimerWaiter {
     /// The returned unit error indicates that the scheduler worker exited
     /// before the deadline completed.
     pub(crate) fn poll(&self, context: &Context<'_>) -> Poll<Result<(), ()>> {
+        let mut candidate = Some(context.waker().clone());
         let replaced_waker = {
             let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             match &mut *state {
@@ -65,13 +66,14 @@ impl StdTimerWaiter {
                 {
                     None
                 }
-                StdTimerWaiterState::Pending(waker) => waker.replace(context.waker().clone()),
-                StdTimerWaiterState::Ready => return Poll::Ready(Ok(())),
-                StdTimerWaiterState::WorkerFailed => {
-                    return Poll::Ready(Err(()));
+                StdTimerWaiterState::Pending(waker) => {
+                    waker.replace(candidate.take().expect("poll candidate must be present"))
                 }
+                StdTimerWaiterState::Ready => return Poll::Ready(Ok(())),
+                StdTimerWaiterState::WorkerFailed => return Poll::Ready(Err(())),
             }
         };
+        drop(candidate);
         drop(replaced_waker);
         Poll::Pending
     }

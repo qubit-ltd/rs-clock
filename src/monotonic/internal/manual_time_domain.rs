@@ -348,9 +348,16 @@ impl ManualTimeDomain {
         observer_id: u64,
         context: &Context<'_>,
     ) -> (Poll<Duration>, Option<Waker>) {
-        let mut state = self.lock_state();
-        let elapsed = state.elapsed;
-        state.waiters.poll_deadline_observer(observer_id, elapsed, context)
+        let mut candidate = Some(context.waker().clone());
+        let result = {
+            let mut state = self.lock_state();
+            let elapsed = state.elapsed;
+            state
+                .waiters
+                .poll_deadline_observer(observer_id, elapsed, &mut candidate)
+        };
+        drop(candidate);
+        result
     }
 
     /// Polls a waiter-count observer and detaches its replaced waker.
@@ -366,7 +373,10 @@ impl ManualTimeDomain {
     #[must_use = "the poll state and detached waker must both be handled"]
     #[inline]
     pub(crate) fn poll_waiter_observer(&self, observer_id: u64, context: &Context<'_>) -> (Poll<()>, Option<Waker>) {
-        self.lock_state().waiters.poll_observer(observer_id, context)
+        let mut candidate = Some(context.waker().clone());
+        let result = { self.lock_state().waiters.poll_observer(observer_id, &mut candidate) };
+        drop(candidate);
+        result
     }
 
     /// Unregisters an incomplete observer and returns its detached waker.
@@ -395,11 +405,13 @@ impl ManualTimeDomain {
     /// The waiter poll state and detached waker.
     #[must_use = "the poll state and detached waker must both be handled"]
     pub(crate) fn poll_timer_waiter(&self, waiter_id: u64, context: &Context<'_>) -> (Poll<()>, Option<Waker>) {
+        let mut candidate = Some(context.waker().clone());
         let result = {
             let mut state = self.lock_state();
             let elapsed = state.elapsed;
-            state.waiters.poll_timer(waiter_id, elapsed, context)
+            state.waiters.poll_timer(waiter_id, elapsed, &mut candidate)
         };
+        drop(candidate);
         let (poll, _) = result;
         if poll.is_ready() {
             self.notify_waiters_changed();

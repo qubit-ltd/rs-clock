@@ -8,7 +8,6 @@
 //! Stores deadline waiters and waiter-count observers for a manual clock.
 
 use std::collections::HashMap;
-use std::task::Context;
 use std::task::Poll;
 use std::task::Waker;
 use std::time::Duration;
@@ -43,6 +42,10 @@ fn allocate_identifier(next_identifier: &mut u64, exhausted_message: &str) -> u6
 }
 
 /// Waiters registered against one manual monotonic timeline.
+///
+/// Every poll requires a present candidate cloned by the caller before the
+/// state lock is acquired. This registry only compares or takes that value; it
+/// never clones, wakes, or drops a Waker under the caller's lock.
 pub(crate) struct ManualWaiterRegistry {
     /// Next identifier assigned to a timer waiter.
     next_timer_waiter_id: u64,
@@ -245,22 +248,34 @@ impl ManualWaiterRegistry {
     /// # Parameters
     ///
     /// * `observer_id` - Identifier of the observer to poll.
-    /// * `context` - Task context whose waker is retained while pending.
+    /// * `candidate` - A present Waker cloned before the caller acquired its
+    ///   state lock. The registry may take it when replacing a registration; an
+    ///   unconsumed candidate remains caller-owned and must be dropped after
+    ///   unlocking.
     ///
     /// # Returns
     ///
     /// The observer poll state and any replaced or removed waker that the
     /// caller must destroy after releasing the clock state lock.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `candidate` is `None`.
     #[must_use = "the poll state and detached waker must both be handled"]
-    pub(crate) fn poll_observer(&mut self, observer_id: u64, context: &Context<'_>) -> (Poll<()>, Option<Waker>) {
+    pub(crate) fn poll_observer(
+        &mut self,
+        observer_id: u64,
+        candidate: &mut Option<Waker>,
+    ) -> (Poll<()>, Option<Waker>) {
         let Some((_, registered_waker)) = self.count_observers.get_mut(&observer_id) else {
             return (Poll::Ready(()), None);
         };
+        let candidate_waker = candidate.as_ref().expect("poll candidate must be present");
         let replaced_waker = if registered_waker
             .as_ref()
-            .is_none_or(|waker| !waker.will_wake(context.waker()))
+            .is_none_or(|waker| !waker.will_wake(candidate_waker))
         {
-            registered_waker.replace(context.waker().clone())
+            registered_waker.replace(candidate.take().expect("poll candidate must be present"))
         } else {
             None
         };
@@ -273,7 +288,10 @@ impl ManualWaiterRegistry {
     ///
     /// * `observer_id` - Identifier of the deadline observer to poll.
     /// * `elapsed` - Current elapsed duration used to exclude due waiters.
-    /// * `context` - Task context whose waker is retained while pending.
+    /// * `candidate` - A present Waker cloned before the caller acquired its
+    ///   state lock. The registry may take it when replacing a registration; an
+    ///   unconsumed candidate remains caller-owned and must be dropped after
+    ///   unlocking.
     ///
     /// # Returns
     ///
@@ -284,12 +302,16 @@ impl ManualWaiterRegistry {
     ///
     /// Panics if the identifier is missing or does not identify a deadline
     /// observer.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `candidate` is `None` or the observer identifier is invalid.
     #[must_use = "the poll state and detached waker must both be handled"]
     pub(crate) fn poll_deadline_observer(
         &mut self,
         observer_id: u64,
         elapsed: Duration,
-        context: &Context<'_>,
+        candidate: &mut Option<Waker>,
     ) -> (Poll<Duration>, Option<Waker>) {
         if !self.deadline_observers.contains_key(&observer_id) {
             panic!("manual deadline observer {observer_id} is not registered");
@@ -301,11 +323,12 @@ impl ManualWaiterRegistry {
         let Some(registered_waker) = self.deadline_observers.get_mut(&observer_id) else {
             unreachable!("deadline observer existence was checked above");
         };
+        let candidate_waker = candidate.as_ref().expect("poll candidate must be present");
         let replaced_waker = if registered_waker
             .as_ref()
-            .is_none_or(|waker| !waker.will_wake(context.waker()))
+            .is_none_or(|waker| !waker.will_wake(candidate_waker))
         {
-            registered_waker.replace(context.waker().clone())
+            registered_waker.replace(candidate.take().expect("poll candidate must be present"))
         } else {
             None
         };
@@ -338,7 +361,10 @@ impl ManualWaiterRegistry {
     ///
     /// * `waiter_id` - Identifier of the registered timer waiter.
     /// * `elapsed` - Current elapsed duration of the manual clock.
-    /// * `context` - Task context whose waker is stored while pending.
+    /// * `candidate` - A present Waker cloned before the caller acquired its
+    ///   state lock. The registry may take it when replacing a registration; an
+    ///   unconsumed candidate remains caller-owned and must be dropped after
+    ///   unlocking.
     ///
     /// # Returns
     ///
@@ -347,13 +373,14 @@ impl ManualWaiterRegistry {
     ///
     /// # Panics
     ///
-    /// Panics if `waiter_id` no longer identifies a registered timer waiter.
+    /// Panics if `waiter_id` no longer identifies a registered timer waiter or
+    /// `candidate` is `None`.
     #[must_use = "the poll state and detached waker must both be handled"]
     pub(crate) fn poll_timer(
         &mut self,
         waiter_id: u64,
         elapsed: Duration,
-        context: &Context<'_>,
+        candidate: &mut Option<Waker>,
     ) -> (Poll<()>, Option<Waker>) {
         let Some(deadline) = self.timer_waiters.get_entry(&waiter_id).map(|entry| *entry.order()) else {
             panic!("manual timer waiter {waiter_id} is not registered");
@@ -363,11 +390,12 @@ impl ManualWaiterRegistry {
                 .timer_waiters
                 .get_mut(&waiter_id)
                 .expect("manual timer waiter must remain registered");
+            let candidate_waker = candidate.as_ref().expect("poll candidate must be present");
             let replaced_waker = if registered_waker
                 .as_ref()
-                .is_none_or(|waker| !waker.will_wake(context.waker()))
+                .is_none_or(|waker| !waker.will_wake(candidate_waker))
             {
-                registered_waker.replace(context.waker().clone())
+                registered_waker.replace(candidate.take().expect("poll candidate must be present"))
             } else {
                 None
             };

@@ -6,6 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Exposes the production manual waiter registry to external Loom models.
+//!
+//! The adapter creates candidates before entering the registry methods. Some
+//! models wrap this adapter in their own Loom mutex; such models cover registry
+//! state transitions only and do not model the production clock's lock boundary
+//! around arbitrary `RawWaker` callbacks.
 
 use std::task::Context;
 use std::task::Poll;
@@ -126,7 +131,10 @@ impl LoomManualWaiterRegistry {
         elapsed: Duration,
         context: &Context<'_>,
     ) -> (Poll<()>, Option<Waker>) {
-        self.inner.poll_timer(waiter_id, elapsed, context)
+        let mut candidate = Some(context.waker().clone());
+        let result = self.inner.poll_timer(waiter_id, elapsed, &mut candidate);
+        drop(candidate);
+        result
     }
 
     /// Polls one observer for the next future deadline.
@@ -155,7 +163,10 @@ impl LoomManualWaiterRegistry {
         elapsed: Duration,
         context: &Context<'_>,
     ) -> (Poll<Duration>, Option<Waker>) {
-        self.inner.poll_deadline_observer(observer_id, elapsed, context)
+        let mut candidate = Some(context.waker().clone());
+        let result = self.inner.poll_deadline_observer(observer_id, elapsed, &mut candidate);
+        drop(candidate);
+        result
     }
 
     /// Takes Wakers belonging to timer waiters due at `elapsed`.
