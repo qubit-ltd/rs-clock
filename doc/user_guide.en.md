@@ -152,6 +152,15 @@ executor-neutral and do not require this feature.
 
 ## Using `Timer`
 
+The runnable example below is a complete `src/main.rs`. For a normal
+application, add these direct dependencies to `Cargo.toml`:
+
+```toml
+[dependencies]
+qubit-clock = "0.13"
+tokio = { version = "1", features = ["macros", "rt"] }
+```
+
 Every monotonic clock creates a same-domain timer without consuming the clock:
 
 ```rust
@@ -188,6 +197,14 @@ Both types retain a Tokio runtime `Handle`. `current()` and `try_current()`
 capture the ambient handle during construction; `try_current()` returns
 `TokioRuntimeError::NotEntered` when there is no ambient runtime. Prefer
 `from_handle(handle)` at dependency-injection boundaries:
+
+The example is a complete `src/main.rs`. Its direct dependencies are:
+
+```toml
+[dependencies]
+qubit-clock = { version = "0.13", features = ["tokio"] }
+tokio = { version = "1", features = ["rt", "time"] }
+```
 
 ```rust
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -247,13 +264,26 @@ component under test:
 
 Manual timers and their coordination futures are executor-neutral and do not
 require the `qubit-clock/tokio` feature. The examples in this section choose
-Tokio only to run, spawn, and select tasks. To run them in tests, declare Tokio
-as a direct development dependency:
+Tokio only to run, spawn, and select tasks. They are complete `src/main.rs`
+programs; for an application, use these direct dependencies:
+
+```toml
+[dependencies]
+qubit-clock = "0.13"
+tokio = { version = "1", features = ["macros", "rt"] }
+```
+
+When placing an example in `tests/` or `examples/`, Tokio may instead be a
+development dependency. A `src/main.rs` binary cannot use `dev-dependencies`:
 
 ```toml
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt", "time"] }
+tokio = { version = "1", features = ["macros", "rt"] }
 ```
+
+Manual-time examples need no Tokio time driver. If the same target also runs a
+`TokioTimer` example, add Tokio's `time` feature as shown in the Tokio timer
+section.
 
 Deterministic manual time controls logical time, deadline selection, and
 deadline completion. It does not define the wake order of waiters sharing one

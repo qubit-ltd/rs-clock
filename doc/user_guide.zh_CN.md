@@ -132,6 +132,14 @@ qubit-clock = { version = "0.13", features = ["tokio"] }
 
 ## 使用 `Timer`
 
+下面的可运行示例是完整的 `src/main.rs`。普通应用请在 `Cargo.toml` 中添加以下直接依赖：
+
+```toml
+[dependencies]
+qubit-clock = "0.13"
+tokio = { version = "1", features = ["macros", "rt"] }
+```
+
 每种单调时钟都能直接创建同域定时器，而且创建定时器后仍可继续使用原时钟：
 
 ```rust
@@ -165,6 +173,14 @@ async fn main() -> Result<(), qubit_clock::TimeError> {
 线程未进入 Tokio 运行时时，`try_current()` 返回
 `TokioRuntimeError::NotEntered`。在 IoC 组装边界应优先使用
 `from_handle(handle)`：
+
+下面是完整的 `src/main.rs` 示例。它需要以下直接依赖：
+
+```toml
+[dependencies]
+qubit-clock = { version = "0.13", features = ["tokio"] }
+tokio = { version = "1", features = ["rt", "time"] }
+```
 
 ```rust
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -214,13 +230,25 @@ Tokio 当前没有公开 API 可查询 `Handle` 是否带有时间驱动；它�
 测试应保留手动时钟作为时间控制面，并把它创建的定时器注入被测组件。
 
 手动定时器及其协调 Future 不绑定执行器，也不需要启用 `qubit-clock/tokio`
-feature。本节只使用 Tokio 运行、派生和选择任务；在测试中运行这些示例时，需要直接
-声明 Tokio 开发依赖：
+feature。本节只使用 Tokio 运行、派生和选择任务。以下示例是完整的 `src/main.rs`
+程序，普通应用应使用直接依赖：
+
+```toml
+[dependencies]
+qubit-clock = "0.13"
+tokio = { version = "1", features = ["macros", "rt"] }
+```
+
+将示例放入 `tests/` 或 `examples/` 时，也可以把 Tokio 声明为开发依赖。
+`src/main.rs` 二进制不能使用 `dev-dependencies`：
 
 ```toml
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt", "time"] }
+tokio = { version = "1", features = ["macros", "rt"] }
 ```
+
+手动时间示例不需要 Tokio 时间驱动。如果同一目标还运行 `TokioTimer` 示例，需按
+Tokio Timer 章节所示为 Tokio 增加 `time` feature。
 
 确定性手动时间可以控制逻辑时间、截止时间的选择和到达，但不规定同一截止时间上多个
 等待者的唤醒顺序，也不规定执行器轮询就绪任务的顺序。

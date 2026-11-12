@@ -204,6 +204,14 @@ fn test_clone_panic_leaves_manual_and_standard_timer_waiters_usable() {
         let _ = standard.as_mut().poll(&mut panic_context);
     }));
     assert!(panicked.is_err());
-    std::thread::sleep(Duration::from_millis(30));
-    assert!(standard.as_mut().poll(&mut context).is_ready());
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("test runtime should build");
+    runtime
+        .block_on(async {
+            tokio::time::timeout(Duration::from_secs(10), standard).await
+        })
+        .expect("standard timer should complete within the test guard")
+        .expect("standard timer should remain usable after clone panic");
 }
