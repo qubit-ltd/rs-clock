@@ -68,12 +68,12 @@ impl TokioRuntimeLivenessRegistry {
                 .entries
                 .lock()
                 .expect("Tokio runtime-liveness registry lock should not be poisoned");
-            entries.retain(|_, liveness| liveness.strong_count() != 0);
             if let Some(liveness) = entries.get(&runtime_id).and_then(Weak::upgrade)
                 && !liveness.is_shutdown()
             {
                 return liveness;
             }
+            entries.retain(|_, liveness| liveness.strong_count() != 0);
             let (liveness, release_notification) = TokioRuntimeLiveness::new();
             let liveness = Arc::new(liveness);
             entries.insert(runtime_id, Arc::downgrade(&liveness));

@@ -273,6 +273,95 @@ fn many_timer_resident_task_increase(timer_count: usize) -> usize {
     resident_tasks
 }
 
+/// Keeps runtime liveness entries active while measuring future registrations.
+struct RuntimeRegistrySetup {
+    /// Runtimes whose liveness sentinels remain alive.
+    runtimes: Vec<Runtime>,
+    /// Pending deadlines retaining each runtime's liveness sentinel.
+    _sentinels: Vec<TimerFuture>,
+}
+
+/// Creates `runtime_count` live current-thread runtimes without timing startup.
+fn runtime_registry_setup(runtime_count: usize) -> RuntimeRegistrySetup {
+    let mut runtimes = Vec::with_capacity(runtime_count);
+    let mut sentinels = Vec::with_capacity(runtime_count);
+    for _ in 0..runtime_count {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("registry benchmark runtime should build");
+        let sentinel = {
+            let _runtime_guard = runtime.enter();
+            TokioTimer::from_handle(runtime.handle().clone())
+                .after(CANCELLATION_DEADLINE)
+                .expect("sentinel deadline should register")
+        };
+        runtimes.push(runtime);
+        sentinels.push(sentinel);
+    }
+    RuntimeRegistrySetup {
+        runtimes,
+        _sentinels: sentinels,
+    }
+}
+
+/// Registers and cancels one fresh Timer on an existing runtime.
+fn register_and_cancel_fresh_timer(runtime: &Runtime) {
+    let _runtime_guard = runtime.enter();
+    let timer = TokioTimer::from_handle(runtime.handle().clone());
+    let future = timer.after(CANCELLATION_DEADLINE).expect("deadline should register");
+    drop(future);
+    drop(timer);
+}
+
+/// Benchmarks first registration on a runtime while unrelated live runtimes
+/// keep weak liveness entries in the registry.
+fn benchmark_runtime_registry(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("tokio_timer/runtime_liveness_registry_first_registration");
+    for runtime_count in [1_usize, 8, 64, 256] {
+        let setup = runtime_registry_setup(runtime_count);
+        let target = &setup.runtimes[0];
+        group.bench_function(BenchmarkId::new("single_caller", runtime_count), |bencher| {
+            bencher.iter_custom(|iterations| {
+                let mut elapsed = Duration::ZERO;
+                for _ in 0..iterations {
+                    let start = std::time::Instant::now();
+                    register_and_cancel_fresh_timer(target);
+                    elapsed += start.elapsed();
+                    target.block_on(tokio::task::yield_now());
+                }
+                elapsed
+            });
+        });
+        if runtime_count >= 8 {
+            let handle = target.handle().clone();
+            group.bench_function(BenchmarkId::new("four_callers", runtime_count), |bencher| {
+                bencher.iter_custom(|iterations| {
+                    let start = std::time::Instant::now();
+                    std::thread::scope(|scope| {
+                        for _ in 0..4 {
+                            let handle = handle.clone();
+                            scope.spawn(move || {
+                                for _ in 0..iterations {
+                                    let _runtime_guard = handle.enter();
+                                    let timer = TokioTimer::from_handle(handle.clone());
+                                    let future = timer.after(CANCELLATION_DEADLINE).expect("deadline should register");
+                                    drop(future);
+                                    drop(timer);
+                                }
+                            });
+                        }
+                    });
+                    target.block_on(tokio::task::yield_now());
+                    start.elapsed()
+                });
+            });
+        }
+        drop(setup);
+    }
+    group.finish();
+}
+
 /// Benchmarks Tokio Timer behavior affected by task-backed scheduling.
 ///
 /// # Parameters
@@ -442,6 +531,6 @@ criterion_group! {
         .sample_size(10)
         .warm_up_time(Duration::from_secs(1))
         .measurement_time(Duration::from_secs(2));
-    targets = benchmark_tokio_timer
+    targets = benchmark_tokio_timer, benchmark_runtime_registry
 }
 criterion_main!(benches);
